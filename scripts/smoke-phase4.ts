@@ -171,7 +171,8 @@ async function main() {
   check(invB.results[0].status === "invited", "org B invites a person who is also org A's candidate");
   const [aName] = await q<{ name: string }>("select cand.name from candidacies c join candidates cand on cand.id = c.candidate_id where c.id = $1", [cand.id]);
   check(aName.name === candA.name, "org A's candidate record (name) is untouched by org B's invite");
-  check((await q("select 1 from candidates where email = $1", [candA.email])).length === 2, "the same email exists as two org-scoped candidate records");
+  const [same] = await q<{ n: number; orgs: number }>("select count(*)::int n, count(distinct org_id)::int orgs from candidates where email = $1", [candA.email]);
+  check(same.n >= 2 && same.n === same.orgs, "the same email exists as separate candidate records, one per organisation");
   const hubB = await fetch(`${BASE}/c/${invB.results[0].link.split("/c/")[1]}`).then((r) => r.text());
   check(hubB.includes("Acme Robotics") && hubB.includes("Acme Backend Engineer"), "org B's candidate sees org B's company name");
 
@@ -218,12 +219,43 @@ async function main() {
   await platform.json("PUT", `/api/platform/orgs/${orgB.id}`, { status: "active" });
   check((await new Client().login(adminB.email, adminB.password)).status === 200, "reactivated organisation's admin can sign in again");
 
-  // Clean up org A fixtures created here.
+  /* ---------------------------- HR knowledge base search ---------------------------- */
+  const filler = Array.from({ length: 250 }, (_, i) => `Section ${i}. General workplace guidance number ${i} covers conduct, equipment care, meeting etiquette and travel booking basics for staff.`).join("\n\n");
+  const policy = `${filler}\n\nRelocation assistance: employees moving cities for the role receive a one-time relocation allowance of INR 50,000 and two weeks of company housing.\n\n${filler}`;
+  await b.json("POST", "/api/settings/kb", { title: "Acme Employee Handbook", content: policy });
+  await b.json("POST", "/api/settings/kb", { title: "छुट्टी नीति", content: "वार्षिक छुट्टी: हर कर्मचारी को साल में 18 दिन की वार्षिक छुट्टी मिलती है।" });
+  const [{ n: chunksB }] = await q<{ n: number }>("select count(*)::int n from kb_chunks where org_id = $1", [orgB.id]);
+  check(chunksB > 5, `large KB document is indexed into passages (${chunksB})`);
+  const hit = await b.json<{ passages: { title: string; content: string }[] }>("GET", `/api/settings/kb/search?q=${encodeURIComponent("Is there any relocation assistance if I move cities?")}`);
+  check(hit.passages[0]?.content.includes("INR 50,000") && hit.passages[0].title === "Acme Employee Handbook", "KB search returns the relocation passage first");
+  const hi = await b.json<{ passages: { title: string }[] }>("GET", `/api/settings/kb/search?q=${encodeURIComponent("वार्षिक छुट्टी कितनी है?")}`);
+  check(hi.passages[0]?.title === "छुट्टी नीति", "KB search works for Hindi questions");
+  const none = await b.json<{ passages: unknown[] }>("GET", `/api/settings/kb/search?q=${encodeURIComponent("stock options vesting cliff")}`);
+  check(none.passages.length === 0, "KB search returns nothing for an unrelated question");
+  const crossKb = await platform.json<{ passages: { title: string }[] }>("GET", `/api/settings/kb/search?q=${encodeURIComponent("relocation assistance")}`);
+  check(!crossKb.passages.some((p) => p.title === "Acme Employee Handbook"), "org A's KB search never returns org B's documents");
+  const kbPage = await b.req("GET", "/app/settings");
+  check(kbPage.text.includes("search mode"), "settings shows the KB is in search mode");
+
+  /* ------------------------------ whiteboard in export ------------------------------ */
+  const [wb] = await q<{ id: string }>(
+    "select c.id from candidacies c join round_sessions s on s.candidacy_id = c.id join exercise_responses e on e.session_id = s.id where c.org_id = $1 and e.whiteboard_png is not null and jsonb_array_length(e.whiteboard) > 0 order by c.created_at desc limit 1",
+    [orgA],
+  );
+  if (wb) {
+    const named = await platform.req("GET", `/print/candidates/${wb.id}`);
+    check(named.status === 200 && named.text.includes("System-design whiteboard (candidate"), "print export includes the system-design whiteboard");
+    const maskedPrint = await platform.req("GET", `/print/candidates/${wb.id}?masked=1`);
+    check(maskedPrint.text.includes("whiteboard omitted from the identity-masked export") && !maskedPrint.text.includes("data:image/png"), "identity-masked export leaves the drawing out");
+  }
+
+  // Clean up fixtures created here (the example.com webhooks would otherwise keep retrying).
+  await b.json("DELETE", `/api/settings/webhooks/${hookB.id}`);
   await platform.json("DELETE", `/api/settings/webhooks/${hookA.id}`);
   await platform.json("DELETE", `/api/settings/api-keys/${keyA.id}`);
   await platform.json("DELETE", `/api/share/${share.id}`);
   await db.end();
-  console.log(`\nPHASE 4 TENANCY CHECKS PASSED (${passed} checks)\norg B: ${orgB.id}`);
+  console.log(`\nPHASE 4 TENANCY CHECKS PASSED (${passed} checks)\norg B: ${orgB.id}\nORG_B_ADMIN_EMAIL=${adminB.email} ORG_B_ADMIN_PASSWORD=${adminB.password}`);
 }
 
 main().catch((e) => {

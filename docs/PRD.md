@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Product** | HBE Interview: an AI-powered, multi-round interview platform |
-| **Document status** | v1.4 — approved; Phases 1, 2 and 3 built |
+| **Document status** | v1.5 — approved; Phases 1–4 built |
 | **Date** | 2026-10-16 |
 | **Owner** | Product Architect / Product Owner |
 | **Companion documents** | [FEATURES.md](FEATURES.md) (detailed feature specification) · [ARCHITECTURE.md](ARCHITECTURE.md) (detailed technical architecture) |
@@ -12,6 +12,7 @@
 
 | Version | Date | Change |
 |---|---|---|
+| 1.5 | 2026-10-16 | Phase 4 built — the deferred decisions §11-3 and §11-8: **multiple organisations** (tenant isolation on every page, API, webhook and job; per-org settings, values, consent, KB, users, API keys, webhooks, retention and usage; platform console to create/suspend organisations, switch into them and set AI budget alerts; platform-wide model settings), **AWS Lambda code executor** (SigV4 Invoke, container image, isolated-VPC CloudFormation template; Judge0 remains the default), **HR knowledge-base search** for large policy sets (Postgres full-text passages per question), whiteboard in the PDF export |
 | 1.4 | 2026-10-16 | Phase 3 built: multilingual interviews (12 languages), OCR for scanned/image resumes, GitLab and Bitbucket repositories, system-design whiteboard, opt-in webcam presence proctoring, REST API with scoped API keys, HMAC-signed webhooks, candidate experience survey, recruiter-released candidate feedback, fairness monitor on process cohorts. Identity verification / face matching deliberately not built (biometric data); demographic bias audits require consented external data |
 | 1.0 | 2026-10-16 | Initial draft: resume parsing, GitHub validation, AI interview, live coding, scorecard |
 | 1.3 | 2026-10-16 | Phase 2 built: analytics, AI usage/cost, candidate comparison, PDF export, expiring share links, code replay, prioritisation exercise, inline snippet editor, AI-generated answer flags, template library, CSV invites, reminders, custom coding problems, model admin, hiring-manager drive assignment. Private repositories remain out of scope (decision §11-4) |
@@ -450,6 +451,7 @@ Diagrams, component design, the interview state machine, data model, API specifi
 | **Phase 1 — MVP** | All P0 items: drives with the round pipeline, onboarding, resume parsing, public GitHub validation, Technical Round with live coding and system design, **Managerial Round** with written case, **HR Round** with practical fit and policy Q&A, round and combined reports, gating, dashboard and pipeline board, integrity signals, PII masking |
 | **Phase 2 — built (v1.3)** | P1 items: bulk CSV invites and reminders (B-2), code replay (F-6), inline snippet editor (F-8), prioritisation exercise (G-8), PDF export and share links (I-8), comparison (J-6), analytics (J-7), template library (A-9), custom coding problems (A-8), AI-generated answer flags (K-3), cross-round contradictions in the combined report (K-5), usage metering (L-3), model admin (L-4), hiring-manager drive assignment. Voice moved to Phase 1. Private repositories (D-3) deferred per decision §11-4 |
 | **Phase 3 — built (v1.4)** | P2 items: multilingual interviews, OCR, whiteboard, GitLab/Bitbucket, opt-in webcam presence proctoring, REST API + signed webhooks for ATS/HRMS, candidate survey and released feedback, fairness monitor (process cohorts, four-fifths rule). Not built by design: face matching / identity verification (biometric data under DPDP/GDPR), demographic bias audits (no protected data is collected). Still deferred: private repositories (§11-4), multiple organisations (§11-8) — see FEATURES §18.8 |
+| **Phase 4 — built (v1.5)** | Deferred decisions delivered: multiple organisations with a platform console (§11-8), AWS Lambda code execution (§11-3), HR knowledge-base search for large policy sets, whiteboard in PDF export. Still out of scope: private repositories (§11-4), identity verification, demographic bias audits |
 
 ### 10.1 Phase 1 build milestones
 
@@ -471,12 +473,12 @@ Diagrams, component design, the interview state machine, data model, API specifi
 |---|---|---|
 | 1 | Interview modality | **Text and voice** in the MVP (voice via the browser Web Speech API; transcripts are editable and evaluated) |
 | 2 | Tech stack | Next.js + Render + Claude API + Judge0, with **Neon Postgres** instead of Supabase |
-| 3 | Code execution | **Judge0** now; migrate to an AWS-hosted sandbox later (executor is pluggable) |
+| 3 | Code execution | **Judge0** now; migrate to an AWS-hosted sandbox later (executor is pluggable). *Phase 4: AWS Lambda executor built and selectable with `CODE_EXECUTOR=aws-lambda`; Judge0 stays the default until it is deployed.* |
 | 4 | Repositories | **Public GitHub repositories only** |
 | 5 | Rubrics | Approved as written (§6), including knockouts and bands |
 | 6 | Round order | **Technical → Managerial (if applicable) → HR last**; staged mode with auto-advance at "Hire" as the default |
 | 7 | Compensation | Skipped: the HR round does not ask about compensation by default (org-level toggle available; salary history never asked) |
-| 8 | Tenancy | **Single internal tool now**; multi-tenant later |
+| 8 | Tenancy | **Single internal tool now**; multi-tenant later. *Phase 4: multiple organisations built; existing data lives in the default organisation and existing admins became platform admins.* |
 | 9 | Branding | Keep **"HBE Interview"** |
 | 10 | Scope | **Full working version** of all P0 modules |
 

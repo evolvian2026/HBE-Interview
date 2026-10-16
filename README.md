@@ -20,6 +20,7 @@ An AI-powered, multi-round interview platform. Candidates upload a resume, link 
 | Fairness & compliance | Protected-topic guardrails + HR compliance filter, integrity signals as context only, retention-based deletion, data deletion on request, salary history never asked (compensation off by default) |
 | Phase 2 | Drive analytics, AI usage & cost, side-by-side comparison, PDF export (named / masked / with transcripts), expiring passcode-protected share links, code replay, drag-and-drop prioritisation exercise, inline snippet editor, AI-generated answer flags, template library, CSV invites, expiry reminders, custom coding problems validated by a reference solution, per-stage model overrides, re-evaluation, hiring-manager drive assignment |
 | Phase 3 | Interviews in 12 languages (incl. Hindi, Tamil, Arabic; voice locales), OCR for scanned/photo resumes, GitLab & Bitbucket repos, system-design whiteboard seen by the AI, opt-in webcam presence checks (no face recognition), REST API with scoped keys and HMAC-signed webhooks, post-round candidate survey, recruiter-released candidate feedback, fairness monitor on process cohorts (four-fifths rule) |
+| Phase 4 | **Multiple organisations** with full data isolation (per-org settings, values, consent, KB, users, API keys, webhooks, retention, usage); **platform console** to create, enter and suspend organisations, set AI budget alerts and platform-wide models; **AWS Lambda code executor** (isolated VPC, CloudFormation template); **HR knowledge-base search** for large policy sets; whiteboard in PDF export |
 | Recruiter app | Drives list, drive editor, candidate table with round/final scores, practical fit and integrity, decisions queue, full candidate report with transcripts, code and repo analysis, notes, settings (company values, HR knowledge base, consent, retention, users & roles) |
 
 ## Tech stack
@@ -47,9 +48,10 @@ npm run dev                   # http://localhost:3000 → sign in with the admin
 | `DATABASE_URL` | Neon connection string. Use the **direct** endpoint (host without `-pooler`) with `sslmode=require` — the interview engine uses session-level advisory locks |
 | `APP_BASE_URL` | Public URL, used in candidate links and emails |
 | `SESSION_SECRET` | ≥ 32 random characters for signing staff sessions |
-| `ADMIN_EMAIL`, `ADMIN_PASSWORD` | First admin, created on first boot / `db:seed` if no users exist |
+| `ADMIN_EMAIL`, `ADMIN_PASSWORD` | First admin — a **platform admin** of the default organisation — created on first boot / `db:seed` if no users exist |
 | `ANTHROPIC_API_KEY` | Claude API key. Optional overrides: `AI_MODEL_INTERVIEWER`, `AI_MODEL_ANALYZER`, `AI_MODEL_EVALUATOR`, `AI_MODEL_UTILITY`, `AI_INTERVIEWER_EFFORT`, `AI_FALLBACKS` |
-| `CODE_EXECUTOR` | `judge0` (default) or `local-dev` |
+| `CODE_EXECUTOR` | `judge0` (default), `aws-lambda` (see [infra/aws-executor](infra/aws-executor/README.md)) or `local-dev` |
+| `AWS_REGION`, `AWS_LAMBDA_FUNCTION`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` | AWS Lambda executor only: region, function name/ARN and the invoke-only user's key (optional `AWS_SESSION_TOKEN`, `AWS_LAMBDA_ENDPOINT`) |
 | `JUDGE0_URL`, `JUDGE0_API_KEY`, `JUDGE0_RAPIDAPI_HOST` | Judge0 CE (RapidAPI-hosted by default; leave the host empty for self-hosted with `X-Auth-Token`). `JUDGE0_LANGUAGE_IDS` overrides language ids, e.g. `{"python":92}` |
 | `GITHUB_TOKEN` | Optional; raises GitHub's rate limit (public repos only; GitLab and Bitbucket public APIs need no token) |
 | `RUN_WORKER_IN_PROCESS` | `true` (default) runs background jobs inside the web server; set `false` and run `npm run worker` separately to scale them out |
@@ -72,6 +74,9 @@ npm run smoke:phase2 # analytics, usage, compare, print, share links, custom pro
 npm run smoke:phase3 # API keys + REST v1, signed webhooks (local receiver), Hindi round, OCR, GitLab, whiteboard, webcam presence, survey, released feedback, fairness
 npm run ui-check     # browser walkthrough with screenshots (Playwright; set CHROMIUM_PATH, CANDIDATE_LINK, RESUME_PATH)
 P3_DRIVE_ID=… P3_CANDIDACY_ID=… npm run ui-check:phase3   # whiteboard, language lobby, integrations, fairness (IDs printed by smoke:phase3)
+npm run smoke:phase4 # multi-tenancy: a second organisation is denied every page/API of the first; per-org data, keys, webhooks; switching; suspension; KB search; export
+npm run ui-check:phase4  # platform console, acting-in-organisation banner, KB search preview
+npm run check:aws-executor   # AWS Lambda executor through the app's client (needs the AWS_* variables)
 ```
 
 ## How it works (short)
@@ -82,3 +87,4 @@ P3_DRIVE_ID=… P3_CANDIDACY_ID=… npm run ui-check:phase3   # whiteboard, lang
 4. When a round ends, the **evaluator** scores each parameter twice (a third time on disagreement), verifies every evidence quote against the transcript or code, applies knockouts and computes the round score; the **gate** auto-advances or waits for the recruiter.
 5. After the last round, the **combined report** weights rounds by seniority and lists focus areas for the human panel. Recruiters can override any parameter with a reason.
 6. **Integrations** (Settings → Integrations): ATS/HRIS systems call `/api/v1` with a scoped API key and receive signed webhooks for invites, round completion/evaluation, gate decisions and final results — see [docs/API.md](docs/API.md).
+7. **Organisations** (platform admins → Platform): each organisation is a separate tenant with its own drives, candidates, users, settings, knowledge base, keys and webhooks. Platform admins create organisations with a first admin, can step into one to help, suspend it, and set a monthly AI budget alert.

@@ -1,3 +1,4 @@
+import { searchKb } from "../services/kb";
 import { and, desc, eq, gt, sql } from "drizzle-orm";
 import { db, pool, schema } from "../db";
 import { HttpError } from "../auth/staff";
@@ -362,6 +363,11 @@ export async function handleTurn(
     const exerciseText = await exerciseStateForModel({ ...ctx, state }, state);
     const buffer = ctx.round.type === "hr";
     const board = await whiteboardImage(sessionId, state);
+    let passages = "";
+    if (ctx.round.type === "hr" && ctx.kbMode === "retrieval" && lastCandidate) {
+      const hits = await searchKb(ctx.candidacy.orgId, lastCandidate.content);
+      passages = `<policy_passages>\n${hits.length ? hits.map((h) => `[${h.title}]\n${h.content}`).join("\n---\n") : "(no matching passages)"}\n</policy_passages>`;
+    }
     let text = await runInterviewerTurn(
       {
         sessionId,
@@ -376,7 +382,7 @@ export async function handleTurn(
         roleBlock: roleBlock({ ...ctx, state }),
         dossierBlock: dossierBlock({ ...ctx, state }),
         history,
-        liveState: liveStateText({ ...ctx, session: { ...ctx.session, deadlineAt } }, state, now, instruction, [exerciseNote ? `Exercise just opened: ${exerciseNote}` : "", exerciseText].filter(Boolean).join("\n"), pool),
+        liveState: liveStateText({ ...ctx, session: { ...ctx.session, deadlineAt } }, state, now, instruction, [exerciseNote ? `Exercise just opened: ${exerciseNote}` : "", exerciseText, passages].filter(Boolean).join("\n"), pool),
         mock: {
           sectionKey: sec?.key ?? "",
           sectionParam: sectionGuide(ctx.round.type, sec?.key ?? "", false).param,

@@ -19,10 +19,4 @@ export async function orgOfCandidacy(candidacyId: string) {
   return c?.orgId ?? null;
 }
 
-export const slugify = (s: string) =>
-  s
-    .toLowerCase()
-    .normalize("NFKD")
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .slice(0, 40);
+export { slugify } from "./core/slug";

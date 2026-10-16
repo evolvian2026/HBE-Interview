@@ -1,0 +1,97 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >
+  HBE Interview code executor. Runs candidate code in a Lambda container inside a VPC with no internet
+  route and no egress rules, with bounded memory, timeout and concurrency.
+
+Parameters:
+  ImageUri:
+    Type: String
+    Description: ECR image URI of infra/aws-executor/Dockerfile (e.g. 123456789012.dkr.ecr.ap-south-1.amazonaws.com/hbe-executor:1)
+  MemorySize:
+    Type: Number
+    Default: 1024
+    MinValue: 512
+    MaxValue: 3008
+  ReservedConcurrency:
+    Type: Number
+    Default: 20
+    Description: Upper bound on parallel runs (also caps cost)
+
+Resources:
+  # Isolated network: private subnet, no internet gateway, no NAT, no VPC endpoints.
+  Vpc:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: 10.42.0.0/24
+      EnableDnsSupport: false
+      EnableDnsHostnames: false
+      Tags: [{ Key: Name, Value: hbe-executor-isolated }]
+  SubnetA:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref Vpc
+      CidrBlock: 10.42.0.0/25
+      AvailabilityZone: !Select [0, !GetAZs ""]
+  SubnetB:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref Vpc
+      CidrBlock: 10.42.0.128/25
+      AvailabilityZone: !Select [1, !GetAZs ""]
+  NoEgress:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: HBE executor - no inbound, no outbound
+      VpcId: !Ref Vpc
+      SecurityGroupEgress:
+        - IpProtocol: "-1"
+          CidrIp: 127.0.0.1/32
+          Description: Placeholder rule that removes the default allow-all egress
+
+  ExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal: { Service: lambda.amazonaws.com }
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole
+
+  Executor:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: hbe-executor
+      PackageType: Image
+      Code: { ImageUri: !Ref ImageUri }
+      Role: !GetAtt ExecutionRole.Arn
+      MemorySize: !Ref MemorySize
+      Timeout: 60
+      EphemeralStorage: { Size: 1024 }
+      ReservedConcurrentExecutions: !Ref ReservedConcurrency
+      VpcConfig:
+        SubnetIds: [!Ref SubnetA, !Ref SubnetB]
+        SecurityGroupIds: [!Ref NoEgress]
+
+  # Least-privilege identity for the HBE Interview web service: may only invoke this function.
+  InvokerUser:
+    Type: AWS::IAM::User
+    Properties:
+      Policies:
+        - PolicyName: invoke-hbe-executor
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action: lambda:InvokeFunction
+                Resource: !GetAtt Executor.Arn
+
+Outputs:
+  FunctionName:
+    Value: !Ref Executor
+    Description: Set AWS_LAMBDA_FUNCTION to this value
+  InvokerUserName:
+    Value: !Ref InvokerUser
+    Description: Create an access key for this user and set AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY on the web service

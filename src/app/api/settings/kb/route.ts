@@ -3,6 +3,7 @@ import { db, schema } from "@/lib/db";
 import { requireStaff } from "@/lib/auth/staff";
 import { handle, json } from "@/lib/http";
 import { extractResumeText } from "@/lib/parse";
+import { indexKbDocument } from "@/lib/services/kb";
 
 const Body = z.object({ title: z.string().trim().min(1).max(200), content: z.string().trim().min(1).max(200_000) });
 
@@ -22,5 +23,6 @@ export const POST = handle(async (req: Request) => {
     ({ title, content } = Body.parse(await req.json()));
   }
   const [d] = await db.insert(schema.kbDocuments).values({ orgId: user.orgId, title, content: content.slice(0, 200_000) }).returning();
+  await indexKbDocument(d);
   return json({ id: d.id });
 });

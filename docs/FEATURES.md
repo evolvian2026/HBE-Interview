@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Document status** | v1.4 — approved; Phases 1–3 built (as-built notes: ARCHITECTURE §0; integration reference: [API.md](API.md)) |
+| **Document status** | v1.5 — approved; Phases 1–4 built (as-built notes: ARCHITECTURE §0; integration reference: [API.md](API.md)) |
 | **Date** | 2026-10-16 |
 | **Related** | [PRD.md](PRD.md) (product requirements) · [ARCHITECTURE.md](ARCHITECTURE.md) (technical architecture) |
 
@@ -30,6 +30,7 @@ This document specifies **how each feature behaves**: user stories, flows, scree
 16. [Global error states & edge cases](#16-global-error-states--edge-cases)
 17. [Phase 2 features (v1.3)](#17-phase-2-features-v13)
 18. [Phase 3 features (v1.4)](#18-phase-3-features-v14)
+19. [Phase 4 features (v1.5)](#19-phase-4-features-v15)
 
 ---
 
@@ -938,7 +939,55 @@ Candidates can request extra time (+25% or +50%) through a link on the consent s
 | Item | Why |
 |---|---|
 | Private repositories (D-3) | Decision §11-4 (public only) |
-| Multiple organisations / tenancy | Decision §11-8 (single internal tool for now) — the next platform step |
 | Vendor-specific ATS connectors (Greenhouse, Lever, Darwinbox…) | Covered generically by the REST API and webhooks |
 | Identity verification / face matching | Biometric data; see 18.5 |
-| AWS code execution | Judge0 now, AWS later (decision §11-3) |
+
+*(Multiple organisations and AWS code execution, listed above in earlier versions, were delivered in Phase 4 — §19.)*
+
+---
+
+## 19. Phase 4 features (v1.5)
+
+### 19.1 Multiple organisations
+
+- **Model:** every hiring drive, candidate, user, setting (company profile, values, consent, retention, compensation toggle), HR knowledge-base document, API key and webhook belongs to one organisation. The same person applying to two organisations is two separate candidate records; neither organisation can see the other's.
+- **Staff:** users belong to one organisation and see only its data — drive lists, decisions queue, candidate pages, exports, analytics, fairness, usage, settings and integrations. Opening another organisation's link shows *not found*. The header shows the organisation name.
+- **Candidates:** links (personal, open-application, share) work unchanged; the candidate sees their hiring organisation's name, values, consent text and policies.
+- **Existing data:** migrated into the *default* organisation; existing admins became **platform admins**.
+- **Acceptance:** an admin of organisation B gets 404/403 for every page and API of organisation A (drives, candidates, reports, shares, problems, proctor images, KB, users, webhooks, keys, platform), and nothing in A changes (`scripts/smoke-phase4.ts`, 87 checks).
+
+### 19.2 Platform console (platform admins)
+
+- **Platform** page: every organisation with users, drives, candidates, rounds in the last 30 days, estimated AI cost (30 days and month to date) and its monthly **AI budget alert**.
+- **Create organisation** (name, optional slug, first admin's name/email/temporary password) — the admin then signs in and sets up their company profile, values, consent and users.
+- **Enter** an organisation to act as its admin (amber banner: *You are acting as an administrator of …*, with *Return to your organisation*); entering is audited.
+- **Suspend / reactivate**: suspended organisations' staff can't sign in and their API keys stop working; candidates already in process are not cut off.
+- **AI models (all organisations):** the per-stage model and interviewer-effort overrides moved here from organisation settings.
+- **Budget alerts:** organisation admins see a banner at 80% and 100% of the monthly budget, and *AI usage* shows month-to-date spend vs budget. Interviews are never blocked.
+
+### 19.3 AWS Lambda code execution
+
+- Select with `CODE_EXECUTOR=aws-lambda`; Judge0 remains the default. Same languages (Python, JavaScript, Java, C++), same verdicts, same 3-second CPU limit per test, same sample/hidden test behaviour — candidates see no difference.
+- Isolation: a container in a VPC with no internet route and no outbound rules, bounded memory, timeout and concurrency; each run in a fresh directory in its own process group; after each run every stray process is killed and `/tmp` emptied.
+- Deployment: build the image (`infra/aws-executor/Dockerfile`), push to ECR, deploy `template.yaml`, create an access key for the stack's invoke-only user, set the environment variables, run `scripts/check-aws-executor.ts`. See `infra/aws-executor/README.md`.
+
+### 19.4 HR knowledge-base search
+
+- Knowledge bases up to ~60,000 characters are given to the HR interviewer whole (as before). Larger ones are split into passages and searched: for each candidate message the five most relevant passages are given to the interviewer, which answers only from them and cites the document; otherwise it logs the question for HR.
+- Works across languages (e.g. a Hindi policy answers a Hindi question).
+- **Settings → HR knowledge base → Try a candidate question** previews which passages would be used; the card says when the KB is in search mode.
+
+### 19.5 Whiteboard in exports
+
+- The PDF/print export includes the system-design whiteboard image. Identity-masked exports leave it out (a drawing can't be scrubbed of names) and say so.
+
+### 19.6 Still out of scope
+
+| Item | Why |
+|---|---|
+| Private repositories (D-3) | Decision §11-4 (public only) |
+| Identity verification / face matching | Biometric data (§18.5) |
+| Demographic bias audits | No protected data is collected (§18.7) |
+| Postgres row-level security | Isolation is enforced in the application and verified route by route; RLS is a later defence-in-depth option |
+| Per-organisation custom domains / branding beyond company name | Not requested yet |
+

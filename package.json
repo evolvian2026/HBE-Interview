@@ -19,7 +19,10 @@
     "generate:problems": "python3 scripts/generate-problems.py src/lib/content/problems.json",
     "smoke:phase2": "tsx scripts/smoke-phase2.ts",
     "smoke:phase3": "tsx scripts/smoke-phase3.ts",
-    "ui-check:phase3": "tsx e2e/ui-phase3.ts"
+    "ui-check:phase3": "tsx e2e/ui-phase3.ts",
+    "smoke:phase4": "tsx scripts/smoke-phase4.ts",
+    "ui-check:phase4": "tsx e2e/ui-phase4.ts",
+    "check:aws-executor": "tsx scripts/check-aws-executor.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.135.0",

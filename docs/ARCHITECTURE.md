@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Document status** | v1.4 — approved; Phases 1–3 implemented (see §0 for as-built decisions; integration API in [API.md](API.md)) |
+| **Document status** | v1.5 — approved; Phases 1–4 implemented (see §0 for as-built decisions; integration API in [API.md](API.md)) |
 | **Date** | 2026-10-16 |
 | **Related** | [PRD.md](PRD.md) · [FEATURES.md](FEATURES.md) · [API.md](API.md) |
 
@@ -36,7 +36,7 @@
 
 ---
 
-## 0. As-built decisions (v1.2–v1.4)
+## 0. As-built decisions (v1.2–v1.5)
 
 The product owner approved the design with these decisions. **Where this section conflicts with later sections, this section wins**; later sections describe the target architecture and the scale-out path.
 
@@ -46,22 +46,23 @@ The product owner approved the design with these decisions. **Where this section
 | Auth | Built-in: staff email + password (bcrypt) with signed HTTP-only JWT cookies (`jose`); roles admin / recruiter / hiring manager / viewer. Candidates use a **personal bearer link** (`/c/{token}`, 192-bit random) issued by invite or open registration — no account needed |
 | File storage | Resumes stored in Postgres (`bytea`, ≤ 5 MB); HR knowledge-base documents stored as extracted text. No separate object store |
 | Realtime | Candidate interview turns stream over **SSE**; status pages poll. No Supabase Realtime |
-| Tenancy | **Single internal organisation** (no `org_id`); org settings live in the `settings` table. Multi-tenancy is a later phase (add `org_id` + scoping) |
+| Tenancy | **Multiple organisations (v1.5).** `organizations` table; `org_id` on users, drives, candidates, candidacies (denormalised), KB documents/passages, API keys, webhooks, AI calls and audit. Application-level isolation: every staff session carries `orgId`; `canSeeDrive(user, drive)` takes the row so the org check can't be skipped; `requireDriveAccess`/`requireDrivePage`/`assertCandidacyAccess` load by id and answer 404 for other organisations; list queries filter by `orgId`; API keys and webhooks are org-scoped; `emitEvent(orgId, …)`. Candidates are per-organisation (unique `org_id + email`). Candidate links, open links and share links resolve their organisation through the token. Platform admins (`users.platform_admin`) can create/suspend organisations and switch into one (JWT `org` claim; they act as its admin, with a banner). Suspension blocks staff sign-in and API keys, never candidates mid-process. Verified route-by-route by `scripts/smoke-phase4.ts`. Postgres RLS is not used (would need per-request transactions with the pooled driver) — a defence-in-depth option for later |
 | Background jobs | Postgres `jobs` table with `FOR UPDATE SKIP LOCKED`, retries with exponential back-off, singleton keys and `:failed` handlers. The worker runs **inside the web process** by default (`RUN_WORKER_IN_PROCESS=true`) or standalone via `npm run worker` |
-| Code execution | **Judge0** (hosted CE via RapidAPI or self-hosted) behind an executor interface (`src/lib/exec`). Later: AWS-hosted sandbox. A `local-dev` executor exists for development/CI only and is refused in production. Problems are stdin/stdout so one test set serves Python, JavaScript, Java and C++ |
+| Code execution | **Judge0** (default) or **AWS Lambda** (`CODE_EXECUTOR=aws-lambda`, v1.5) behind an executor interface (`src/lib/exec`). The Lambda client signs Invoke requests with SigV4 (`exec/sigv4.ts`, checked against the AWS test suite) — no SDK. The function (`infra/aws-executor`) is a container image (Python 3, Node 22, Java 21, g++) bundling the same runner as the local executor (`exec/runner.ts`: fresh temp dir per run, per-test CPU limit, own process group), deployed in a VPC with no internet route and a no-egress security group, bounded memory/timeout/concurrency; after each invocation it kills stray processes and empties `/tmp` so warm environments can't carry state between candidates. A `local-dev` executor exists for development/CI only and is refused in production. Problems are stdin/stdout so one test set serves Python, JavaScript, Java and C++ |
 | Interview modality | **Text and voice.** Voice uses the browser Web Speech API (speech-to-text in Chrome/Edge/Safari, text-to-speech everywhere); the transcript is editable before sending and is what gets evaluated |
 | Git hosts | **Public repositories only** on GitHub, GitLab (nested groups) and Bitbucket — `src/lib/github/index.ts` parses all three into `{host, owner, repo, branch, subPath}` and uses each host's public REST API (optional `GITHUB_TOKEN` for GitHub rate limits) |
 | Round order | Technical/Functional → Managerial (when applicable) → **HR always last**; order is fixed in the editor |
 | Compensation | HR round does **not** ask compensation by default (org setting, off). Salary history is never asked |
-| HR knowledge base | Small-KB fast path only: the whole KB (≤ 120k chars) is placed in the cached HR dossier; vector/FTS retrieval deferred |
+| HR knowledge base | Up to 60k characters: the whole KB is placed in the cached HR dossier. Larger (v1.5): documents are chunked into ~1.2k-character passages (`kb_chunks`, GIN index on `to_tsvector('simple', content)` — language-agnostic, works for Indic scripts) and each HR turn attaches the five passages most relevant to the candidate's latest message as `<policy_passages>`; the dossier lists the document titles. Admins can preview retrieval in Settings |
 | Codebase | A single Next.js app (`src/app`, `src/lib`, `src/components`) rather than a monorepo; module boundaries are kept as folders (`lib/core` is pure and unit-tested) |
 | Hosting | **Render** web service (`render.yaml`); migrations + seed run on start; `/api/health` health check |
 | Mock mode | `AI_MOCK=true` runs the whole pipeline with deterministic mock AI (development, demos and CI); `GITHUB_MOCK=true` uses a synthetic repository |
 | Phase 2 data | `share_links` (SHA-256 token hash, bcrypt passcode, expiry, revocation, views), `coding_problems` (drive-scoped custom problems with reference solution and validation result), `users.drive_ids` (hiring-manager assignment), `candidacies.reminder_sent_at` — migration `drizzle/0001_phase2.sql` |
 | PDF export | Print-optimised server-rendered report (`/print/candidates/[id]`) using the browser's Save-as-PDF — no headless Chromium on the server. Shared with the public share page (`/r/[token]`) via one `ReportDocument` component |
-| Model overrides | Org settings hold per-tier model and interviewer-effort overrides; the gateway refreshes them at most once a minute and falls back to environment defaults |
+| Model overrides | Platform settings (key `platform`, v1.5; previously org settings) hold per-tier model and interviewer-effort overrides; the gateway refreshes them at most once a minute and falls back to environment defaults |
 | Problem lookup | `services/problems.getProblem` resolves bank problems and validated custom problems; `pickProblemForDrive` prefers the drive's custom problems |
 | Phase 3 data | `api_keys` (SHA-256 key hash, scopes, last used, revoked), `webhooks` (URL, secret, events, active), `webhook_deliveries` (payload, status, attempts, response; purged after 30 days), `proctor_snapshots` (JPEG `bytea`, presence-check JSON, flagged), `candidate_feedback` (per-round 1–5 ratings + comment), `candidacies.feedback_summary/feedback_released_at`, `round_sessions.language`, `resumes.ocr_used`, `exercise_responses.whiteboard` (shapes JSON) + `whiteboard_png` — migrations `0002_phase3.sql`, `0003_whiteboard.sql` |
+| Phase 4 data | `organizations` (name, slug, status, AI budget), `org_id` columns (see Tenancy), `users.platform_admin`, `kb_chunks`; settings keys `org:{id}` and `platform` — migration `0004_phase4_tenancy.sql` creates the default organisation `00000000-0000-4000-8000-000000000001` and backfills all existing rows into it |
 | Languages | `core/languages.ts` lists 12 languages with BCP-47 speech locales; the drive config holds `languages`, the session stores the chosen one; the interviewer system prompt carries a language rule; evidence normalisation is Unicode-aware (`\p{L}\p{M}\p{N}`) so non-Latin quotes verify |
 | OCR | `ai/ocr.ts` sends image-only PDFs (document block) and PNG/JPEG (image block) to the analyzer tier for transcription before normal resume parsing |
 | Whiteboard | Client SVG editor; shapes + rendered PNG saved via `PUT …/whiteboard`. The PNG is attached as an image block to the interviewer's next turn and to the evaluator's evidence bundle |
@@ -78,7 +79,9 @@ The product owner approved the design with these decisions. **Where this section
 | Interview orchestrator, agent, dossier, exercises | `src/lib/interview/*` |
 | Jobs & services (resume, repos, evaluation/gating, maintenance, notifications) | `src/lib/jobs/*`, `src/lib/services/*` |
 | Content banks (12 validated coding problems, design prompts, cases, scenarios) | `src/lib/content/*`, generator `scripts/generate-problems.py` |
-| Code execution | `src/lib/exec/index.ts` |
+| Code execution | `src/lib/exec/{index,runner,aws,sigv4}.ts`, `infra/aws-executor/*` (handler, Dockerfile, CloudFormation) |
+| Tenancy & platform | `src/lib/tenancy.ts`, `src/lib/auth/staff.ts` (guards), `src/lib/services/platform.ts`, `src/app/(staff)/app/platform`, `src/app/api/platform/*` |
+| HR KB search | `src/lib/core/kb.ts`, `src/lib/services/kb.ts`, `src/app/api/settings/kb/search` |
 | Candidate UI (onboarding, interview room, voice, editors) | `src/app/c/*`, `src/app/i/*`, `src/components/candidate/*`, `src/components/room/*` |
 | Recruiter UI (drives, editor, reports, decisions, settings) | `src/app/(staff)/app/*`, `src/components/staff/*` |
 | API routes | `src/app/api/*` |
@@ -86,7 +89,7 @@ The product owner approved the design with these decisions. **Where this section
 | Integrations (API keys, REST v1, webhooks) | `src/lib/services/integrations.ts`, `src/lib/core/webhook-sign.ts`, `src/lib/integrations-shared.ts`, `src/app/api/v1/*`, `src/app/api/settings/{api-keys,webhooks}/*`, `src/components/staff/integrations-admin.tsx` |
 | Languages, OCR, whiteboard, proctoring | `src/lib/core/languages.ts`, `src/lib/ai/{ocr,proctor}.ts`, `src/lib/services/proctor.ts`, `src/components/room/{whiteboard,webcam}.tsx` |
 | Feedback & fairness | `src/lib/services/feedback.ts`, `src/lib/ai/feedback.ts`, `src/lib/core/fairness.ts`, `src/app/(staff)/app/drives/[id]/fairness`, `src/components/{candidate/feedback-survey,staff/candidate-feedback-panel}.tsx` |
-| End-to-end checks | `scripts/smoke.ts` (HTTP, all three rounds; `SMOKE_ROLE=manager` for the manager track), `scripts/smoke-phase2.ts` (Phase 2 features), `scripts/smoke-phase3.ts` (Phase 3 features incl. a local signed-webhook receiver), `e2e/ui-check.ts` (browser walkthrough; `PHASE2=1`), `e2e/ui-phase3.ts` (whiteboard, language lobby, integrations, fairness) |
+| End-to-end checks | `scripts/smoke.ts` (HTTP, all three rounds; `SMOKE_ROLE=manager` for the manager track), `scripts/smoke-phase2.ts` (Phase 2 features), `scripts/smoke-phase3.ts` (Phase 3 features incl. a local signed-webhook receiver), `e2e/ui-check.ts` (browser walkthrough; `PHASE2=1`), `e2e/ui-phase3.ts` (whiteboard, language lobby, integrations, fairness), `scripts/smoke-phase4.ts` (cross-tenant isolation over every staff page and ID-based route, REST API, webhooks, switching, suspension, KB search, export), `scripts/check-aws-executor.ts` (Lambda executor through the app's client), `e2e/ui-phase4.ts` |
 
 ---
 

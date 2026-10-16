@@ -35,6 +35,15 @@ services:
         value: judge0-ce.p.rapidapi.com
       - key: JUDGE0_API_KEY
         sync: false
+      # To use the AWS Lambda executor instead: set CODE_EXECUTOR=aws-lambda and these (infra/aws-executor/README.md)
+      - key: AWS_REGION
+        value: ap-south-1
+      - key: AWS_LAMBDA_FUNCTION
+        value: hbe-executor
+      - key: AWS_ACCESS_KEY_ID
+        sync: false
+      - key: AWS_SECRET_ACCESS_KEY
+        sync: false
       - key: GITHUB_TOKEN
         sync: false
       - key: RUN_WORKER_IN_PROCESS

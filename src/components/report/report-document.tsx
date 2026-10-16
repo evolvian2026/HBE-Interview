@@ -26,6 +26,11 @@ export async function ReportDocument({ candidacyId, masked, includeTranscript = 
   const [combined] = await db.select().from(schema.combinedReports).where(eq(schema.combinedReports.candidacyId, candidacyId));
   const [fit] = await db.select().from(schema.practicalFit).where(eq(schema.practicalFit.candidacyId, candidacyId));
   const sessions = await db.select().from(schema.roundSessions).where(eq(schema.roundSessions.candidacyId, candidacyId));
+  const boards = sessions.length
+    ? (await db.select({ sessionId: schema.exerciseResponses.sessionId, shapes: schema.exerciseResponses.whiteboard, png: schema.exerciseResponses.whiteboardPng }).from(schema.exerciseResponses).where(inArray(schema.exerciseResponses.sessionId, sessions.map((s) => s.id)))).filter(
+        (b) => b.png && ((b.shapes as unknown[] | null)?.length ?? 0) > 0,
+      )
+    : [];
   const msgs = includeTranscript && sessions.length
     ? await db.select().from(schema.messages).where(inArray(schema.messages.sessionId, sessions.map((s) => s.id))).orderBy(asc(schema.messages.seq))
     : [];
@@ -147,6 +152,21 @@ export async function ReportDocument({ candidacyId, masked, includeTranscript = 
                     Live coding — {rs.coding.problem}: {rs.coding.passed}/{rs.coding.total} hidden tests, {rs.coding.hints} hint(s).
                   </p>
                 )}
+                {(() => {
+                  const sid = sessions.find((s) => s.roundIndex === i)?.id;
+                  const board = boards.find((b) => b.sessionId === sid);
+                  if (!board?.png) return null;
+                  // A drawing can't be scrubbed of names, so identity-masked exports leave it out.
+                  return masked ? (
+                    <p className="mt-1 text-xs text-slate-500">System-design whiteboard omitted from the identity-masked export.</p>
+                  ) : (
+                    <figure className="mt-2 break-inside-avoid">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={`data:image/png;base64,${board.png.toString("base64")}`} alt="Candidate's system-design whiteboard" className="w-full max-w-2xl rounded border border-slate-200" />
+                      <figcaption className="text-[11px] text-slate-500">System-design whiteboard (candidate&apos;s drawing)</figcaption>
+                    </figure>
+                  );
+                })()}
                 <DocList title="Focus areas" items={rs.focusAreas?.map(scrub)} />
                 {rs.integrity && <p className="mt-1 text-xs text-slate-500">Integrity (context only): {rs.integrity.concern} — {rs.integrity.summary}</p>}
               </>

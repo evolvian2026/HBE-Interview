@@ -1,3 +1,5 @@
+import { KB_INLINE_LIMIT } from "../core/kb";
+import { ensureKbIndexed } from "../services/kb";
 import { and, asc, eq, lt } from "drizzle-orm";
 import { db, schema } from "../db";
 import type { DriveConfig, RoundType } from "../core/types";
@@ -48,6 +50,9 @@ export async function loadSessionContext(sessionId: string) {
     }));
   const settings = await getSettings(row.candidacy.orgId);
   const kb = round?.type === "hr" ? await db.select().from(schema.kbDocuments).where(eq(schema.kbDocuments.orgId, row.candidacy.orgId)).orderBy(asc(schema.kbDocuments.title)) : [];
+  // Small knowledge bases go whole into the cached dossier; large ones are searched per question (passages).
+  const kbMode: "inline" | "retrieval" = kb.reduce((n, d) => n + d.content.length + d.title.length, 0) > KB_INLINE_LIMIT ? "retrieval" : "inline";
+  if (kbMode === "retrieval") await ensureKbIndexed(row.candidacy.orgId);
   const [fit] = await db.select().from(schema.practicalFit).where(eq(schema.practicalFit.candidacyId, row.candidacy.id));
   return {
     session: row.session,
@@ -64,6 +69,7 @@ export async function loadSessionContext(sessionId: string) {
     prior,
     settings,
     kb,
+    kbMode,
     practicalFit: fit ?? null,
   };
 }

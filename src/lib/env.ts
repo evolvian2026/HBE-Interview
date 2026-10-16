@@ -28,7 +28,16 @@ export const env = {
     utility: process.env.AI_MODEL_UTILITY ?? "claude-haiku-5-5",
   },
   interviewerEffort: (process.env.AI_INTERVIEWER_EFFORT ?? "low") as "low" | "medium" | "high",
-  codeExecutor: (process.env.CODE_EXECUTOR ?? "judge0") as "judge0" | "local-dev",
+  codeExecutor: (process.env.CODE_EXECUTOR ?? "judge0") as "judge0" | "local-dev" | "aws-lambda",
+  /** AWS Lambda executor (CODE_EXECUTOR=aws-lambda): function name/ARN, optional endpoint override (VPC endpoint or tests). */
+  awsLambdaFunction: process.env.AWS_LAMBDA_FUNCTION ?? "",
+  awsLambdaEndpoint: process.env.AWS_LAMBDA_ENDPOINT ?? "",
+  aws: {
+    region: process.env.AWS_REGION ?? process.env.AWS_DEFAULT_REGION ?? "ap-south-1",
+    accessKeyId: process.env.AWS_ACCESS_KEY_ID ?? "",
+    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY ?? "",
+    sessionToken: process.env.AWS_SESSION_TOKEN || undefined,
+  },
   judge0Url: process.env.JUDGE0_URL ?? "https://judge0-ce.p.rapidapi.com",
   judge0Key: process.env.JUDGE0_API_KEY,
   judge0RapidApiHost: process.env.JUDGE0_RAPIDAPI_HOST,

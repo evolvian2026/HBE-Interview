@@ -15,6 +15,10 @@ export function KnowledgeBase({ docs }: { docs: { id: string; title: string; siz
     <Card title="HR knowledge base (policy Q&A)">
       <p className="mb-3 text-sm text-slate-600">
         In the HR round, the AI answers candidates&apos; questions about policies (leave, benefits, work model, probation…) <b>only</b> from these documents and cites them. Anything else is logged for HR to follow up.
+        <span className="mt-1 block text-xs text-slate-500">
+          Up to ~60,000 characters in total are given to the interviewer whole. Larger knowledge bases are searched instead: each candidate question retrieves the five most relevant passages.
+          {docs.reduce((n, d) => n + d.size, 0) > 60_000 && <b className="text-slate-700"> Your knowledge base is in search mode.</b>}
+        </span>
       </p>
       <ul className="mb-4 divide-y divide-slate-100 text-sm">
         {docs.map((d) => (
@@ -22,7 +26,7 @@ export function KnowledgeBase({ docs }: { docs: { id: string; title: string; siz
             <div>
               <p className="font-medium">{d.title}</p>
               <p className="text-xs text-slate-500">
-                {Math.round(d.size / 1000)}k chars · {d.preview}…
+                {d.size < 1000 ? `${d.size} chars` : `${Math.round(d.size / 1000)}k chars`} · {d.preview}…
               </p>
             </div>
             <Button
@@ -89,7 +93,42 @@ export function KnowledgeBase({ docs }: { docs: { id: string; title: string; siz
           </Button>
         </div>
       </div>
+      {docs.length > 0 && <KbSearchPreview />}
       {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
     </Card>
+  );
+}
+
+/** Lets admins check which passages a candidate question would retrieve (used when the KB is in search mode). */
+function KbSearchPreview() {
+  const [q, setQ] = useState("");
+  const [hits, setHits] = useState<{ title: string; content: string; rank: number }[] | null>(null);
+  return (
+    <div className="mt-4 border-t border-slate-100 pt-4">
+      <p className="text-sm font-medium">Try a candidate question</p>
+      <div className="mt-2 flex gap-2">
+        <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="e.g. How many days of annual leave do I get?" />
+        <Button
+          variant="secondary"
+          disabled={!q.trim()}
+          onClick={async () => setHits((await api<{ passages: { title: string; content: string; rank: number }[] }>(`/api/settings/kb/search?q=${encodeURIComponent(q)}`)).passages)}
+        >
+          Search
+        </Button>
+      </div>
+      {hits && (
+        <ol className="mt-2 space-y-2 text-sm">
+          {hits.length === 0 && <li className="text-slate-500">No matching passages — the interviewer would say HR will follow up.</li>}
+          {hits.map((h, i) => (
+            <li key={i} className="rounded-lg bg-slate-50 p-2">
+              <p className="text-xs font-medium text-slate-500">
+                {h.title} · relevance {h.rank}
+              </p>
+              <p className="whitespace-pre-wrap">{h.content}</p>
+            </li>
+          ))}
+        </ol>
+      )}
+    </div>
   );
 }

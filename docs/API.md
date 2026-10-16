@@ -7,7 +7,7 @@ This is the integration surface for an ATS, HRIS or internal tooling. It has two
 - **REST API** (`/api/v1/…`) — authenticated with an API key; read drives and candidates, invite candidates.
 - **Webhooks** — HBE Interview POSTs signed JSON to your endpoint when something happens.
 
-Both are managed by an **admin** under **Settings → Integrations**.
+Both are managed by an **admin** under **Settings → Integrations**. Keys and webhooks belong to one organisation: a key only sees that organisation's drives and candidates, and a webhook only receives that organisation's events. A suspended organisation's keys are refused with `403`.
 
 ---
 

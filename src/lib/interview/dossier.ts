@@ -94,8 +94,15 @@ ${(ins?.questions ?? []).map((q, i) => `${i + 1}. [${q.kind}] ${q.question} (fil
     parts.push(
       `Organisation values (cover at least three in the values section):\n${ctx.settings.values.map((v) => `- ${v.name}: ${v.description} Observable behaviours: ${v.behaviors.join("; ")}`).join("\n")}`,
     );
-    const kb = ctx.kb.map((d) => `### ${d.title}\n${d.content}`).join("\n\n");
-    parts.push(`<hr_knowledge_base>\n${kb.slice(0, 120_000) || "(no documents — defer all policy questions to the HR team)"}\n</hr_knowledge_base>`);
+    if (ctx.kbMode === "retrieval") {
+      // Large KB: list the documents here; the passages relevant to the candidate's latest message arrive each turn.
+      parts.push(
+        `<hr_knowledge_base mode="search">\nThe organisation's HR knowledge base has ${ctx.kb.length} documents: ${ctx.kb.map((d) => `"${d.title}"`).join(", ")}.\nFor each candidate message, the most relevant passages appear in <policy_passages> inside <interview_state>. Answer policy questions only from those passages and cite the document title; if they don't answer the question, say the HR team will follow up and call log_followup_question.\n</hr_knowledge_base>`,
+      );
+    } else {
+      const kb = ctx.kb.map((d) => `### ${d.title}\n${d.content}`).join("\n\n");
+      parts.push(`<hr_knowledge_base>\n${kb || "(no documents — defer all policy questions to the HR team)"}\n</hr_knowledge_base>`);
+    }
     if (ctx.settings.companyBlurb) parts.push(`About the company: ${ctx.settings.companyBlurb}`);
     parts.push(`Compensation: ${ctx.settings.askCompensation ? "you may ask for the expected compensation range (never current or past salary)." : "do NOT ask about compensation at all; if the candidate raises it, say the recruiter will discuss it later."}`);
   }
