@@ -46,8 +46,8 @@ export async function loadSessionContext(sessionId: string) {
       concerns: (r.concerns as string[]) ?? [],
       focusAreas: ((r.roundSpecific as { focusAreas?: string[] })?.focusAreas ?? []) as string[],
     }));
-  const settings = await getSettings();
-  const kb = round?.type === "hr" ? await db.select().from(schema.kbDocuments).orderBy(asc(schema.kbDocuments.title)) : [];
+  const settings = await getSettings(row.candidacy.orgId);
+  const kb = round?.type === "hr" ? await db.select().from(schema.kbDocuments).where(eq(schema.kbDocuments.orgId, row.candidacy.orgId)).orderBy(asc(schema.kbDocuments.title)) : [];
   const [fit] = await db.select().from(schema.practicalFit).where(eq(schema.practicalFit.candidacyId, row.candidacy.id));
   return {
     session: row.session,

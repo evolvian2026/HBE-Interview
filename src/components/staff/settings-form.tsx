@@ -1,9 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { Button, Card, Field, Input, Select, Textarea } from "../ui";
+import { Button, Card, Field, Input, Textarea } from "../ui";
 import { api } from "../api";
-import { MODEL_CHOICES } from "@/lib/settings-shared";
 import type { OrgSettings, OrgValue } from "@/lib/settings";
 
 export function SettingsForm({ initial }: { initial: OrgSettings }) {
@@ -62,31 +61,6 @@ export function SettingsForm({ initial }: { initial: OrgSettings }) {
           </Field>
         </div>
       </Card>
-      <Card title="AI models (advanced)">
-        <p className="mb-3 text-sm text-slate-600">Override the model used at each stage. Leave on default to use the deployment configuration. New settings apply within a minute; every report records the evaluator model used.</p>
-        <div className="grid gap-3 md:grid-cols-5">
-          {(["interviewer", "analyzer", "evaluator", "utility"] as const).map((tier) => (
-            <Field key={tier} label={{ interviewer: "Interviewer", analyzer: "JD / resume / repo analysis", evaluator: "Evaluator & combined report", utility: "Utility (compliance, redaction)" }[tier]}>
-              <Select value={s.models[tier]} onChange={(e) => set("models", { ...s.models, [tier]: e.target.value })}>
-                <option value="">Default</option>
-                {MODEL_CHOICES.map((m) => (
-                  <option key={m} value={m}>
-                    {m}
-                  </option>
-                ))}
-              </Select>
-            </Field>
-          ))}
-          <Field label="Interviewer effort">
-            <Select value={s.interviewerEffort} onChange={(e) => set("interviewerEffort", e.target.value as OrgSettings["interviewerEffort"])}>
-              <option value="">Default</option>
-              <option value="low">Low (fastest)</option>
-              <option value="medium">Medium</option>
-              <option value="high">High</option>
-            </Select>
-          </Field>
-        </div>
-      </Card>
       <div className="flex items-center gap-3">
         <Button
           onClick={async () => {
@@ -94,7 +68,7 @@ export function SettingsForm({ initial }: { initial: OrgSettings }) {
             try {
               const r = await api<OrgSettings>("/api/settings", {
                 method: "PUT",
-                body: { companyName: s.companyName, companyBlurb: s.companyBlurb, supportEmail: s.supportEmail, values: s.values.filter((v) => v.name.trim()), askCompensation: s.askCompensation, retentionDays: s.retentionDays, consentText: s.consentText, models: s.models, interviewerEffort: s.interviewerEffort },
+                body: { companyName: s.companyName, companyBlurb: s.companyBlurb, supportEmail: s.supportEmail, values: s.values.filter((v) => v.name.trim()), askCompensation: s.askCompensation, retentionDays: s.retentionDays, consentText: s.consentText },
               });
               setS(r);
               setMsg("Saved.");

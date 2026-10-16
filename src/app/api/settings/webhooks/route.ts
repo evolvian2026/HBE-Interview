@@ -10,7 +10,7 @@ const Body = z.object({ url: z.string().trim().min(8).max(2000), events: z.array
 export const POST = handle(async (req: Request) => {
   const user = await requireStaff("admin");
   const { url, events } = Body.parse(await req.json());
-  const out = await createWebhook(url, [...new Set(events)], user.id);
-  await audit({ type: "staff", id: user.id }, "webhook.create", "webhook", out.id, { url, events });
+  const out = await createWebhook(user.orgId, url, [...new Set(events)], user.id);
+  await audit({ type: "staff", id: user.id, orgId: user.orgId }, "webhook.create", "webhook", out.id, { url, events });
   return json(out, 201);
 });

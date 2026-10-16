@@ -1,8 +1,8 @@
 import Link from "next/link";
-import { asc, desc, eq, inArray } from "drizzle-orm";
+import { asc, desc, eq, inArray, sql } from "drizzle-orm";
 import { notFound } from "next/navigation";
 import { db, schema } from "@/lib/db";
-import { canSeeDrive, hasRole, requireStaffPage } from "@/lib/auth/staff";
+import { canSeeDrive, hasRole, isUuid, requireStaffPage } from "@/lib/auth/staff";
 import { enabledRounds } from "@/lib/core/rounds";
 import { PARAMETERS } from "@/lib/core/rubrics";
 import { RECOMMENDATION_LABEL, ROUND_LABEL, type DriveConfig, type ParamScore, type Recommendation, type RoundType } from "@/lib/core/types";
@@ -50,9 +50,9 @@ export default async function CandidatePage({ params }: { params: Promise<{ id: 
     .innerJoin(schema.candidates, eq(schema.candidacies.candidateId, schema.candidates.id))
     .innerJoin(schema.drives, eq(schema.candidacies.driveId, schema.drives.id))
     .innerJoin(schema.driveVersions, eq(schema.candidacies.driveVersionId, schema.driveVersions.id))
-    .where(eq(schema.candidacies.id, id));
-  if (!row || !canSeeDrive(user, row.d.id)) notFound();
-  await audit({ type: "staff", id: user.id }, "report.view", "candidacy", id);
+    .where(isUuid(id) ? eq(schema.candidacies.id, id) : sql`false`);
+  if (!row || !canSeeDrive(user, row.d)) notFound();
+  await audit({ type: "staff", id: user.id, orgId: user.orgId }, "report.view", "candidacy", id);
   const config = row.v.config as DriveConfig;
   const rounds = enabledRounds(config);
   const [resume] = await db.select().from(schema.resumes).where(eq(schema.resumes.candidacyId, id));

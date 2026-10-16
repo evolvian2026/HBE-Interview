@@ -30,7 +30,7 @@ export async function sendInviteEmail(candidacyId: string) {
     .innerJoin(schema.drives, eq(schema.candidacies.driveId, schema.drives.id))
     .where(eq(schema.candidacies.id, candidacyId));
   if (!row) return;
-  const s = await getSettings();
+  const s = await getSettings(row.c.orgId);
   const link = candidateLink(row.c.accessToken);
   await sendEmail(
     row.cand.email,
@@ -47,7 +47,7 @@ export async function notifyCandidateNextRound(candidacyId: string) {
     .innerJoin(schema.drives, eq(schema.candidacies.driveId, schema.drives.id))
     .where(eq(schema.candidacies.id, candidacyId));
   if (!row) return;
-  const s = await getSettings();
+  const s = await getSettings(row.c.orgId);
   await sendEmail(
     row.cand.email,
     `Next interview round for ${row.d.title}`,

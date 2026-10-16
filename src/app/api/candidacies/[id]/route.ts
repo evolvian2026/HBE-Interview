@@ -1,4 +1,4 @@
-import { requireStaff } from "@/lib/auth/staff";
+import { assertCandidacyAccess, requireStaff } from "@/lib/auth/staff";
 import { handle, json } from "@/lib/http";
 import { purgeCandidacy } from "@/lib/services/maintenance";
 
@@ -6,6 +6,7 @@ import { purgeCandidacy } from "@/lib/services/maintenance";
 export const DELETE = handle(async (_req: Request, { params }: { params: Promise<{ id: string }> }) => {
   const user = await requireStaff("admin");
   const { id } = await params;
-  await purgeCandidacy(id, "admin_request", { type: "staff", id: user.id });
+  await assertCandidacyAccess(user, id);
+  await purgeCandidacy(id, "admin_request", { type: "staff", id: user.id, orgId: user.orgId });
   return json({ ok: true });
 });

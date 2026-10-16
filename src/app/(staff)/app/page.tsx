@@ -1,8 +1,8 @@
 import Link from "next/link";
-import { sql } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
 import { listDrives } from "@/lib/services/drives";
-import { requireStaffPage, hasRole, canSeeDrive } from "@/lib/auth/staff";
+import { requireStaffPage, hasRole } from "@/lib/auth/staff";
 import { Badge, Card, Empty, LinkButton, PageHeader } from "@/components/ui";
 import { SENIORITY_LABEL, type DriveConfig } from "@/lib/core/types";
 
@@ -12,8 +12,8 @@ const STATUS_TONE = { draft: "slate", active: "green", paused: "amber", closed: 
 
 export default async function DrivesPage() {
   const user = await requireStaffPage();
-  const drives = (await listDrives()).filter((d) => canSeeDrive(user, d.id));
-  const [{ n: pending }] = await db.select({ n: sql<number>`count(*)::int` }).from(schema.candidacies).where(sql`${schema.candidacies.stage} = 'gate_pending'`);
+  const drives = await listDrives(user);
+  const [{ n: pending }] = await db.select({ n: sql<number>`count(*)::int` }).from(schema.candidacies).where(and(eq(schema.candidacies.orgId, user.orgId), sql`${schema.candidacies.stage} = 'gate_pending'`));
   return (
     <>
       <PageHeader

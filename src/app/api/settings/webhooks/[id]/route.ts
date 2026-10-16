@@ -1,7 +1,7 @@
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { z } from "zod";
 import { db, schema } from "@/lib/db";
-import { requireStaff } from "@/lib/auth/staff";
+import { HttpError, requireStaff } from "@/lib/auth/staff";
 import { handle, json } from "@/lib/http";
 import { audit } from "@/lib/audit";
 
@@ -13,15 +13,17 @@ export const PUT = handle(async (req: Request, { params }: Ctx) => {
   const user = await requireStaff("admin");
   const { id } = await params;
   const { active } = Body.parse(await req.json());
-  await db.update(schema.webhooks).set({ active }).where(eq(schema.webhooks.id, id));
-  await audit({ type: "staff", id: user.id }, active ? "webhook.enable" : "webhook.disable", "webhook", id);
+  const done = await db.update(schema.webhooks).set({ active }).where(and(eq(schema.webhooks.id, id), eq(schema.webhooks.orgId, user.orgId))).returning({ id: schema.webhooks.id });
+  if (!done.length) throw new HttpError(404, "Webhook not found");
+  await audit({ type: "staff", id: user.id, orgId: user.orgId }, active ? "webhook.enable" : "webhook.disable", "webhook", id);
   return json({ ok: true });
 });
 
 export const DELETE = handle(async (_req: Request, { params }: Ctx) => {
   const user = await requireStaff("admin");
   const { id } = await params;
-  await db.delete(schema.webhooks).where(eq(schema.webhooks.id, id));
-  await audit({ type: "staff", id: user.id }, "webhook.delete", "webhook", id);
+  const gone = await db.delete(schema.webhooks).where(and(eq(schema.webhooks.id, id), eq(schema.webhooks.orgId, user.orgId))).returning({ id: schema.webhooks.id });
+  if (!gone.length) throw new HttpError(404, "Webhook not found");
+  await audit({ type: "staff", id: user.id, orgId: user.orgId }, "webhook.delete", "webhook", id);
   return json({ ok: true });
 });

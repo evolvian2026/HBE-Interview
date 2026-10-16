@@ -12,7 +12,7 @@ export function UsersAdmin({
   drives,
   meId,
 }: {
-  users: { id: string; name: string; email: string; role: Role; active: boolean; driveIds: string[] }[];
+  users: { id: string; name: string; email: string; role: Role; active: boolean; driveIds: string[]; platformAdmin?: boolean }[];
   drives: { id: string; title: string }[];
   meId: string;
 }) {
@@ -43,7 +43,9 @@ export function UsersAdmin({
         <tbody className="divide-y divide-slate-100">
           {users.map((u) => (
             <tr key={u.id}>
-              <td className="py-2">{u.name}</td>
+              <td className="py-2">
+                {u.name} {u.platformAdmin && <Badge tone="blue">platform admin</Badge>}
+              </td>
               <td>{u.email}</td>
               <td>
                 <Select className="w-40" value={u.role} disabled={u.id === meId} onChange={(e) => update(u.id, { role: e.target.value })}>

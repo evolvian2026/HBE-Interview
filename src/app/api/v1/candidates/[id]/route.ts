@@ -1,4 +1,4 @@
-import { asc, eq } from "drizzle-orm";
+import { and, asc, eq } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
 import { handle, json } from "@/lib/http";
 import { HttpError } from "@/lib/auth/staff";
@@ -8,7 +8,7 @@ import type { DriveConfig } from "@/lib/core/types";
 
 /** GET /api/v1/candidates/{candidacyId} — stage, per-round status/scores and the final result (scope candidates:read). */
 export const GET = handle(async (req: Request, { params }: { params: Promise<{ id: string }> }) => {
-  await requireApiKey(req, "candidates:read");
+  const key = await requireApiKey(req, "candidates:read");
   const { id } = await params;
   if (!/^[0-9a-f-]{36}$/i.test(id)) throw new HttpError(404, "Candidate not found");
   const [row] = await db
@@ -16,7 +16,7 @@ export const GET = handle(async (req: Request, { params }: { params: Promise<{ i
     .from(schema.candidacies)
     .innerJoin(schema.candidates, eq(schema.candidacies.candidateId, schema.candidates.id))
     .innerJoin(schema.driveVersions, eq(schema.candidacies.driveVersionId, schema.driveVersions.id))
-    .where(eq(schema.candidacies.id, id));
+    .where(and(eq(schema.candidacies.id, id), eq(schema.candidacies.orgId, key.orgId)));
   if (!row) throw new HttpError(404, "Candidate not found");
   const rounds = await candidateRounds(row.c, row.v.config as DriveConfig);
   const reports = await db.select().from(schema.roundReports).where(eq(schema.roundReports.candidacyId, id)).orderBy(asc(schema.roundReports.roundIndex));

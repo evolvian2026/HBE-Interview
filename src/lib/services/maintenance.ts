@@ -52,25 +52,30 @@ export async function periodicMaintenance() {
   // 5) Retention purge (daily).
   if (now.getTime() - lastPurge > 24 * 3600_000) {
     lastPurge = now.getTime();
-    const settings = await getSettings();
-    const cutoff = new Date(now.getTime() - settings.retentionDays * 86_400_000);
-    const old = await db
-      .select({ id: schema.candidacies.id })
-      .from(schema.candidacies)
-      .where(and(lt(schema.candidacies.updatedAt, cutoff), sql`${schema.candidacies.stage} in ('completed','rejected','expired','declined','shortlisted')`));
-    for (const c of old) await purgeCandidacy(c.id, "retention");
+    // Each organisation has its own retention period.
+    for (const org of await db.select({ id: schema.organizations.id }).from(schema.organizations)) {
+      const settings = await getSettings(org.id);
+      const cutoff = new Date(now.getTime() - settings.retentionDays * 86_400_000);
+      const old = await db
+        .select({ id: schema.candidacies.id })
+        .from(schema.candidacies)
+        .where(
+          and(eq(schema.candidacies.orgId, org.id), lt(schema.candidacies.updatedAt, cutoff), sql`${schema.candidacies.stage} in ('completed','rejected','expired','declined','shortlisted')`),
+        );
+      for (const c of old) await purgeCandidacy(c.id, "retention");
+    }
     // Webhook payloads carry candidate names/emails — keep delivery history for 30 days only.
     await db.delete(schema.webhookDeliveries).where(lt(schema.webhookDeliveries.createdAt, new Date(now.getTime() - 30 * 86_400_000)));
   }
 }
 
 /** Delete a candidacy's personal data (resume, transcripts, code, reports), leaving an anonymised audit stub. */
-export async function purgeCandidacy(candidacyId: string, reason: string, actor: { type: "staff" | "system"; id?: string } = { type: "system" }) {
+export async function purgeCandidacy(candidacyId: string, reason: string, actor: { type: "staff" | "system"; id?: string; orgId?: string } = { type: "system" }) {
   const [c] = await db.select().from(schema.candidacies).where(eq(schema.candidacies.id, candidacyId));
   if (!c) return;
   await db.delete(schema.candidacies).where(eq(schema.candidacies.id, candidacyId));
   // Remove the candidate record if they have no other candidacies.
   const others = await db.select({ id: schema.candidacies.id }).from(schema.candidacies).where(eq(schema.candidacies.candidateId, c.candidateId)).limit(1);
   if (!others.length) await db.delete(schema.candidates).where(eq(schema.candidates.id, c.candidateId));
-  await audit(actor, "candidacy.purge", "candidacy", candidacyId, { driveId: c.driveId, reason, createdAt: c.createdAt });
+  await audit({ ...actor, orgId: c.orgId }, "candidacy.purge", "candidacy", candidacyId, { driveId: c.driveId, reason, createdAt: c.createdAt });
 }

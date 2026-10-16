@@ -1,8 +1,8 @@
 import Link from "next/link";
 import { eq, inArray } from "drizzle-orm";
-import { notFound } from "next/navigation";
+
 import { db, schema } from "@/lib/db";
-import { canSeeDrive, requireStaffPage } from "@/lib/auth/staff";
+import { requireDrivePage, requireStaffPage } from "@/lib/auth/staff";
 import { enabledRounds } from "@/lib/core/rounds";
 import { PARAMETERS } from "@/lib/core/rubrics";
 import { effectiveScore } from "@/lib/core/scoring";
@@ -16,12 +16,10 @@ export const dynamic = "force-dynamic";
 export default async function ComparePage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ ids?: string | string[] }> }) {
   const user = await requireStaffPage();
   const { id } = await params;
-  if (!canSeeDrive(user, id)) notFound();
+  const drive = await requireDrivePage(user, id);
   const raw = (await searchParams).ids;
   const all = (Array.isArray(raw) ? raw : raw ? raw.split(",") : []).filter(Boolean);
   const ids = all.slice(0, 4);
-  const [drive] = await db.select().from(schema.drives).where(eq(schema.drives.id, id));
-  if (!drive) notFound();
   if (ids.length < 2)
     return (
       <>

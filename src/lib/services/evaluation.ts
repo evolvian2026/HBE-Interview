@@ -29,6 +29,7 @@ import { isMock, modelFor } from "../ai/gateway";
 import type { RepoInsight } from "../ai/analyzers";
 import { enqueue } from "../jobs/queue";
 import { getSettings } from "../settings";
+import { orgOfCandidacy } from "../tenancy";
 import { audit } from "../audit";
 import { notifyCandidateNextRound } from "./notify";
 import { emitEvent } from "./integrations";
@@ -291,7 +292,7 @@ export async function evaluateRoundJob(payload: { sessionId: string }) {
 
   let practicalFit = null;
   if (round.type === "hr" && ctx.practicalFit) {
-    const settings = await getSettings();
+    const settings = await getSettings(ctx.candidacy.orgId);
     practicalFit = checkCompatibility(ctx.practicalFit.data as PracticalFitData, ctx.config.practicalFitBand, { askCompensation: settings.askCompensation });
     await db.update(schema.practicalFit).set({ compatibility: practicalFit }).where(eq(schema.practicalFit.candidacyId, ctx.candidacy.id));
   }
@@ -330,7 +331,7 @@ export async function evaluateRoundJob(payload: { sessionId: string }) {
     })
     .where(eq(schema.roundReports.sessionId, ctx.session.id));
 
-  await emitEvent("round.evaluated", { candidacyId: ctx.candidacy.id, driveId: ctx.candidacy.driveId, roundIndex: ctx.session.roundIndex, roundType: round.type, score, recommendation, confidence });
+  await emitEvent(ctx.candidacy.orgId, "round.evaluated", { candidacyId: ctx.candidacy.id, driveId: ctx.candidacy.driveId, roundIndex: ctx.session.roundIndex, roundType: round.type, score, recommendation, confidence });
   await afterRoundEvaluated(ctx.candidacy.id, ctx.session.roundIndex, recommendation);
 }
 
@@ -390,7 +391,7 @@ export async function advanceCandidacy(candidacyId: string, fromRoundIndex: numb
     .set({ stage: "round_available", currentRoundIndex: fromRoundIndex + 1, roundAvailableUntil: expiry, reminderSentAt: null, updatedAt: new Date() })
     .where(eq(schema.candidacies.id, candidacyId));
   await db.insert(schema.gateDecisions).values({ candidacyId, fromRoundIndex, decision: "advance", mode: opts.mode, decidedBy: opts.userId ?? null, reason: opts.reason ?? null });
-  await emitEvent("gate.decided", { candidacyId, fromRoundIndex, decision: "advance", mode: opts.mode });
+  await emitEvent(row.candidacy.orgId, "gate.decided", { candidacyId, fromRoundIndex, decision: "advance", mode: opts.mode });
   await notifyCandidateNextRound(candidacyId).catch((e) => console.error("notify failed", e));
 }
 
@@ -409,14 +410,14 @@ export async function decideGate(candidacyId: string, decision: "advance" | "hol
       .set({ stage: decision === "hold" ? "on_hold" : "rejected", updatedAt: new Date() })
       .where(eq(schema.candidacies.id, candidacyId));
     await db.insert(schema.gateDecisions).values({ candidacyId, fromRoundIndex: from, decision, mode: "manual", decidedBy: userId, reason: reason ?? null });
-    await emitEvent("gate.decided", { candidacyId, fromRoundIndex: from, decision, mode: "manual" });
+    await emitEvent(candidacy.orgId, "gate.decided", { candidacyId, fromRoundIndex: from, decision, mode: "manual" });
   }
   await audit({ type: "staff", id: userId }, `gate.${decision}`, "candidacy", candidacyId, { fromRoundIndex: from, reason });
 }
 
 /* --------------------------- Overrides & combined --------------------------- */
 
-export async function overrideScore(reportId: string, parameter: string, newScore: number, reason: string, user: { id: string; name: string }) {
+export async function overrideScore(reportId: string, parameter: string, newScore: number, reason: string, user: { id: string; name: string; orgId: string }) {
   const [report] = await db.select().from(schema.roundReports).where(eq(schema.roundReports.id, reportId));
   if (!report || report.status !== "ready") throw new Error("Report not ready");
   const row = await candidacyConfig(report.candidacyId);
@@ -433,7 +434,7 @@ export async function overrideScore(reportId: string, parameter: string, newScor
   const recommendation = roundRecommendation(score, knockouts, row.config);
   await db.update(schema.roundReports).set({ params, roundScore: score, recommendation, knockouts, updatedAt: new Date() }).where(eq(schema.roundReports.id, reportId));
   await db.insert(schema.scoreOverrides).values({ reportId, parameter, oldScore: old, newScore, reason, userId: user.id });
-  await audit({ type: "staff", id: user.id }, "report.override", "round_report", reportId, { parameter, old, newScore, reason });
+  await audit({ type: "staff", id: user.id, orgId: user.orgId }, "report.override", "round_report", reportId, { parameter, old, newScore, reason });
   await recomputeFinal(report.candidacyId);
 }
 
@@ -496,7 +497,8 @@ export async function combinedReportJob(payload: { candidacyId: string }) {
     .insert(schema.combinedReports)
     .values({ candidacyId: payload.candidacyId, ...values })
     .onConflictDoUpdate({ target: schema.combinedReports.candidacyId, set: values });
-  await emitEvent("candidate.completed", { candidacyId: payload.candidacyId, finalScore: result.finalScore, recommendation: result.recommendation, partial: result.partial });
+  const orgId = await orgOfCandidacy(payload.candidacyId);
+  if (orgId) await emitEvent(orgId, "candidate.completed", { candidacyId: payload.candidacyId, finalScore: result.finalScore, recommendation: result.recommendation, partial: result.partial });
 }
 
 export async function combinedReportFailed(payload: { candidacyId: string; error?: string }) {

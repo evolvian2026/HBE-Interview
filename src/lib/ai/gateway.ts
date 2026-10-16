@@ -1,6 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import type { z } from "zod";
+import { eq } from "drizzle-orm";
 import { db, schema } from "../db";
 import { env } from "../env";
 
@@ -19,8 +20,8 @@ let overrides: { models: Partial<Record<ModelTier, string>>; effort?: string; at
 export async function refreshModelOverrides() {
   if (Date.now() - overrides.at < 60_000) return;
   try {
-    const { getSettings } = await import("../settings");
-    const s = await getSettings();
+    const { getPlatformSettings } = await import("../settings");
+    const s = await getPlatformSettings();
     overrides = { models: Object.fromEntries(Object.entries(s.models ?? {}).filter(([, v]) => v)) as Partial<Record<ModelTier, string>>, effort: s.interviewerEffort || undefined, at: Date.now() };
   } catch {
     overrides.at = Date.now();
@@ -48,6 +49,8 @@ export function fallbackParams(model: string): { betas?: string[]; fallbacks?: "
 export interface CallContext {
   sessionId?: string | null;
   candidacyId?: string | null;
+  /** Organisation billed for the call; resolved from the candidacy when omitted. */
+  orgId?: string | null;
 }
 
 export async function recordAiCall(
@@ -59,8 +62,14 @@ export async function recordAiCall(
   error?: string,
 ) {
   try {
+    let orgId = ctx.orgId ?? null;
+    if (!orgId && ctx.candidacyId) {
+      const [c] = await db.select({ orgId: schema.candidacies.orgId }).from(schema.candidacies).where(eq(schema.candidacies.id, ctx.candidacyId));
+      orgId = c?.orgId ?? null;
+    }
     await db.insert(schema.aiCalls).values({
       stage,
+      orgId,
       model,
       inputTokens: usage?.input_tokens ?? null,
       outputTokens: usage?.output_tokens ?? null,

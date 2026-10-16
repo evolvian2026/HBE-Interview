@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { requireStaff } from "@/lib/auth/staff";
 import { handle, json } from "@/lib/http";
-import { MODEL_CHOICES, saveSettings } from "@/lib/settings";
+import { saveSettings } from "@/lib/settings";
 import { audit } from "@/lib/audit";
 
 const Body = z.object({
@@ -12,17 +12,12 @@ const Body = z.object({
   askCompensation: z.boolean().optional(),
   retentionDays: z.number().int().min(30).max(730).optional(),
   consentText: z.string().min(50).max(8000).optional(),
-  models: z
-    .object({ interviewer: z.string().max(60), analyzer: z.string().max(60), evaluator: z.string().max(60), utility: z.string().max(60) })
-    .refine((m) => Object.values(m).every((v) => v === "" || MODEL_CHOICES.includes(v)), "Unknown model")
-    .optional(),
-  interviewerEffort: z.enum(["", "low", "medium", "high"]).optional(),
 });
 
 export const PUT = handle(async (req: Request) => {
   const user = await requireStaff("admin");
   const patch = Body.parse(await req.json());
-  const s = await saveSettings(patch);
-  await audit({ type: "staff", id: user.id }, "settings.update", "settings", "org", Object.keys(patch));
+  const s = await saveSettings(user.orgId, patch);
+  await audit({ type: "staff", id: user.id, orgId: user.orgId }, "settings.update", "settings", "org", Object.keys(patch));
   return json(s);
 });

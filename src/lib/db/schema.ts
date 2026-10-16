@@ -1,3 +1,4 @@
+import { sql } from "drizzle-orm";
 import {
   pgTable,
   uuid,
@@ -23,10 +24,28 @@ const ts = (name: string) => timestamp(name, { withTimezone: true });
 const createdAt = () => ts("created_at").notNull().defaultNow();
 const updatedAt = () => ts("updated_at").notNull().defaultNow();
 
+/* ------------------------------ Organisations ----------------------------- */
+
+/** A tenant. Every drive, user, candidate, setting, key and webhook belongs to exactly one organisation. */
+export const organizations = pgTable("organizations", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  name: text("name").notNull(),
+  slug: text("slug").notNull().unique(),
+  status: text("status").notNull().default("active").$type<"active" | "suspended">(),
+  /** Optional monthly AI spend alert threshold in USD (estimate). */
+  aiBudgetUsd: real("ai_budget_usd"),
+  createdAt: createdAt(),
+});
+
+const orgRef = () => uuid("org_id").notNull().references(() => organizations.id, { onDelete: "cascade" });
+
 /* ---------------------------------- Staff --------------------------------- */
 
 export const users = pgTable("users", {
   id: uuid("id").primaryKey().defaultRandom(),
+  orgId: orgRef(),
+  /** Platform operators can create organisations and switch into any of them. */
+  platformAdmin: boolean("platform_admin").notNull().default(false),
   email: text("email").notNull().unique(),
   name: text("name").notNull(),
   passwordHash: text("password_hash").notNull(),
@@ -37,7 +56,7 @@ export const users = pgTable("users", {
   createdAt: createdAt(),
 });
 
-/** Single-row-per-key org settings (company profile, values, policies). */
+/** Settings rows: key `org:{orgId}` holds an organisation's settings; key `platform` holds platform-wide ones. */
 export const settings = pgTable("settings", {
   key: text("key").primaryKey(),
   value: jsonb("value").notNull(),
@@ -47,6 +66,7 @@ export const settings = pgTable("settings", {
 /** HR knowledge base documents / FAQ entries used by the HR round's policy Q&A. */
 export const kbDocuments = pgTable("kb_documents", {
   id: uuid("id").primaryKey().defaultRandom(),
+  orgId: orgRef(),
   title: text("title").notNull(),
   content: text("content").notNull(),
   createdAt: createdAt(),
@@ -57,6 +77,7 @@ export const kbDocuments = pgTable("kb_documents", {
 
 export const drives = pgTable("drives", {
   id: uuid("id").primaryKey().defaultRandom(),
+  orgId: orgRef(),
   title: text("title").notNull(),
   status: text("status").notNull().default("draft").$type<"draft" | "active" | "paused" | "closed">(),
   draft: jsonb("draft").notNull(),
@@ -77,18 +98,26 @@ export const driveVersions = pgTable("drive_versions", {
 
 /* ------------------------------- Candidates ------------------------------- */
 
-export const candidates = pgTable("candidates", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  email: text("email").notNull().unique(),
-  name: text("name").notNull(),
-  githubUsername: text("github_username"),
-  createdAt: createdAt(),
-});
+/** A person, per organisation (the same email in two organisations is two separate records). */
+export const candidates = pgTable(
+  "candidates",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    orgId: orgRef(),
+    email: text("email").notNull(),
+    name: text("name").notNull(),
+    githubUsername: text("github_username"),
+    createdAt: createdAt(),
+  },
+  (t) => [uniqueIndex("candidate_org_email").on(t.orgId, t.email)],
+);
 
 export const candidacies = pgTable(
   "candidacies",
   {
     id: uuid("id").primaryKey().defaultRandom(),
+    /** Denormalised from the drive so every candidate-scoped check is a single comparison. */
+    orgId: orgRef(),
     driveId: uuid("drive_id").notNull().references(() => drives.id, { onDelete: "cascade" }),
     driveVersionId: uuid("drive_version_id").notNull().references(() => driveVersions.id),
     candidateId: uuid("candidate_id").notNull().references(() => candidates.id, { onDelete: "cascade" }),
@@ -340,6 +369,7 @@ export const aiCalls = pgTable("ai_calls", {
   cacheReadTokens: integer("cache_read_tokens"),
   cacheWriteTokens: integer("cache_write_tokens"),
   latencyMs: integer("latency_ms"),
+  orgId: uuid("org_id"),
   sessionId: uuid("session_id"),
   candidacyId: uuid("candidacy_id"),
   error: text("error"),
@@ -348,6 +378,7 @@ export const aiCalls = pgTable("ai_calls", {
 
 export const auditLog = pgTable("audit_log", {
   id: uuid("id").primaryKey().defaultRandom(),
+  orgId: uuid("org_id"),
   actorType: text("actor_type").notNull(),
   actorId: text("actor_id"),
   action: text("action").notNull(),
@@ -397,6 +428,7 @@ export const codingProblems = pgTable("coding_problems", {
 /** API keys for the integrations REST API (only a SHA-256 hash is stored). */
 export const apiKeys = pgTable("api_keys", {
   id: uuid("id").primaryKey().defaultRandom(),
+  orgId: orgRef(),
   name: text("name").notNull(),
   prefix: text("prefix").notNull(),
   keyHash: text("key_hash").notNull().unique(),
@@ -410,6 +442,7 @@ export const apiKeys = pgTable("api_keys", {
 /** Outbound webhook endpoints (payloads are HMAC-SHA256 signed with the secret). */
 export const webhooks = pgTable("webhooks", {
   id: uuid("id").primaryKey().defaultRandom(),
+  orgId: orgRef(),
   url: text("url").notNull(),
   secret: text("secret").notNull(),
   events: jsonb("events").$type<string[]>().notNull(),
@@ -454,3 +487,18 @@ export const candidateFeedback = pgTable("candidate_feedback", {
   comment: text("comment"),
   createdAt: createdAt(),
 });
+
+/* ------------------------------- Phase 4 ---------------------------------- */
+
+/** HR knowledge-base passages for full-text retrieval when the KB is too large to place whole in the dossier. */
+export const kbChunks = pgTable(
+  "kb_chunks",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    orgId: orgRef(),
+    documentId: uuid("document_id").notNull().references(() => kbDocuments.id, { onDelete: "cascade" }),
+    ord: integer("ord").notNull(),
+    content: text("content").notNull(),
+  },
+  (t) => [index("kb_chunks_fts").using("gin", sql`to_tsvector('simple', ${t.content})`), index("kb_chunks_org").on(t.orgId)],
+);

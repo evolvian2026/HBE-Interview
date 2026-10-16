@@ -33,7 +33,7 @@ export const PUT = handle(async (req: Request, { params }: { params: Promise<{ t
   const sec = currentSection(session.state as SessionState);
   if (sec?.exercise !== "practical_fit") throw new HttpError(409, "The practical details form is not open");
   const { data } = Body.parse(await req.json());
-  const settings = await getSettings();
+  const settings = await getSettings(candidacy.orgId);
   if (!settings.askCompensation) {
     data.expectedCompMin = null;
     data.expectedCompMax = null;

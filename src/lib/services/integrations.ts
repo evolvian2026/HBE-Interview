@@ -17,19 +17,25 @@ export type { ApiScope, WebhookEvent } from "../integrations-shared";
 
 const sha = (s: string) => createHash("sha256").update(s).digest("hex");
 
-export async function createApiKey(name: string, scopes: ApiScope[], userId: string) {
+export async function createApiKey(orgId: string, name: string, scopes: ApiScope[], userId: string) {
   const key = `hbe_${randomBytes(24).toString("base64url")}`;
-  const [row] = await db.insert(schema.apiKeys).values({ name, prefix: key.slice(0, 12), keyHash: sha(key), scopes, createdBy: userId }).returning();
+  const [row] = await db.insert(schema.apiKeys).values({ orgId, name, prefix: key.slice(0, 12), keyHash: sha(key), scopes, createdBy: userId }).returning();
   return { id: row.id, key };
 }
 
-/** Authenticate an integration request (Authorization: Bearer hbe_…) and check its scope. */
+/** Authenticate an integration request (Authorization: Bearer hbe_…) and check its scope. The key's `orgId` scopes every query. */
 export async function requireApiKey(req: Request, scope: ApiScope) {
   const auth = req.headers.get("authorization") ?? "";
   const key = auth.replace(/^Bearer\s+/i, "").trim();
   if (!key.startsWith("hbe_")) throw new HttpError(401, "Missing or invalid API key");
-  const [row] = await db.select().from(schema.apiKeys).where(and(eq(schema.apiKeys.keyHash, sha(key)), isNull(schema.apiKeys.revokedAt)));
-  if (!row) throw new HttpError(401, "Missing or invalid API key");
+  const [found] = await db
+    .select({ k: schema.apiKeys, status: schema.organizations.status })
+    .from(schema.apiKeys)
+    .innerJoin(schema.organizations, eq(schema.apiKeys.orgId, schema.organizations.id))
+    .where(and(eq(schema.apiKeys.keyHash, sha(key)), isNull(schema.apiKeys.revokedAt)));
+  if (!found) throw new HttpError(401, "Missing or invalid API key");
+  if (found.status !== "active") throw new HttpError(403, "This organisation is suspended");
+  const row = found.k;
   if (!row.scopes.includes(scope)) throw new HttpError(403, `API key lacks scope ${scope}`);
   await db.update(schema.apiKeys).set({ lastUsedAt: new Date() }).where(eq(schema.apiKeys.id, row.id));
   return row;
@@ -52,17 +58,17 @@ export function validateWebhookUrl(raw: string) {
   return u.toString();
 }
 
-export async function createWebhook(url: string, events: WebhookEvent[], userId: string) {
+export async function createWebhook(orgId: string, url: string, events: WebhookEvent[], userId: string) {
   const secret = `whsec_${randomBytes(24).toString("base64url")}`;
-  const [row] = await db.insert(schema.webhooks).values({ url: validateWebhookUrl(url), secret, events, createdBy: userId }).returning();
+  const [row] = await db.insert(schema.webhooks).values({ orgId, url: validateWebhookUrl(url), secret, events, createdBy: userId }).returning();
   return { id: row.id, secret };
 }
 
 
-/** Record an event for every subscribed webhook and queue its delivery. Never throws into the caller. */
-export async function emitEvent(event: WebhookEvent, data: Record<string, unknown>) {
+/** Record an event for every subscribed webhook of the organisation and queue its delivery. Never throws into the caller. */
+export async function emitEvent(orgId: string, event: WebhookEvent, data: Record<string, unknown>) {
   try {
-    const hooks = (await db.select().from(schema.webhooks).where(eq(schema.webhooks.active, true))).filter((h) => h.events.includes(event));
+    const hooks = (await db.select().from(schema.webhooks).where(and(eq(schema.webhooks.orgId, orgId), eq(schema.webhooks.active, true)))).filter((h) => h.events.includes(event));
     for (const h of hooks) {
       const [d] = await db
         .insert(schema.webhookDeliveries)
@@ -122,11 +128,12 @@ export async function deliverWebhookFailed(payload: { deliveryId: string }) {
   await db.update(schema.webhookDeliveries).set({ status: "failed" }).where(eq(schema.webhookDeliveries.id, payload.deliveryId));
 }
 
-export async function recentDeliveries(limit = 20) {
+export async function recentDeliveries(orgId: string, limit = 20) {
   return db
     .select({ d: schema.webhookDeliveries, url: schema.webhooks.url })
     .from(schema.webhookDeliveries)
     .innerJoin(schema.webhooks, eq(schema.webhookDeliveries.webhookId, schema.webhooks.id))
+    .where(eq(schema.webhooks.orgId, orgId))
     .orderBy(desc(schema.webhookDeliveries.createdAt))
     .limit(limit);
 }

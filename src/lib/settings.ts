@@ -17,6 +17,10 @@ export interface OrgSettings {
   retentionDays: number;
   consentText: string;
   consentVersion: number;
+}
+
+/** Platform-wide settings, managed by platform admins (models are a cost/quality decision for the operator). */
+export interface PlatformSettings {
   /** Per-tier model overrides (empty = use environment defaults). */
   models: { interviewer: string; analyzer: string; evaluator: string; utility: string };
   interviewerEffort: "" | "low" | "medium" | "high";
@@ -41,24 +45,48 @@ export const DEFAULT_SETTINGS: OrgSettings = {
   retentionDays: 180,
   consentText: DEFAULT_CONSENT,
   consentVersion: 1,
+};
+
+export const DEFAULT_PLATFORM_SETTINGS: PlatformSettings = {
   models: { interviewer: "", analyzer: "", evaluator: "", utility: "" },
   interviewerEffort: "",
 };
 
 export { MODEL_CHOICES } from "./settings-shared";
 
-export async function getSettings(): Promise<OrgSettings> {
-  const [row] = await db.select().from(schema.settings).where(eq(schema.settings.key, "org"));
-  return { ...DEFAULT_SETTINGS, ...((row?.value as Partial<OrgSettings>) ?? {}) };
+const orgKey = (orgId: string) => `org:${orgId}`;
+
+async function readKey<T>(key: string, defaults: T): Promise<T> {
+  const [row] = await db.select().from(schema.settings).where(eq(schema.settings.key, key));
+  return { ...defaults, ...((row?.value as Partial<T>) ?? {}) };
 }
 
-export async function saveSettings(patch: Partial<OrgSettings>) {
-  const current = await getSettings();
-  const next = { ...current, ...patch };
-  if (patch.consentText && patch.consentText !== current.consentText) next.consentVersion = current.consentVersion + 1;
+async function writeKey(key: string, value: object) {
   await db
     .insert(schema.settings)
-    .values({ key: "org", value: next })
-    .onConflictDoUpdate({ target: schema.settings.key, set: { value: next, updatedAt: new Date() } });
+    .values({ key, value })
+    .onConflictDoUpdate({ target: schema.settings.key, set: { value, updatedAt: new Date() } });
+}
+
+/** An organisation's settings (company profile, values, consent, retention…). */
+export async function getSettings(orgId: string): Promise<OrgSettings> {
+  return readKey(orgKey(orgId), DEFAULT_SETTINGS);
+}
+
+export async function saveSettings(orgId: string, patch: Partial<OrgSettings>) {
+  const current = await getSettings(orgId);
+  const next = { ...current, ...patch };
+  if (patch.consentText && patch.consentText !== current.consentText) next.consentVersion = current.consentVersion + 1;
+  await writeKey(orgKey(orgId), next);
+  return next;
+}
+
+export async function getPlatformSettings(): Promise<PlatformSettings> {
+  return readKey("platform", DEFAULT_PLATFORM_SETTINGS);
+}
+
+export async function savePlatformSettings(patch: Partial<PlatformSettings>) {
+  const next = { ...(await getPlatformSettings()), ...patch };
+  await writeKey("platform", next);
   return next;
 }

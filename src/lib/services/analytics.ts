@@ -150,7 +150,8 @@ export async function driveAnalytics(driveId: string) {
 
 /* ------------------------------ AI usage & cost ----------------------------- */
 
-export async function aiUsage(sinceDays: number | null) {
+/** AI usage and estimated cost. `orgId` null = all organisations (platform view). */
+export async function aiUsage(sinceDays: number | null, orgId: string | null) {
   const since = sinceDays ? new Date(Date.now() - sinceDays * 86_400_000) : new Date(0);
   const rows = await db
     .select({
@@ -165,7 +166,7 @@ export async function aiUsage(sinceDays: number | null) {
       p50: sql<number>`coalesce(percentile_cont(0.5) within group (order by ${schema.aiCalls.latencyMs}),0)::int`,
     })
     .from(schema.aiCalls)
-    .where(gte(schema.aiCalls.createdAt, since))
+    .where(and(gte(schema.aiCalls.createdAt, since), orgId ? eq(schema.aiCalls.orgId, orgId) : undefined))
     .groupBy(schema.aiCalls.stage, schema.aiCalls.model);
   const byStage = rows
     .map((r) => {
@@ -176,7 +177,8 @@ export async function aiUsage(sinceDays: number | null) {
   const [{ n: roundsEnded }] = await db
     .select({ n: sql<number>`count(*)::int` })
     .from(schema.roundSessions)
-    .where(and(eq(schema.roundSessions.status, "ended"), gte(schema.roundSessions.endedAt, since)));
+    .innerJoin(schema.candidacies, eq(schema.roundSessions.candidacyId, schema.candidacies.id))
+    .where(and(eq(schema.roundSessions.status, "ended"), gte(schema.roundSessions.endedAt, since), orgId ? eq(schema.candidacies.orgId, orgId) : undefined));
   const total = byStage.reduce((a, r) => a + r.cost, 0);
   const totalIn = byStage.reduce((a, r) => a + r.input + r.cacheRead + r.cacheWrite, 0);
   return {

@@ -14,7 +14,7 @@ export const POST = handle(async (req: Request, { params }: { params: Promise<{ 
   const { token } = await params;
   const { candidacy } = await requireCandidacy(token);
   if (candidacy.stage !== "invited") throw new HttpError(409, "Consent was already recorded");
-  const s = await getSettings();
+  const s = await getSettings(candidacy.orgId);
   const { accept, webcam } = Body.parse(await req.json());
   const [v] = await db.select({ config: schema.driveVersions.config }).from(schema.driveVersions).where(eq(schema.driveVersions.id, candidacy.driveVersionId));
   if (accept && (v.config as DriveConfig).proctoring?.webcam && !webcam) throw new HttpError(400, "This interview uses webcam proctoring — please consent to webcam snapshots to continue.");

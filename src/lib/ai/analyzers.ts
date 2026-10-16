@@ -81,8 +81,9 @@ function mockJd(title: string, jd: string): RoleProfile {
   };
 }
 
-export async function analyzeJd(title: string, jd: string): Promise<RoleProfile> {
+export async function analyzeJd(title: string, jd: string, ctx: CallContext = {}): Promise<RoleProfile> {
   return structured({
+    ctx,
     stage: "jd_analyze",
     tier: "analyzer",
     system: JD_SYSTEM,

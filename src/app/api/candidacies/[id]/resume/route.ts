@@ -10,7 +10,7 @@ export const GET = handle(async (_req: Request, { params }: { params: Promise<{ 
   await assertCandidacyAccess(user, id);
   const [r] = await db.select().from(schema.resumes).where(eq(schema.resumes.candidacyId, id));
   if (!r) throw new HttpError(404, "No resume");
-  await audit({ type: "staff", id: user.id }, "resume.download", "candidacy", id);
+  await audit({ type: "staff", id: user.id, orgId: user.orgId }, "resume.download", "candidacy", id);
   return new Response(new Uint8Array(r.fileData), {
     headers: { "content-type": r.mimeType, "content-disposition": `attachment; filename="${r.fileName.replace(/[^\w.-]/g, "_")}"` },
   });

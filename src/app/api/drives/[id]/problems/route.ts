@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { requireStaff } from "@/lib/auth/staff";
+import { requireDriveAccess, requireStaff } from "@/lib/auth/staff";
 import { handle, json } from "@/lib/http";
 import { createCustomProblem } from "@/lib/services/problems";
 import { audit } from "@/lib/audit";
@@ -19,8 +19,9 @@ const Body = z.object({
 export const POST = handle(async (req: Request, { params }: { params: Promise<{ id: string }> }) => {
   const user = await requireStaff("recruiter");
   const { id } = await params;
+  await requireDriveAccess(user, id);
   const input = Body.parse(await req.json());
   const { problem, validation } = await createCustomProblem(id, input, user.id);
-  await audit({ type: "staff", id: user.id }, "problem.create", "drive", id, { problemId: problem.id, valid: validation.ok });
+  await audit({ type: "staff", id: user.id, orgId: user.orgId }, "problem.create", "drive", id, { problemId: problem.id, valid: validation.ok });
   return json({ id: problem.id, validation });
 });

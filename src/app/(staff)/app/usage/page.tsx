@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { requireStaffPage } from "@/lib/auth/staff";
 import { aiUsage, PRICES } from "@/lib/services/analytics";
+import { orgBudget } from "@/lib/services/platform";
 import { Card, PageHeader, cx } from "@/components/ui";
 import { BarList, StatTile } from "@/components/charts";
 
@@ -16,9 +17,10 @@ const usd = (x: number) => (x < 1 ? `$${x.toFixed(3)}` : `$${x.toFixed(2)}`);
 const tok = (x: number) => (x >= 1e6 ? `${(x / 1e6).toFixed(1)}M` : x >= 1e3 ? `${(x / 1e3).toFixed(1)}k` : String(x));
 
 export default async function UsagePage({ searchParams }: { searchParams: Promise<{ range?: string }> }) {
-  await requireStaffPage("admin");
+  const user = await requireStaffPage("admin");
   const { range = "30" } = await searchParams;
-  const u = await aiUsage(range === "all" ? null : Number(range));
+  const u = await aiUsage(range === "all" ? null : Number(range), user.orgId);
+  const budget = await orgBudget(user.orgId);
   return (
     <div className="space-y-6">
       <PageHeader title="AI usage & cost" subtitle="Estimated from recorded token usage at list prices. Mock-mode calls are not recorded." />
@@ -34,7 +36,11 @@ export default async function UsagePage({ searchParams }: { searchParams: Promis
         <StatTile label="Cost per completed round" value={u.perRound == null ? "—" : usd(u.perRound)} sub={`${u.roundsEnded} round(s) ended`} />
         <StatTile label="Model calls" value={String(u.calls)} sub={`${u.errors} error(s)`} />
         <StatTile label="Input served from cache" value={u.cacheShare == null ? "—" : `${Math.round(u.cacheShare * 100)}%`} />
-        <StatTile label="PRD target" value="≤ $1.50" sub="per 45-min technical round" />
+        <StatTile
+          label="This month vs budget"
+          value={budget.budget == null ? usd(budget.spent) : `${Math.round((budget.ratio ?? 0) * 100)}%`}
+          sub={budget.budget == null ? "No monthly budget set (platform admins set it)" : `${usd(budget.spent)} of ${usd(budget.budget)} · target ≤ $1.50 per technical round`}
+        />
       </div>
       <Card title="Cost by pipeline stage">
         {u.byStage.length ? (

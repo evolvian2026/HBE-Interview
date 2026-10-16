@@ -15,9 +15,9 @@ export default async function GateQueuePage() {
     .from(schema.candidacies)
     .innerJoin(schema.candidates, eq(schema.candidacies.candidateId, schema.candidates.id))
     .innerJoin(schema.drives, eq(schema.candidacies.driveId, schema.drives.id))
-    .where(inArray(schema.candidacies.stage, ["gate_pending", "on_hold"]))
+    .where(and(eq(schema.candidacies.orgId, user.orgId), inArray(schema.candidacies.stage, ["gate_pending", "on_hold"])))
     .orderBy(desc(schema.candidacies.updatedAt));
-  const rows = allRows.filter((r) => canSeeDrive(user, r.d.id));
+  const rows = allRows.filter((r) => canSeeDrive(user, r.d));
   const ids = rows.map((r) => r.c.id);
   const reports = ids.length ? await db.select().from(schema.roundReports).where(inArray(schema.roundReports.candidacyId, ids)) : [];
   const auto = await db
@@ -25,7 +25,7 @@ export default async function GateQueuePage() {
     .from(schema.gateDecisions)
     .innerJoin(schema.candidacies, eq(schema.gateDecisions.candidacyId, schema.candidacies.id))
     .innerJoin(schema.candidates, eq(schema.candidacies.candidateId, schema.candidates.id))
-    .where(and(eq(schema.gateDecisions.mode, "auto")))
+    .where(and(eq(schema.gateDecisions.mode, "auto"), eq(schema.candidacies.orgId, user.orgId)))
     .orderBy(desc(schema.gateDecisions.createdAt))
     .limit(20);
   return (
@@ -72,11 +72,11 @@ export default async function GateQueuePage() {
         </div>
       )}
       <h2 className="mb-3 mt-10 text-sm font-semibold text-slate-700">Recently auto-advanced</h2>
-      {auto.filter((a) => canSeeDrive(user, a.c.driveId)).length === 0 ? (
+      {auto.filter((a) => canSeeDrive(user, { id: a.c.driveId, orgId: a.c.orgId })).length === 0 ? (
         <p className="text-sm text-slate-500">None yet.</p>
       ) : (
         <ul className="space-y-1 text-sm">
-          {auto.filter((a) => canSeeDrive(user, a.c.driveId)).map(({ g, cand, c }) => (
+          {auto.filter((a) => canSeeDrive(user, { id: a.c.driveId, orgId: a.c.orgId })).map(({ g, cand, c }) => (
             <li key={g.id}>
               <Link href={`/app/candidates/${c.id}`} className="text-brand-700 hover:underline">
                 {cand.name}

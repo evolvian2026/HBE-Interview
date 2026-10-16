@@ -11,11 +11,11 @@ import { emitEvent } from "./integrations";
 
 const emailOk = (e: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e);
 
-async function upsertCandidate(name: string, email: string) {
+async function upsertCandidate(orgId: string, name: string, email: string) {
   const [c] = await db
     .insert(schema.candidates)
-    .values({ name: name.trim(), email: email.trim().toLowerCase() })
-    .onConflictDoUpdate({ target: schema.candidates.email, set: { name: name.trim() } })
+    .values({ orgId, name: name.trim(), email: email.trim().toLowerCase() })
+    .onConflictDoUpdate({ target: [schema.candidates.orgId, schema.candidates.email], set: { name: name.trim() } })
     .returning();
   return c;
 }
@@ -24,7 +24,7 @@ async function createCandidacy(drive: typeof schema.drives.$inferSelect, name: s
   if (!drive.currentVersionId) throw new HttpError(400, "This drive is not published yet.");
   const [version] = await db.select().from(schema.driveVersions).where(eq(schema.driveVersions.id, drive.currentVersionId));
   const config = version.config as DriveConfig;
-  const candidate = await upsertCandidate(name, email);
+  const candidate = await upsertCandidate(drive.orgId, name, email);
   const [existing] = await db
     .select()
     .from(schema.candidacies)
@@ -33,6 +33,7 @@ async function createCandidacy(drive: typeof schema.drives.$inferSelect, name: s
   const [candidacy] = await db
     .insert(schema.candidacies)
     .values({
+      orgId: drive.orgId,
       driveId: drive.id,
       driveVersionId: version.id,
       candidateId: candidate.id,
@@ -40,12 +41,13 @@ async function createCandidacy(drive: typeof schema.drives.$inferSelect, name: s
       expiresAt: new Date(Date.now() + config.inviteExpiryDays * 86_400_000),
     })
     .returning();
-  await emitEvent("candidate.invited", { candidacyId: candidacy.id, driveId: drive.id, candidate: { name: candidate.name, email: candidate.email } });
+  await emitEvent(drive.orgId, "candidate.invited", { candidacyId: candidacy.id, driveId: drive.id, candidate: { name: candidate.name, email: candidate.email } });
   return { candidacy, created: true };
 }
 
-export async function inviteCandidates(driveId: string, list: { name: string; email: string }[], user: { id: string | null }, via: "ui" | "api" = "ui") {
-  const [drive] = await db.select().from(schema.drives).where(eq(schema.drives.id, driveId));
+/** Invite candidates to a drive of the actor's organisation (staff user or API key). */
+export async function inviteCandidates(driveId: string, list: { name: string; email: string }[], actor: { id: string | null; orgId: string }, via: "ui" | "api" = "ui") {
+  const [drive] = await db.select().from(schema.drives).where(and(eq(schema.drives.id, driveId), eq(schema.drives.orgId, actor.orgId)));
   if (!drive) throw new HttpError(404, "Drive not found");
   if (drive.status !== "active") throw new HttpError(400, "Publish (activate) the drive before inviting candidates.");
   const out: { name: string; email: string; link?: string; status: string }[] = [];
@@ -61,7 +63,7 @@ export async function inviteCandidates(driveId: string, list: { name: string; em
     ids.push(candidacy.id);
     out.push({ name: item.name, email: item.email, link: candidateLink(candidacy.accessToken), status: created ? "invited" : "already_invited" });
   }
-  await audit({ type: "staff", id: user.id }, "drive.invite", "drive", driveId, { count: out.length, via });
+  await audit({ type: "staff", id: actor.id, orgId: actor.orgId }, "drive.invite", "drive", driveId, { count: out.length, via });
   return out.map((o, i) => ({ ...o, candidacyId: ids[i] }));
 }
 

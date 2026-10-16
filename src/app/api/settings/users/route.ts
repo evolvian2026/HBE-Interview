@@ -16,10 +16,10 @@ export const POST = handle(async (req: Request) => {
   const b = Body.parse(await req.json());
   const [u] = await db
     .insert(schema.users)
-    .values({ name: b.name, email: b.email.toLowerCase(), passwordHash: await hashPassword(b.password), role: b.role })
+    .values({ orgId: admin.orgId, name: b.name, email: b.email.toLowerCase(), passwordHash: await hashPassword(b.password), role: b.role })
     .onConflictDoNothing()
     .returning();
   if (!u) return json({ error: { message: "A user with this email already exists" } }, 409);
-  await audit({ type: "staff", id: admin.id }, "user.create", "user", u.id, { role: b.role });
+  await audit({ type: "staff", id: admin.id, orgId: admin.orgId }, "user.create", "user", u.id, { role: b.role });
   return json({ id: u.id });
 });

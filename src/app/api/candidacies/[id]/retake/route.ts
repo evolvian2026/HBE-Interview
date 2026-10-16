@@ -1,7 +1,7 @@
 import { and, eq } from "drizzle-orm";
 import { z } from "zod";
 import { db, schema } from "@/lib/db";
-import { HttpError, requireStaff } from "@/lib/auth/staff";
+import { HttpError, assertCandidacyAccess, requireStaff } from "@/lib/auth/staff";
 import { handle, json } from "@/lib/http";
 import { audit } from "@/lib/audit";
 
@@ -11,6 +11,7 @@ const Body = z.object({ roundIndex: z.number().int().min(0), reason: z.string().
 export const POST = handle(async (req: Request, { params }: { params: Promise<{ id: string }> }) => {
   const user = await requireStaff("recruiter");
   const { id } = await params;
+  await assertCandidacyAccess(user, id);
   const { roundIndex, reason } = Body.parse(await req.json());
   const [c] = await db.select().from(schema.candidacies).where(eq(schema.candidacies.id, id));
   if (!c) throw new HttpError(404, "Not found");
@@ -20,6 +21,6 @@ export const POST = handle(async (req: Request, { params }: { params: Promise<{ 
     .update(schema.candidacies)
     .set({ stage: "round_available", roundAvailableUntil: new Date(Date.now() + 7 * 86_400_000), updatedAt: new Date() })
     .where(eq(schema.candidacies.id, id));
-  await audit({ type: "staff", id: user.id }, "round.retake", "candidacy", id, { roundIndex, reason });
+  await audit({ type: "staff", id: user.id, orgId: user.orgId }, "round.retake", "candidacy", id, { roundIndex, reason });
   return json({ ok: true });
 });

@@ -8,7 +8,7 @@ const Body = z.object({ title: z.string().trim().min(1).max(200), content: z.str
 
 /** Add an HR knowledge base document: JSON {title, content} or multipart file (PDF/DOCX/TXT/MD). */
 export const POST = handle(async (req: Request) => {
-  await requireStaff("admin");
+  const user = await requireStaff("admin");
   let title: string;
   let content: string;
   if ((req.headers.get("content-type") ?? "").includes("multipart/form-data")) {
@@ -21,6 +21,6 @@ export const POST = handle(async (req: Request) => {
   } else {
     ({ title, content } = Body.parse(await req.json()));
   }
-  const [d] = await db.insert(schema.kbDocuments).values({ title, content: content.slice(0, 200_000) }).returning();
+  const [d] = await db.insert(schema.kbDocuments).values({ orgId: user.orgId, title, content: content.slice(0, 200_000) }).returning();
   return json({ id: d.id });
 });

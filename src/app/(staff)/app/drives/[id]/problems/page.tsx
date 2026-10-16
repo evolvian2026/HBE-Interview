@@ -1,18 +1,17 @@
 import Link from "next/link";
 import { desc, eq } from "drizzle-orm";
-import { notFound } from "next/navigation";
+
 import { db, schema } from "@/lib/db";
-import { requireStaffPage } from "@/lib/auth/staff";
+import { requireDrivePage, requireStaffPage } from "@/lib/auth/staff";
 import { Badge, Card, PageHeader } from "@/components/ui";
 import { ProblemForm, DeleteProblemButton } from "@/components/staff/problem-form";
 
 export const dynamic = "force-dynamic";
 
 export default async function ProblemsPage({ params }: { params: Promise<{ id: string }> }) {
-  await requireStaffPage("recruiter");
+  const user = await requireStaffPage("recruiter");
   const { id } = await params;
-  const [d] = await db.select().from(schema.drives).where(eq(schema.drives.id, id));
-  if (!d) notFound();
+  const d = await requireDrivePage(user, id);
   const problems = await db.select().from(schema.codingProblems).where(eq(schema.codingProblems.driveId, id)).orderBy(desc(schema.codingProblems.createdAt));
   return (
     <div className="space-y-6">

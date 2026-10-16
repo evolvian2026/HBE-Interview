@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { canSeeDrive, requireStaffPage } from "@/lib/auth/staff";
+import { requireDrivePage, requireStaffPage } from "@/lib/auth/staff";
 import { driveAnalytics } from "@/lib/services/analytics";
 import { Card, PageHeader } from "@/components/ui";
 import { BarList, Histogram, StatTile } from "@/components/charts";
@@ -13,7 +13,7 @@ const mins = (x: number | null) => (x == null ? "—" : x < 1 ? "<1" : String(Ma
 export default async function AnalyticsPage({ params }: { params: Promise<{ id: string }> }) {
   const user = await requireStaffPage();
   const { id } = await params;
-  if (!canSeeDrive(user, id)) notFound();
+  await requireDrivePage(user, id);
   const a = await driveAnalytics(id);
   if (!a) notFound();
   const k = a.kpis;

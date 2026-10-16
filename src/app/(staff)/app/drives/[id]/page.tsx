@@ -1,8 +1,8 @@
 import Link from "next/link";
 import { desc, eq, inArray } from "drizzle-orm";
-import { notFound } from "next/navigation";
+
 import { db, schema } from "@/lib/db";
-import { canSeeDrive, hasRole, requireStaffPage } from "@/lib/auth/staff";
+import { requireDrivePage, hasRole, requireStaffPage } from "@/lib/auth/staff";
 import { env } from "@/lib/env";
 import { enabledRounds } from "@/lib/core/rounds";
 import { CATEGORY_LABEL, RECOMMENDATION_LABEL, ROUND_LABEL, SENIORITY_LABEL, type DriveConfig, type Recommendation } from "@/lib/core/types";
@@ -21,8 +21,7 @@ export default async function DrivePage({ params, searchParams }: { params: Prom
   const user = await requireStaffPage();
   const { id } = await params;
   const { stage = "all", sort = "recent" } = await searchParams;
-  const [d] = await db.select().from(schema.drives).where(eq(schema.drives.id, id));
-  if (!d || !canSeeDrive(user, d.id)) notFound();
+  const d = await requireDrivePage(user, id);
   const [version] = d.currentVersionId ? await db.select().from(schema.driveVersions).where(eq(schema.driveVersions.id, d.currentVersionId)) : [];
   const config = (version?.config ?? d.draft) as DriveConfig;
   const rounds = enabledRounds(config);

@@ -1,3 +1,4 @@
+import { DEFAULT_ORG_ID } from "@/lib/tenancy";
 import { eq } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
 import { getSettings } from "@/lib/settings";
@@ -11,7 +12,7 @@ export const dynamic = "force-dynamic";
 export default async function OpenInvitePage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
   const [drive] = await db.select().from(schema.drives).where(eq(schema.drives.openSlug, slug));
-  const settings = await getSettings();
+  const settings = await getSettings(drive?.orgId ?? DEFAULT_ORG_ID);
   const active = drive && drive.status === "active" && drive.currentVersionId;
   let rounds: string[] = [];
   if (active) {

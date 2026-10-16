@@ -1,4 +1,4 @@
-import { desc, eq } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 import { z } from "zod";
 import { db, schema } from "@/lib/db";
 import { handle, json } from "@/lib/http";
@@ -9,7 +9,7 @@ type Ctx = { params: Promise<{ id: string }> };
 
 /** GET /api/v1/drives/{id}/candidates — candidates in a drive with stage and final result (scope candidates:read). */
 export const GET = handle(async (req: Request, { params }: Ctx) => {
-  await requireApiKey(req, "candidates:read");
+  const key = await requireApiKey(req, "candidates:read");
   const { id } = await params;
   const rows = await db
     .select({
@@ -26,7 +26,7 @@ export const GET = handle(async (req: Request, { params }: Ctx) => {
     .from(schema.candidacies)
     .innerJoin(schema.candidates, eq(schema.candidacies.candidateId, schema.candidates.id))
     .leftJoin(schema.combinedReports, eq(schema.combinedReports.candidacyId, schema.candidacies.id))
-    .where(eq(schema.candidacies.driveId, id))
+    .where(and(eq(schema.candidacies.driveId, id), eq(schema.candidacies.orgId, key.orgId)))
     .orderBy(desc(schema.candidacies.createdAt));
   return json({ data: rows });
 });
@@ -40,6 +40,6 @@ export const POST = handle(async (req: Request, { params }: Ctx) => {
   const key = await requireApiKey(req, "candidates:write");
   const { id } = await params;
   const { candidates } = Body.parse(await req.json());
-  const results = await inviteCandidates(id, candidates, { id: key.createdBy }, "api");
+  const results = await inviteCandidates(id, candidates, { id: key.createdBy, orgId: key.orgId }, "api");
   return json({ data: results }, 201);
 });

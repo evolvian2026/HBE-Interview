@@ -14,7 +14,7 @@ export const POST = handle(async (req: Request, { params }: { params: Promise<{ 
   await assertCandidacyAccess(user, id);
   const { status } = Body.parse(await req.json());
   await db.update(schema.candidacies).set({ stage: status, finalStatus: status, updatedAt: new Date() }).where(eq(schema.candidacies.id, id));
-  await audit({ type: "staff", id: user.id }, `candidacy.${status}`, "candidacy", id);
-  await emitEvent("candidate.status_changed", { candidacyId: id, status });
+  await audit({ type: "staff", id: user.id, orgId: user.orgId }, `candidacy.${status}`, "candidacy", id);
+  await emitEvent(user.orgId, "candidate.status_changed", { candidacyId: id, status });
   return json({ ok: true });
 });

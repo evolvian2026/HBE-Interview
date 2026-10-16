@@ -21,7 +21,7 @@ export async function ReportDocument({ candidacyId, masked, includeTranscript = 
   if (!row) return <p>Report not found.</p>;
   const config = row.v.config as DriveConfig;
   const rounds = enabledRounds(config);
-  const settings = await getSettings();
+  const settings = await getSettings(row.c.orgId);
   const reports = await db.select().from(schema.roundReports).where(eq(schema.roundReports.candidacyId, candidacyId));
   const [combined] = await db.select().from(schema.combinedReports).where(eq(schema.combinedReports.candidacyId, candidacyId));
   const [fit] = await db.select().from(schema.practicalFit).where(eq(schema.practicalFit.candidacyId, candidacyId));

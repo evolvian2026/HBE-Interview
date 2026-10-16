@@ -1,8 +1,6 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
-import { eq } from "drizzle-orm";
-import { db, schema } from "@/lib/db";
-import { canSeeDrive, requireStaffPage } from "@/lib/auth/staff";
+
+import { requireDrivePage, requireStaffPage } from "@/lib/auth/staff";
 import { driveFairness } from "@/lib/services/feedback";
 import { FOUR_FIFTHS, MIN_COHORT } from "@/lib/core/fairness";
 import { Badge, Card, PageHeader } from "@/components/ui";
@@ -16,9 +14,7 @@ const one = (x: number | null) => (x == null ? "—" : x.toFixed(1));
 export default async function FairnessPage({ params }: { params: Promise<{ id: string }> }) {
   const user = await requireStaffPage("recruiter");
   const { id } = await params;
-  if (!canSeeDrive(user, id)) notFound();
-  const [drive] = await db.select().from(schema.drives).where(eq(schema.drives.id, id));
-  if (!drive) notFound();
+  const drive = await requireDrivePage(user, id);
   const f = await driveFairness(id);
   const flagged = f.dimensions.filter((d) => d.key !== "round").flatMap((d) => d.stats.filter((s) => s.flagged).map((s) => `${d.label}: ${s.cohort}`));
   return (

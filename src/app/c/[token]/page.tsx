@@ -33,7 +33,7 @@ export default async function CandidateHub({ params }: { params: Promise<{ token
   const [drive] = await db.select().from(schema.drives).where(eq(schema.drives.id, candidacy.driveId));
   const [version] = await db.select().from(schema.driveVersions).where(eq(schema.driveVersions.id, candidacy.driveVersionId));
   const config = version.config as DriveConfig;
-  const settings = await getSettings();
+  const settings = await getSettings(candidacy.orgId);
   const [resume] = await db.select().from(schema.resumes).where(eq(schema.resumes.candidacyId, candidacy.id));
   const rounds = await candidateRounds(candidacy, config);
   const needsProjects = needsProjectsStep(config);

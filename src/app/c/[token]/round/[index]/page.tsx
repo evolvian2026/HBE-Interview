@@ -23,7 +23,7 @@ export default async function RoundPage({ params }: { params: Promise<{ token: s
     .where(and(eq(schema.roundSessions.candidacyId, row.candidacy.id), eq(schema.roundSessions.roundIndex, i)));
   const available = i === row.candidacy.currentRoundIndex && ["ready", "round_available"].includes(row.candidacy.stage);
   if (!session && !available) redirect(`/c/${token}`);
-  const settings = await getSettings();
+  const settings = await getSettings(row.candidacy.orgId);
   const sections = round.sections.filter((s) => s.enabled);
   return (
     <InterviewRoom
