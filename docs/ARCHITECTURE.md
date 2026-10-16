@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Document status** | Draft v1.1, awaiting product owner approval |
+| **Document status** | v1.2 — approved; Phase 1 implemented (see §0 for as-built decisions) |
 | **Date** | 2026-10-16 |
 | **Related** | [PRD.md](PRD.md) · [FEATURES.md](FEATURES.md) |
 
@@ -10,6 +10,7 @@
 
 ## Contents
 
+0. [As-built decisions (v1.2)](#0-as-built-decisions-v12)
 1. [Scope](#1-scope)
 2. [Architectural principles](#2-architectural-principles)
 3. [System context](#3-system-context)
@@ -32,6 +33,45 @@
 20. [Resilience & failure modes](#20-resilience--failure-modes)
 21. [Testing strategy](#21-testing-strategy)
 22. [Architecture decision records](#22-architecture-decision-records)
+
+---
+
+## 0. As-built decisions (v1.2)
+
+The product owner approved the design with these decisions. **Where this section conflicts with later sections, this section wins**; later sections describe the target architecture and the scale-out path.
+
+| Decision | As built |
+|---|---|
+| Database | **Neon Postgres** (instead of Supabase). Accessed with Drizzle ORM over the `pg` driver; migrations in `drizzle/` applied by `npm run db:migrate`. Use Neon's **direct** endpoint (not `-pooler`): the interview engine takes session-level advisory locks |
+| Auth | Built-in: staff email + password (bcrypt) with signed HTTP-only JWT cookies (`jose`); roles admin / recruiter / hiring manager / viewer. Candidates use a **personal bearer link** (`/c/{token}`, 192-bit random) issued by invite or open registration — no account needed |
+| File storage | Resumes stored in Postgres (`bytea`, ≤ 5 MB); HR knowledge-base documents stored as extracted text. No separate object store |
+| Realtime | Candidate interview turns stream over **SSE**; status pages poll. No Supabase Realtime |
+| Tenancy | **Single internal organisation** (no `org_id`); org settings live in the `settings` table. Multi-tenancy is a later phase (add `org_id` + scoping) |
+| Background jobs | Postgres `jobs` table with `FOR UPDATE SKIP LOCKED`, retries with exponential back-off, singleton keys and `:failed` handlers. The worker runs **inside the web process** by default (`RUN_WORKER_IN_PROCESS=true`) or standalone via `npm run worker` |
+| Code execution | **Judge0** (hosted CE via RapidAPI or self-hosted) behind an executor interface (`src/lib/exec`). Later: AWS-hosted sandbox. A `local-dev` executor exists for development/CI only and is refused in production. Problems are stdin/stdout so one test set serves Python, JavaScript, Java and C++ |
+| Interview modality | **Text and voice.** Voice uses the browser Web Speech API (speech-to-text in Chrome/Edge/Safari, text-to-speech everywhere); the transcript is editable before sending and is what gets evaluated |
+| GitHub | **Public repositories only** (REST API; optional `GITHUB_TOKEN` for rate limits) |
+| Round order | Technical/Functional → Managerial (when applicable) → **HR always last**; order is fixed in the editor |
+| Compensation | HR round does **not** ask compensation by default (org setting, off). Salary history is never asked |
+| HR knowledge base | Small-KB fast path only: the whole KB (≤ 120k chars) is placed in the cached HR dossier; vector/FTS retrieval deferred |
+| Codebase | A single Next.js app (`src/app`, `src/lib`, `src/components`) rather than a monorepo; module boundaries are kept as folders (`lib/core` is pure and unit-tested) |
+| Hosting | **Render** web service (`render.yaml`); migrations + seed run on start; `/api/health` health check |
+| Mock mode | `AI_MOCK=true` runs the whole pipeline with deterministic mock AI (development, demos and CI); `GITHUB_MOCK=true` uses a synthetic repository |
+
+### 0.1 Source map
+
+| Concern | Location |
+|---|---|
+| Pure domain logic (round matrix, state machine, scoring, gating, practical fit, authenticity, evidence) | `src/lib/core/*` (tests in `tests/core.test.ts`) |
+| AI gateway, analyzers, evaluator, compliance/redaction | `src/lib/ai/*` |
+| Interview orchestrator, agent, dossier, exercises | `src/lib/interview/*` |
+| Jobs & services (resume, repos, evaluation/gating, maintenance, notifications) | `src/lib/jobs/*`, `src/lib/services/*` |
+| Content banks (12 validated coding problems, design prompts, cases, scenarios) | `src/lib/content/*`, generator `scripts/generate-problems.py` |
+| Code execution | `src/lib/exec/index.ts` |
+| Candidate UI (onboarding, interview room, voice, editors) | `src/app/c/*`, `src/app/i/*`, `src/components/candidate/*`, `src/components/room/*` |
+| Recruiter UI (drives, editor, reports, decisions, settings) | `src/app/(staff)/app/*`, `src/components/staff/*` |
+| API routes | `src/app/api/*` |
+| End-to-end checks | `scripts/smoke.ts` (HTTP, all three rounds), `e2e/ui-check.ts` (browser walkthrough) |
 
 ---
 
@@ -134,9 +174,9 @@ flowchart TB
 | **hbe-web** | UI rendering, REST/SSE API, auth checks, **interview turn loop** (latency-critical), code run proxy | Horizontal, stateless (2–6 instances) |
 | **hbe-worker** | Long-running/async jobs: resume parsing, JD analysis (when async), repo analysis, problem validation, evaluation, combined report, KB indexing, emails | Horizontal by queue depth (1–4 instances) |
 | **hbe-cron** | Scheduled jobs (Render Cron) that enqueue work: retention purge, reminders, stale-session finalization, usage rollups | Single |
-| **Supabase Postgres** | System of record, job queue (pg-boss), full-text search for KB, RLS for tenant isolation | Managed; vertical scale, plus read replica in P2 |
-| **Supabase Storage** | Private buckets for resumes, KB docs, exports | Managed |
-| **Supabase Auth** | Recruiter auth (email + password, Google SSO), candidate passwordless OTP | Managed |
+| **Neon Postgres** | System of record, job queue (`jobs` table), resume files, KB text | Managed serverless Postgres; scale compute, read replica later |
+| **File storage** | Resumes in Postgres `bytea` (≤ 5 MB); exports later in object storage | — |
+| **Auth** | Built-in staff auth (bcrypt + signed JWT cookie); candidate personal bearer links | — |
 
 ---
 
@@ -150,8 +190,8 @@ flowchart TB
 | Editors | Monaco (code), TipTap or a structured textarea (design/case panels) | |
 | Client state | TanStack Query (server state), Zustand (room UI state) | |
 | Validation | Zod | API inputs, LLM output schemas, config |
-| DB access | Supabase JS (RLS-scoped) + Drizzle ORM (server/worker typed SQL) | Migrations via Supabase CLI (SQL files) |
-| Job queue | pg-boss (Postgres) | Retries, scheduling, singleton keys, dead-letter |
+| DB access | Drizzle ORM over `pg` | Migrations generated by drizzle-kit, applied with `npm run db:migrate` |
+| Job queue | Postgres `jobs` table (`SKIP LOCKED`) | Retries with back-off, singleton keys, failure handlers |
 | AI SDK | `@anthropic-ai/sdk` | Streaming, tool use, structured outputs, prompt caching |
 | Doc parsing | `pdf-parse` / `pdfjs-dist` (PDF), `mammoth` (DOCX) | |
 | Code sandbox | Judge0 CE (hosted for MVP; self-hostable on an isolated VM) | |
@@ -161,7 +201,7 @@ flowchart TB
 | Observability | OpenTelemetry → Grafana Cloud / Honeycomb; Sentry for errors | |
 | Testing | Vitest, Playwright, k6, a custom AI eval harness | |
 | Runtime | Node.js LTS | |
-| Hosting | Render (web, worker, cron), Supabase (managed Postgres/Auth/Storage) | Both already connected to this workspace |
+| Hosting | Render (web service; optional worker), Neon (Postgres) | `render.yaml` blueprint |
 
 ---
 
@@ -832,7 +872,7 @@ Failed jobs go to a dead-letter queue with alerting. All handlers are idempotent
 
 ### 18.3 Configuration (environment variables)
 
-`SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `DATABASE_URL` (pg-boss/Drizzle), `ANTHROPIC_API_KEY`, `GITHUB_APP_ID`, `GITHUB_APP_PRIVATE_KEY`, `GITHUB_APP_INSTALLATION_ID`, `JUDGE0_URL`, `JUDGE0_API_KEY`, `RESEND_API_KEY`, `APP_BASE_URL`, `SENTRY_DSN`, `OTEL_EXPORTER_OTLP_ENDPOINT`, `ENCRYPTION_KEY` (share-link tokens).
+As built: see `.env.example` — `DATABASE_URL` (Neon), `APP_BASE_URL`, `SESSION_SECRET`, `ADMIN_EMAIL`/`ADMIN_PASSWORD`, `ANTHROPIC_API_KEY`, `AI_MOCK`, optional `AI_MODEL_*` overrides, `CODE_EXECUTOR`, `JUDGE0_URL`/`JUDGE0_API_KEY`/`JUDGE0_RAPIDAPI_HOST`/`JUDGE0_LANGUAGE_IDS`, `GITHUB_TOKEN`, `RUN_WORKER_IN_PROCESS`, `RESEND_API_KEY`/`EMAIL_FROM`. Target additions: `SENTRY_DSN`, `OTEL_EXPORTER_OTLP_ENDPOINT`.
 
 ### 18.4 CI/CD (GitHub Actions)
 
@@ -929,8 +969,8 @@ k6 load test (200 concurrent sessions with a mock model and 20 with the live mod
 | ADR-001 | Modular monolith (Next.js) + one worker | Microservices | Small team, fast iteration; module boundaries allow a later split |
 | ADR-002 | Server-owned state machine; the LLM acts through validated tools | LLM-driven free-form conversation | Predictable timing, coverage, and fairness; reproducibility; testability |
 | ADR-003 | Render (long-lived Node) for web | Serverless (Vercel/Lambda) | SSE turns of up to 30 s+, watchdogs, persistent connections; Render is already connected |
-| ADR-004 | Supabase (Postgres, Auth, Storage, Realtime) | Self-managed Postgres + Auth0 + S3 | One managed platform, RLS for multi-tenancy, already connected |
-| ADR-005 | pg-boss queue on Postgres | Redis/BullMQ, SQS | No extra infrastructure; transactional enqueue with business writes |
+| ADR-004 | Neon Postgres + built-in auth (product owner decision) | Supabase (Postgres, Auth, Storage, Realtime) | Product owner preference; fewer moving parts for a single internal tool |
+| ADR-005 | Postgres `jobs` table queue (SKIP LOCKED) | pg-boss, Redis/BullMQ, SQS | No extra infrastructure or dependency; transactional enqueue with business writes |
 | ADR-006 | Judge0 for code execution | Custom Docker runner, Piston | Mature isolation and multi-language support; hosted option for the MVP |
 | ADR-007 | Claude model tiering (Sonnet interviewer, Opus evaluator, Haiku utilities) | Single model for everything | Balances interactive latency, evaluation quality, and cost |
 | ADR-008 | Deterministic scoring math and authenticity rules in code | Ask the LLM for the final score | Transparency, auditability, consistent results |

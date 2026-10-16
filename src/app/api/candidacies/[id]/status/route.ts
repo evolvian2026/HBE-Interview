@@ -1,0 +1,17 @@
+import { eq } from "drizzle-orm";
+import { z } from "zod";
+import { db, schema } from "@/lib/db";
+import { requireStaff } from "@/lib/auth/staff";
+import { handle, json } from "@/lib/http";
+import { audit } from "@/lib/audit";
+
+const Body = z.object({ status: z.enum(["shortlisted", "rejected", "on_hold", "completed"]) });
+
+export const POST = handle(async (req: Request, { params }: { params: Promise<{ id: string }> }) => {
+  const user = await requireStaff("hiring_manager");
+  const { id } = await params;
+  const { status } = Body.parse(await req.json());
+  await db.update(schema.candidacies).set({ stage: status, finalStatus: status, updatedAt: new Date() }).where(eq(schema.candidacies.id, id));
+  await audit({ type: "staff", id: user.id }, `candidacy.${status}`, "candidacy", id);
+  return json({ ok: true });
+});

@@ -1,0 +1,45 @@
+# Render Blueprint for HBE Interview (single internal tool).
+# Database: Neon Postgres — set DATABASE_URL to the *direct* (non "-pooler") connection string, with sslmode=require.
+services:
+  - type: web
+    name: hbe-interview
+    runtime: node
+    plan: starter
+    region: singapore
+    buildCommand: npm ci && npm run build
+    # Migrations run before the server starts; the background job worker runs inside the web process.
+    startCommand: npm run db:migrate && npm run db:seed && npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: DATABASE_URL
+        sync: false
+      - key: APP_BASE_URL
+        sync: false
+      - key: SESSION_SECRET
+        generateValue: true
+      - key: ADMIN_EMAIL
+        sync: false
+      - key: ADMIN_PASSWORD
+        sync: false
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: AI_MOCK
+        value: "false"
+      - key: CODE_EXECUTOR
+        value: judge0
+      - key: JUDGE0_URL
+        value: https://judge0-ce.p.rapidapi.com
+      - key: JUDGE0_RAPIDAPI_HOST
+        value: judge0-ce.p.rapidapi.com
+      - key: JUDGE0_API_KEY
+        sync: false
+      - key: GITHUB_TOKEN
+        sync: false
+      - key: RUN_WORKER_IN_PROCESS
+        value: "true"
+      - key: RESEND_API_KEY
+        sync: false
+      - key: EMAIL_FROM
+        sync: false

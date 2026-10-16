@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Product** | HBE Interview: an AI-powered, multi-round interview platform |
-| **Document status** | Draft v1.1, awaiting product owner approval |
+| **Document status** | v1.2 — approved by the product owner; Phase 1 built |
 | **Date** | 2026-10-16 |
 | **Owner** | Product Architect / Product Owner |
 | **Companion documents** | [FEATURES.md](FEATURES.md) (detailed feature specification) · [ARCHITECTURE.md](ARCHITECTURE.md) (detailed technical architecture) |
@@ -13,6 +13,7 @@
 | Version | Date | Change |
 |---|---|---|
 | 1.0 | 2026-10-16 | Initial draft: resume parsing, GitHub validation, AI interview, live coding, scorecard |
+| 1.2 | 2026-10-16 | Product owner decisions recorded (§11) and Phase 1 built: text + voice, Neon Postgres, Judge0, public repos, single internal organisation, HR always last, no compensation questions by default |
 | 1.1 | 2026-10-16 | Added the **multi-round interview pipeline** with a **Managerial Round** (for senior and higher roles) and an **HR Round** (all roles). Added a seniority-based round matrix, round gating, round-level and combined scorecards, and detailed architecture and feature documents |
 
 ---
@@ -217,7 +218,7 @@ Priority: **P0** = MVP must-have, **P1** = MVP should-have, **P2** = later phase
 | ID | Requirement | Priority |
 |---|---|---|
 | E-1 | Chat-style interview UI with streaming AI messages | P0 |
-| E-2 | Voice mode (TTS questions, STT answers with a live transcript), especially valuable for HR and Managerial rounds | P2 (P1 if approved, see §11) |
+| E-2 | Voice mode (TTS questions, STT answers with a live, editable transcript), especially valuable for HR and Managerial rounds | P0 (approved, §11) |
 | E-3 | Server-side section state machine per round, with timers and a progress bar | P0 |
 | E-4 | Adaptive questioning: follow-ups on shallow answers, difficulty escalation on strong ones, move on after 2 weak follow-ups | P0 |
 | E-5 | Question sources: claims, repo questions, skills matrix, competency library, org values, pinned questions | P0 |
@@ -430,10 +431,10 @@ The server, not the LLM, owns interview state. Every stage uses schema-validated
 ## 9. Technical architecture (summary)
 
 - **Frontend + API:** Next.js (App Router, TypeScript), Tailwind + shadcn/ui, Monaco editor, hosted on **Render**.
-- **Data / Auth / Files:** **Supabase** (Postgres with row-level security, Auth, Storage).
-- **Async jobs:** a Render background worker on a Postgres-backed queue (pg-boss), used for resume parsing, repo analysis, evaluation, and reports.
+- **Data:** **Neon Postgres** (resumes stored in the database); built-in staff auth and candidate personal links.
+- **Async jobs:** a Postgres-backed job queue processed in the web process (or a separate Render worker), used for resume parsing, repo analysis, evaluation, and reports.
 - **AI:** Anthropic Claude API (Sonnet / Opus / Haiku tiers) with tool use, structured outputs, and prompt caching.
-- **Code execution:** Judge0 sandbox (hosted for MVP, self-hostable).
+- **Code execution:** Judge0 sandbox now; AWS-hosted sandbox later.
 - **Integrations:** GitHub REST API, an email provider (Resend/SendGrid).
 
 Diagrams, component design, the interview state machine, data model, API specification, security, deployment, and testing strategy are in **[ARCHITECTURE.md](ARCHITECTURE.md)**.
@@ -450,7 +451,7 @@ Diagrams, component design, the interview state machine, data model, API specifi
 
 ### 10.1 Phase 1 build milestones
 
-1. **M1 Foundations**: scaffold, Supabase schema and row-level security, auth, Render deploy pipeline.
+1. **M1 Foundations**: scaffold, Neon Postgres schema and migrations, auth, Render deploy pipeline.
 2. **M2 Drives & round pipeline**: JD analysis, round matrix, section/rubric/gate editor, org values and HR knowledge base, invites.
 3. **M3 Resume pipeline**: upload, parse, confirm, JD match, round-tagged claims.
 4. **M4 GitHub pipeline**: ingestion, authenticity signals, grounded questions.
@@ -462,18 +463,20 @@ Diagrams, component design, the interview state machine, data model, API specifi
 
 ---
 
-## 11. Decisions requested from the product owner
+## 11. Product owner decisions (approved 2026-10-16)
 
-1. **Interview format for MVP:** text chat + editors (recommended), or include **voice** now? Voice strongly benefits the HR and Managerial rounds.
-2. **Tech stack:** approve Next.js + Supabase + Render + Claude API + Judge0?
-3. **Code execution:** hosted Judge0 API for the MVP, or self-hosted?
-4. **Private repos:** public-only in the MVP, with GitHub OAuth in Phase 2?
-5. **Rubrics:** approve the parameters and weights for all three rounds (§6), the knockout rules, and the recommendation bands?
-6. **Round matrix and gating:** approve the seniority → rounds mapping and round weights (§3.1), Staged mode as the default, and auto-advance at "Hire"?
-7. **HR compensation policy:** ask **expected** compensation only (recommended default), or also current compensation where legally allowed?
-8. **Tenancy:** multi-tenant SaaS from day one (recommended), or a single-organization tool first?
-9. **Branding:** keep "HBE Interview"? Any brand colors or logo?
-10. **First delivery:** a working end-to-end MVP of all P0 modules (recommended), or a narrower prototype first?
+| # | Topic | Decision |
+|---|---|---|
+| 1 | Interview modality | **Text and voice** in the MVP (voice via the browser Web Speech API; transcripts are editable and evaluated) |
+| 2 | Tech stack | Next.js + Render + Claude API + Judge0, with **Neon Postgres** instead of Supabase |
+| 3 | Code execution | **Judge0** now; migrate to an AWS-hosted sandbox later (executor is pluggable) |
+| 4 | Repositories | **Public GitHub repositories only** |
+| 5 | Rubrics | Approved as written (§6), including knockouts and bands |
+| 6 | Round order | **Technical → Managerial (if applicable) → HR last**; staged mode with auto-advance at "Hire" as the default |
+| 7 | Compensation | Skipped: the HR round does not ask about compensation by default (org-level toggle available; salary history never asked) |
+| 8 | Tenancy | **Single internal tool now**; multi-tenant later |
+| 9 | Branding | Keep **"HBE Interview"** |
+| 10 | Scope | **Full working version** of all P0 modules |
 
 ---
 

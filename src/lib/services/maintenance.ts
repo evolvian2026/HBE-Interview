@@ -1,0 +1,54 @@
+import { and, eq, lt, sql } from "drizzle-orm";
+import { db, schema } from "../db";
+import { getSettings } from "../settings";
+import { endSession } from "../interview/orchestrator";
+import { audit } from "../audit";
+
+let lastPurge = 0;
+
+/** Periodic housekeeping: finalise abandoned/overdue sessions, expire invitations, purge data past retention. */
+export async function periodicMaintenance() {
+  const now = new Date();
+  // 1) Active sessions with no heartbeat beyond the reconnect window, or well past their deadline.
+  const active = await db.select().from(schema.roundSessions).where(eq(schema.roundSessions.status, "active"));
+  for (const s of active) {
+    const hb = s.lastHeartbeatAt?.getTime() ?? s.startedAt?.getTime() ?? now.getTime();
+    const overdue = s.deadlineAt && now.getTime() > s.deadlineAt.getTime() + 5 * 60_000;
+    const abandoned = now.getTime() - hb > 15 * 60_000;
+    if (overdue || abandoned) {
+      await endSession(s.id, overdue ? "time_up" : "incomplete_disconnect").catch((e) => console.error("endSession failed", e));
+    }
+  }
+  // 2) Expire invitations that were never started.
+  await db
+    .update(schema.candidacies)
+    .set({ stage: "expired", updatedAt: now })
+    .where(and(eq(schema.candidacies.stage, "invited"), lt(schema.candidacies.expiresAt, now)));
+  // 3) Expire next-round availability windows.
+  await db
+    .update(schema.candidacies)
+    .set({ stage: "expired", updatedAt: now })
+    .where(and(eq(schema.candidacies.stage, "round_available"), lt(schema.candidacies.roundAvailableUntil, now)));
+  // 4) Retention purge (daily).
+  if (now.getTime() - lastPurge > 24 * 3600_000) {
+    lastPurge = now.getTime();
+    const settings = await getSettings();
+    const cutoff = new Date(now.getTime() - settings.retentionDays * 86_400_000);
+    const old = await db
+      .select({ id: schema.candidacies.id })
+      .from(schema.candidacies)
+      .where(and(lt(schema.candidacies.updatedAt, cutoff), sql`${schema.candidacies.stage} in ('completed','rejected','expired','declined','shortlisted')`));
+    for (const c of old) await purgeCandidacy(c.id, "retention");
+  }
+}
+
+/** Delete a candidacy's personal data (resume, transcripts, code, reports), leaving an anonymised audit stub. */
+export async function purgeCandidacy(candidacyId: string, reason: string, actor: { type: "staff" | "system"; id?: string } = { type: "system" }) {
+  const [c] = await db.select().from(schema.candidacies).where(eq(schema.candidacies.id, candidacyId));
+  if (!c) return;
+  await db.delete(schema.candidacies).where(eq(schema.candidacies.id, candidacyId));
+  // Remove the candidate record if they have no other candidacies.
+  const others = await db.select({ id: schema.candidacies.id }).from(schema.candidacies).where(eq(schema.candidacies.candidateId, c.candidateId)).limit(1);
+  if (!others.length) await db.delete(schema.candidates).where(eq(schema.candidates.id, c.candidateId));
+  await audit(actor, "candidacy.purge", "candidacy", candidacyId, { driveId: c.driveId, reason, createdAt: c.createdAt });
+}

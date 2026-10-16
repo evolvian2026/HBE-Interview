@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Document status** | Draft v1.1, awaiting product owner approval |
+| **Document status** | v1.2 — approved; Phase 1 built (as-built notes: ARCHITECTURE §0) |
 | **Date** | 2026-10-16 |
 | **Related** | [PRD.md](PRD.md) (product requirements) · [ARCHITECTURE.md](ARCHITECTURE.md) (technical architecture) |
 
