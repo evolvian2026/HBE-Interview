@@ -84,6 +84,8 @@ export interface TextExerciseWorkspace {
   template: { key: string; label: string }[];
   content: Record<string, string>;
   submitted: boolean;
+  /** Whiteboard shapes (system design only). */
+  whiteboard?: unknown[];
 }
 
 export interface PracticalFitWorkspace {
@@ -175,7 +177,7 @@ export async function workspaceFor(ctx: SessionContext, state: SessionState): Pr
     .where(and(eq(schema.exerciseResponses.sessionId, ctx.session.id), eq(schema.exerciseResponses.kind, ex.kind)));
   if (ex.kind === "system_design") {
     const d = DESIGN_PROMPTS.find((x) => x.id === ex.refId)!;
-    return { kind: "system_design", sectionKey: sec.key, title: d.title, brief: d.brief, minutes: sec.minutes, template: DESIGN_TEMPLATE, content: (resp?.content as Record<string, string>) ?? {}, submitted: !!ex.submittedAt };
+    return { kind: "system_design", sectionKey: sec.key, title: d.title, brief: d.brief, minutes: sec.minutes, template: DESIGN_TEMPLATE, content: (resp?.content as Record<string, string>) ?? {}, submitted: !!ex.submittedAt, whiteboard: (resp?.whiteboard as unknown[]) ?? [] };
   }
   if (ex.kind === "prioritization") {
     const p = PRIORITIZATION_SETS.find((x) => x.id === ex.refId)!;
@@ -221,4 +223,17 @@ export async function exerciseStateForModel(ctx: SessionContext, state: SessionS
     .join("\n");
   const title = writtenExerciseInfo(ex.kind, ex.refId)?.title;
   return `Exercise: "${title}" (${ex.kind}). Submitted: ${ex.submittedAt ? "yes" : "no"}.\nCandidate's written response so far:\n${content || "(empty)"}`;
+}
+
+/** Latest whiteboard PNG for the open system-design exercise (sent to the interviewer as an image). */
+export async function whiteboardImage(sessionId: string, state: SessionState): Promise<string | null> {
+  const sec = currentSection(state);
+  const ex = sec ? state.exercises[sec.key] : undefined;
+  if (!ex || ex.kind !== "system_design") return null;
+  const [resp] = await db
+    .select({ png: schema.exerciseResponses.whiteboardPng, shapes: schema.exerciseResponses.whiteboard })
+    .from(schema.exerciseResponses)
+    .where(and(eq(schema.exerciseResponses.sessionId, sessionId), eq(schema.exerciseResponses.kind, "system_design")));
+  if (!resp?.png || !((resp.shapes as unknown[] | null)?.length)) return null;
+  return resp.png.toString("base64");
 }

@@ -28,18 +28,20 @@ import { getProblem } from "../services/problems";
 import { checkCompliance } from "../ai/evaluation";
 import { executeTests } from "../exec";
 import { loadMessages, loadSessionContext, type SessionContext } from "./load";
-import { ensureExerciseOpen, exerciseStateForModel, workspaceFor, type Workspace } from "./exercises";
+import { ensureExerciseOpen, exerciseStateForModel, whiteboardImage, workspaceFor, type Workspace } from "./exercises";
 import { dossierBlock, hash, liveStateText, questionPool, roleBlock, type ServerInstruction } from "./dossier";
 import { sectionGuide } from "./sections";
 import { runInterviewerTurn, type ToolOutcome } from "./agent";
 import { SENIORITY_LABEL, type Language } from "../core/types";
 import { audit } from "../audit";
+import { emitEvent } from "../services/integrations";
 
 export interface PublicState {
   sessionId: string;
   roundType: string;
   status: string;
   mode: "text" | "voice";
+  language: string;
   sections: { key: string; title: string; status: string }[];
   current: number;
   timeLeftSec: number;
@@ -60,12 +62,13 @@ export type TurnEvent =
 
 export type TurnKind = "open" | "answer" | "skip" | "hint" | "submitted";
 
-export function publicState(session: { id: string; roundType: string; status: string; mode: string; deadlineAt: Date | null }, state: SessionState, now = new Date()): PublicState {
+export function publicState(session: { id: string; roundType: string; status: string; mode: string; language?: string; deadlineAt: Date | null }, state: SessionState, now = new Date()): PublicState {
   return {
     sessionId: session.id,
     roundType: session.roundType,
     status: session.status,
     mode: session.mode as "text" | "voice",
+    language: session.language ?? "en",
     sections: state.sections.map((s) => ({ key: s.key, title: s.title, status: s.status })),
     current: state.current,
     timeLeftSec: session.status === "active" ? timeLeftSec(session.deadlineAt, now, state) : 0,
@@ -110,7 +113,7 @@ async function nextSeq(sessionId: string): Promise<number> {
 /* --------------------------------- Start --------------------------------- */
 
 /** Create (or return) the session for a round and start its clock. */
-export async function startRound(candidacyId: string, roundIndex: number, mode: "text" | "voice") {
+export async function startRound(candidacyId: string, roundIndex: number, mode: "text" | "voice", language = "en") {
   const [cand] = await db
     .select({ candidacy: schema.candidacies, version: schema.driveVersions })
     .from(schema.candidacies)
@@ -132,6 +135,8 @@ export async function startRound(candidacyId: string, roundIndex: number, mode: 
     throw new HttpError(409, "This round is not available yet.");
   if (cand.candidacy.roundAvailableUntil && cand.candidacy.roundAvailableUntil < new Date())
     throw new HttpError(410, "The window to take this round has expired — please contact the recruiter.");
+  const allowed = (cand.version.config as { languages?: string[] }).languages ?? ["en"];
+  if (!allowed.includes(language)) throw new HttpError(400, "This interview language is not available for this role.");
   const now = new Date();
   let state = startFirstSection(initState(round, paramIds(round.type)), now);
   if (round.type === "managerial") {
@@ -150,6 +155,7 @@ export async function startRound(candidacyId: string, roundIndex: number, mode: 
       roundType: round.type,
       status: "active",
       mode,
+      language,
       state,
       startedAt: now,
       deadlineAt: deadline,
@@ -165,7 +171,7 @@ export async function startRound(candidacyId: string, roundIndex: number, mode: 
     return again;
   }
   await db.update(schema.candidacies).set({ stage: "in_round", updatedAt: now }).where(eq(schema.candidacies.id, candidacyId));
-  await audit({ type: "candidate", id: candidacyId }, "round.start", "round_session", created.id, { roundIndex, type: round.type, mode });
+  await audit({ type: "candidate", id: candidacyId }, "round.start", "round_session", created.id, { roundIndex, type: round.type, mode, language });
   return created;
 }
 
@@ -355,6 +361,7 @@ export async function handleTurn(
     const sec = currentSection(state);
     const exerciseText = await exerciseStateForModel({ ...ctx, state }, state);
     const buffer = ctx.round.type === "hr";
+    const board = await whiteboardImage(sessionId, state);
     let text = await runInterviewerTurn(
       {
         sessionId,
@@ -364,6 +371,8 @@ export async function handleTurn(
         companyName: ctx.settings.companyName,
         roleTitle: ctx.config.title,
         seniority: SENIORITY_LABEL[ctx.config.roleProfile.seniority],
+        language: ctx.session.language,
+        images: board ? [board] : undefined,
         roleBlock: roleBlock({ ...ctx, state }),
         dossierBlock: dossierBlock({ ...ctx, state }),
         history,
@@ -479,6 +488,7 @@ export async function endSession(sessionId: string, reason: string) {
   await db.insert(schema.roundReports).values({ sessionId, candidacyId: ctx.candidacy.id, roundIndex: ctx.session.roundIndex, roundType: ctx.session.roundType }).onConflictDoNothing();
   await enqueue("evaluate-round", { sessionId }, { singletonKey: `evaluate:${sessionId}`, maxAttempts: 5 });
   await audit({ type: "system" }, "round.end", "round_session", sessionId, { reason });
+  await emitEvent("round.completed", { candidacyId: ctx.candidacy.id, driveId: ctx.candidacy.driveId, roundIndex: ctx.session.roundIndex, roundType: ctx.session.roundType, endReason: reason });
 }
 
 /* -------------------------------- Controls -------------------------------- */

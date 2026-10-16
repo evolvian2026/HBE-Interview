@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Product** | HBE Interview: an AI-powered, multi-round interview platform |
-| **Document status** | v1.3 — approved; Phase 1 and Phase 2 built |
+| **Document status** | v1.4 — approved; Phases 1, 2 and 3 built |
 | **Date** | 2026-10-16 |
 | **Owner** | Product Architect / Product Owner |
 | **Companion documents** | [FEATURES.md](FEATURES.md) (detailed feature specification) · [ARCHITECTURE.md](ARCHITECTURE.md) (detailed technical architecture) |
@@ -12,6 +12,7 @@
 
 | Version | Date | Change |
 |---|---|---|
+| 1.4 | 2026-10-16 | Phase 3 built: multilingual interviews (12 languages), OCR for scanned/image resumes, GitLab and Bitbucket repositories, system-design whiteboard, opt-in webcam presence proctoring, REST API with scoped API keys, HMAC-signed webhooks, candidate experience survey, recruiter-released candidate feedback, fairness monitor on process cohorts. Identity verification / face matching deliberately not built (biometric data); demographic bias audits require consented external data |
 | 1.0 | 2026-10-16 | Initial draft: resume parsing, GitHub validation, AI interview, live coding, scorecard |
 | 1.3 | 2026-10-16 | Phase 2 built: analytics, AI usage/cost, candidate comparison, PDF export, expiring share links, code replay, prioritisation exercise, inline snippet editor, AI-generated answer flags, template library, CSV invites, reminders, custom coding problems, model admin, hiring-manager drive assignment. Private repositories remain out of scope (decision §11-4) |
 | 1.2 | 2026-10-16 | Product owner decisions recorded (§11) and Phase 1 built: text + voice, Neon Postgres, Judge0, public repos, single internal organisation, HR always last, no compensation questions by default |
@@ -58,8 +59,8 @@ After each round, the platform produces an **evidence-backed round scorecard**. 
 
 - Replacing the final hiring decision. AI output is **advisory**, and a human decides.
 - Offer generation, salary negotiation, or background verification.
-- Full video proctoring with face or identity verification (Phase 3).
-- ATS / HRMS integrations (Phase 2).
+- Full video proctoring with face or identity verification. Phase 3 adds only opt-in webcam *presence* checks; biometric identity matching remains out of scope.
+- Vendor-specific ATS / HRMS connectors (Phase 3 provides a generic REST API and signed webhooks instead).
 - Panel or group interviews; native mobile apps (responsive web only, and coding requires a desktop or laptop).
 
 ---
@@ -448,7 +449,7 @@ Diagrams, component design, the interview state machine, data model, API specifi
 |---|---|
 | **Phase 1 — MVP** | All P0 items: drives with the round pipeline, onboarding, resume parsing, public GitHub validation, Technical Round with live coding and system design, **Managerial Round** with written case, **HR Round** with practical fit and policy Q&A, round and combined reports, gating, dashboard and pipeline board, integrity signals, PII masking |
 | **Phase 2 — built (v1.3)** | P1 items: bulk CSV invites and reminders (B-2), code replay (F-6), inline snippet editor (F-8), prioritisation exercise (G-8), PDF export and share links (I-8), comparison (J-6), analytics (J-7), template library (A-9), custom coding problems (A-8), AI-generated answer flags (K-3), cross-round contradictions in the combined report (K-5), usage metering (L-3), model admin (L-4), hiring-manager drive assignment. Voice moved to Phase 1. Private repositories (D-3) deferred per decision §11-4 |
-| **Phase 3** | P2 items: multilingual interviews, OCR, whiteboard, other git hosts, proctoring and identity verification, ATS/HRMS integrations, candidate feedback, bias audits |
+| **Phase 3 — built (v1.4)** | P2 items: multilingual interviews, OCR, whiteboard, GitLab/Bitbucket, opt-in webcam presence proctoring, REST API + signed webhooks for ATS/HRMS, candidate survey and released feedback, fairness monitor (process cohorts, four-fifths rule). Not built by design: face matching / identity verification (biometric data under DPDP/GDPR), demographic bias audits (no protected data is collected). Still deferred: private repositories (§11-4), multiple organisations (§11-8) — see FEATURES §18.8 |
 
 ### 10.1 Phase 1 build milestones
 

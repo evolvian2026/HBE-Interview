@@ -6,6 +6,7 @@ import { Badge, Button, Card, Field, Input, Select, Textarea, cx } from "../ui";
 import { api } from "../api";
 import { buildDefaultDriveConfig, enabledRounds, rescaleSections, validateDriveConfig } from "@/lib/core/rounds";
 import { PARAMETERS } from "@/lib/core/rubrics";
+import { INTERVIEW_LANGUAGES } from "@/lib/core/languages";
 import {
   CATEGORY_LABEL,
   RECOMMENDATION_LABEL,
@@ -394,6 +395,51 @@ export function DriveEditor({ driveId, initial, published }: { driveId: string; 
                 <option value="single">Single sitting — all rounds back to back</option>
               </Select>
             </Field>
+            <div>
+              <p className="mb-1 text-sm font-medium">Interview languages</p>
+              <div className="flex flex-wrap gap-x-3 gap-y-1 text-sm">
+                {INTERVIEW_LANGUAGES.map((l) => {
+                  const langs = c.languages ?? ["en"];
+                  return (
+                    <label key={l.code} className="flex items-center gap-1">
+                      <input
+                        type="checkbox"
+                        checked={langs.includes(l.code)}
+                        disabled={l.code === "en" && langs.length === 1 && langs[0] === "en"}
+                        onChange={(e) => {
+                          const next = e.target.checked ? [...langs, l.code] : langs.filter((x) => x !== l.code);
+                          update({ languages: next.length ? next : ["en"] });
+                        }}
+                      />
+                      {l.label}
+                    </label>
+                  );
+                })}
+              </div>
+              <p className="mt-1 text-xs text-slate-500">Candidates choose one in the round lobby. Voice mode uses the same language.</p>
+            </div>
+            <div className="rounded-lg bg-slate-50 p-3 text-sm">
+              <label className="flex items-start gap-2">
+                <input
+                  type="checkbox"
+                  className="mt-1"
+                  checked={c.proctoring?.webcam ?? false}
+                  onChange={(e) => update({ proctoring: { intervalSec: c.proctoring?.intervalSec ?? 90, webcam: e.target.checked } })}
+                />
+                <span>
+                  <b>Webcam proctoring (opt-in)</b> — with the candidate&apos;s explicit consent, take a low-resolution snapshot every
+                  <input
+                    type="number"
+                    min={30}
+                    max={600}
+                    className="mx-1 w-16 rounded border border-slate-300 px-1"
+                    value={c.proctoring?.intervalSec ?? 90}
+                    onChange={(e) => update({ proctoring: { webcam: c.proctoring?.webcam ?? false, intervalSec: Number(e.target.value) } })}
+                  />
+                  seconds and check that one person is present. Snapshots are context only (never scored), no face recognition is performed, and they are deleted with the candidate&apos;s data.
+                </span>
+              </label>
+            </div>
             <div className="grid grid-cols-2 gap-3">
               <Field label="Invite valid for (days)">
                 <Input type="number" value={c.inviteExpiryDays} onChange={(e) => update({ inviteExpiryDays: Number(e.target.value) })} />

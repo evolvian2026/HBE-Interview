@@ -5,7 +5,7 @@ import { handle, json } from "@/lib/http";
 
 const Body = z.object({
   events: z
-    .array(z.object({ type: z.enum(["blur", "paste", "copy", "fullscreen_exit", "fast_answer", "devtools"]), payload: z.record(z.string(), z.union([z.string(), z.number(), z.boolean()])).optional() }))
+    .array(z.object({ type: z.enum(["blur", "paste", "copy", "fullscreen_exit", "fast_answer", "devtools", "camera_off"]), payload: z.record(z.string(), z.union([z.string(), z.number(), z.boolean()])).optional() }))
     .max(50),
 });
 

@@ -33,6 +33,10 @@ export type Evaluation = z.infer<typeof EvaluationSchema>;
 
 export interface EvidenceBundle {
   roundType: RoundType;
+  /** Interview language name (e.g. "Hindi"); transcript quotes stay in the original language. */
+  language?: string;
+  /** Base64 PNG artefacts (e.g. the system-design whiteboard). */
+  images?: { label: string; data: string }[];
   roleProfileText: string;
   weights: Record<string, number>;
   sectionsText: string;
@@ -108,6 +112,7 @@ function mockEvaluate(b: EvidenceBundle): Evaluation {
 export async function evaluateRound(b: EvidenceBundle, ctx: CallContext, focus?: string): Promise<Evaluation> {
   const user = [
     `# Round: ${b.roundType}`,
+    b.language && b.language !== "English" ? `Interview language: ${b.language}. Evidence quotes must be copied verbatim in the original language; write justifications, summaries and lists in English. Do not penalise the candidate for the interview language itself — assess Communication Clarity within the chosen language.` : "",
     `## Role profile\n${b.roleProfileText}`,
     `## Rubric\n${rubricText(b.roundType, b.weights)}`,
     `## Sections\n${b.sectionsText}`,
@@ -123,11 +128,20 @@ export async function evaluateRound(b: EvidenceBundle, ctx: CallContext, focus?:
   ]
     .filter(Boolean)
     .join("\n\n");
+  const content = b.images?.length
+    ? [
+        ...b.images.flatMap((img) => [
+          { type: "text" as const, text: `Artefact image: ${img.label} (cite as ref "ART")` },
+          { type: "image" as const, source: { type: "base64" as const, media_type: "image/png" as const, data: img.data } },
+        ]),
+        { type: "text" as const, text: user },
+      ]
+    : user;
   return structured({
     stage: "evaluate_round",
     tier: "evaluator",
     system: evaluatorSystem(b.roundType),
-    user,
+    user: content,
     schema: EvaluationSchema,
     effort: "high",
     maxTokens: 24000,

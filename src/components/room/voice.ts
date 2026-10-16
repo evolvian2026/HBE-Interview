@@ -26,7 +26,7 @@ export function voiceSupport() {
 }
 
 /** Dictation hook: appends final transcripts via onFinal; exposes interim text while speaking. */
-export function useDictation(onFinal: (text: string) => void) {
+export function useDictation(onFinal: (text: string) => void, lang = "en-IN") {
   const recRef = useRef<Recognition | null>(null);
   const wantRef = useRef(false);
   const [listening, setListening] = useState(false);
@@ -42,7 +42,7 @@ export function useDictation(onFinal: (text: string) => void) {
     const rec = new Ctor();
     rec.continuous = true;
     rec.interimResults = true;
-    rec.lang = "en-IN";
+    rec.lang = lang;
     rec.onresult = (e) => {
       let interimText = "";
       for (let i = e.resultIndex; i < e.results.length; i++) {
@@ -77,7 +77,7 @@ export function useDictation(onFinal: (text: string) => void) {
     } catch {
       /* already started */
     }
-  }, [onFinal]);
+  }, [onFinal, lang]);
 
   const stop = useCallback(() => {
     wantRef.current = false;
@@ -93,14 +93,20 @@ export function useDictation(onFinal: (text: string) => void) {
   return { listening, interim, error, start, stop };
 }
 
-export function speak(text: string, onEnd?: () => void) {
+export function speak(text: string, lang = "en-IN", onEnd?: () => void) {
   if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
   window.speechSynthesis.cancel();
   const clean = text.replace(/```[\s\S]*?```/g, " (see the code on screen) ").replace(/[`*_#]/g, "");
   const u = new SpeechSynthesisUtterance(clean);
   u.rate = 1;
   const voices = window.speechSynthesis.getVoices();
-  const v = voices.find((x) => /en-(IN|GB|US)/.test(x.lang) && /female|google|natural/i.test(x.name)) ?? voices.find((x) => x.lang.startsWith("en"));
+  const base = lang.split("-")[0];
+  u.lang = lang;
+  const v =
+    voices.find((x) => x.lang === lang && /female|google|natural/i.test(x.name)) ??
+    voices.find((x) => x.lang === lang) ??
+    voices.find((x) => x.lang.startsWith(base)) ??
+    (base === "en" ? voices.find((x) => x.lang.startsWith("en")) : undefined);
   if (v) u.voice = v;
   if (onEnd) u.onend = onEnd;
   window.speechSynthesis.speak(u);

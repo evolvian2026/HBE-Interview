@@ -30,7 +30,7 @@ export const POST = handle(async (req: Request, { params }: Ctx) => {
   if (!["onboarding", "ready"].includes(candidacy.stage)) throw new HttpError(409, "Project links can no longer be changed");
   const body = Body.parse(await req.json());
   for (const p of body.projects) {
-    if (p.url && !parseRepoUrl(p.url)) throw new HttpError(400, `"${p.url}" is not a GitHub repository URL (https://github.com/owner/repo)`);
+    if (p.url && !parseRepoUrl(p.url)) throw new HttpError(400, `"${p.url}" is not a supported repository URL (github.com, gitlab.com or bitbucket.org)`);
     if (!p.url && !p.notPublicReason) throw new HttpError(400, `Add a repository link or a reason for "${p.projectName}"`);
   }
   await db.update(schema.candidates).set({ githubUsername: body.githubUsername || null }).where(eq(schema.candidates.id, candidacy.candidateId));

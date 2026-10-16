@@ -39,3 +39,38 @@ describe("prioritisation section", () => {
     expect(mgr.durationMin).toBe(mgr.sections.filter((s) => s.enabled).reduce((a, s) => a + s.minutes, 0));
   });
 });
+
+import { quoteMatches } from "@/lib/core/evidence";
+import { parseRepoUrl, commitStats } from "@/lib/github";
+import { detectResumeType } from "@/lib/parse";
+
+describe("phase 3 helpers", () => {
+  it("verifies evidence quotes in non-Latin scripts", () => {
+    const src = "मैंने Redis कैश जोड़ा जिससे latency 800ms से घटकर 120ms हो गई।";
+    expect(quoteMatches("मैंने Redis कैश जोड़ा", src)).toBe(true);
+    expect(quoteMatches("मैंने Kafka पाइपलाइन बनाई", src)).toBe(false);
+    expect(quoteMatches("أنا صممت النظام", "في مشروعي أنا صممت النظام بالكامل")).toBe(true);
+  });
+  it("parses GitHub, GitLab (nested groups) and Bitbucket URLs", () => {
+    expect(parseRepoUrl("https://github.com/acme/api/tree/main/svc")).toEqual({ host: "github", owner: "acme", repo: "api", branch: "main", subPath: "svc" });
+    expect(parseRepoUrl("https://gitlab.com/group/sub/proj/-/tree/dev")).toMatchObject({ host: "gitlab", owner: "group/sub", repo: "proj", branch: "dev" });
+    expect(parseRepoUrl("bitbucket.org/team/repo.git")).toMatchObject({ host: "bitbucket", owner: "team", repo: "repo" });
+    expect(parseRepoUrl("https://example.com/a/b")).toBeNull();
+  });
+  it("attributes commits by login, email or name", () => {
+    const s = commitStats(
+      [
+        { login: "ravik", name: "Ravi K", email: "r@x.com", date: "2026-01-01T00:00:00Z", changes: 10 },
+        { name: "Ravi K", email: "r@x.com", date: "2026-01-02T00:00:00Z", changes: 30 },
+        { name: "Someone", email: "s@y.com", date: "2026-01-02T00:00:00Z", changes: 60 },
+      ],
+      "ravik",
+    );
+    expect(s).toMatchObject({ totalCommits: 3, candidateCommits: 2, activeDays: 2 });
+    expect(s.largestCommitShare).toBeCloseTo(0.6, 5);
+  });
+  it("detects resume image types", () => {
+    expect(detectResumeType("a.png", Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d]))).toBe("png");
+    expect(detectResumeType("a.jpg", Buffer.from([0xff, 0xd8, 0xff, 0xe0]))).toBe("jpeg");
+  });
+});

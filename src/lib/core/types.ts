@@ -107,6 +107,10 @@ export interface DriveConfig {
   nextRoundExpiryDays: number;
   inviteExpiryDays: number;
   reconnectWindowMin: number;
+  /** Interview languages the candidate may choose from (A-10). Absent = English only. */
+  languages?: string[];
+  /** Opt-in webcam proctoring (K-7): periodic low-res snapshots with an AI presence check. */
+  proctoring?: { webcam: boolean; intervalSec: number };
 }
 
 export interface ParameterDef {

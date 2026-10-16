@@ -4,6 +4,7 @@ import { db, schema } from "@/lib/db";
 import { requireStaff, assertCandidacyAccess } from "@/lib/auth/staff";
 import { handle, json } from "@/lib/http";
 import { audit } from "@/lib/audit";
+import { emitEvent } from "@/lib/services/integrations";
 
 const Body = z.object({ status: z.enum(["shortlisted", "rejected", "on_hold", "completed"]) });
 
@@ -14,5 +15,6 @@ export const POST = handle(async (req: Request, { params }: { params: Promise<{ 
   const { status } = Body.parse(await req.json());
   await db.update(schema.candidacies).set({ stage: status, finalStatus: status, updatedAt: new Date() }).where(eq(schema.candidacies.id, id));
   await audit({ type: "staff", id: user.id }, `candidacy.${status}`, "candidacy", id);
+  await emitEvent("candidate.status_changed", { candidacyId: id, status });
   return json({ ok: true });
 });

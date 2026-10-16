@@ -5,17 +5,18 @@ import { useRouter } from "next/navigation";
 import { Button } from "../ui";
 import { api } from "../api";
 
-export function ConsentStep({ token, text, companyName }: { token: string; text: string; companyName: string }) {
+export function ConsentStep({ token, text, companyName, webcamRequired = false }: { token: string; text: string; companyName: string; webcamRequired?: boolean }) {
   const router = useRouter();
   const [agree, setAgree] = useState(false);
   const [rules, setRules] = useState(false);
+  const [webcam, setWebcam] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   async function send(accept: boolean) {
     setBusy(true);
     setError("");
     try {
-      await api(`/api/c/${token}/consent`, { body: { accept } });
+      await api(`/api/c/${token}/consent`, { body: { accept, webcam: webcamRequired && webcam } });
       router.refresh();
     } catch (e) {
       setError((e as Error).message);
@@ -42,9 +43,17 @@ export function ConsentStep({ token, text, companyName }: { token: string; text:
         <input type="checkbox" className="mt-1" checked={rules} onChange={(e) => setRules(e.target.checked)} />
         <span>I agree to the interview rules.</span>
       </label>
+      {webcamRequired && (
+        <label className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm">
+          <input type="checkbox" className="mt-1" checked={webcam} onChange={(e) => setWebcam(e.target.checked)} />
+          <span>
+            This interview uses <b>webcam proctoring</b>: a small, low-resolution photo is taken periodically during each round and checked only for whether one person is present. No face recognition is performed. Photos are visible to the hiring team as context (never scored) and are deleted with your data. I consent to webcam snapshots.
+          </span>
+        </label>
+      )}
       {error && <p className="text-sm text-red-600">{error}</p>}
       <div className="flex flex-wrap gap-2">
-        <Button disabled={!agree || !rules || busy} onClick={() => send(true)}>
+        <Button disabled={!agree || !rules || (webcamRequired && !webcam) || busy} onClick={() => send(true)}>
           Accept and continue
         </Button>
         <Button variant="ghost" disabled={busy} onClick={() => confirm("Declining means you can't take this interview. Continue?") && send(false)}>

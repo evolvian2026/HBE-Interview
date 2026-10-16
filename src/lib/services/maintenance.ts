@@ -59,6 +59,8 @@ export async function periodicMaintenance() {
       .from(schema.candidacies)
       .where(and(lt(schema.candidacies.updatedAt, cutoff), sql`${schema.candidacies.stage} in ('completed','rejected','expired','declined','shortlisted')`));
     for (const c of old) await purgeCandidacy(c.id, "retention");
+    // Webhook payloads carry candidate names/emails — keep delivery history for 30 days only.
+    await db.delete(schema.webhookDeliveries).where(lt(schema.webhookDeliveries.createdAt, new Date(now.getTime() - 30 * 86_400_000)));
   }
 }
 

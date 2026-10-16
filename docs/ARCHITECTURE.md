@@ -2,9 +2,9 @@
 
 | | |
 |---|---|
-| **Document status** | v1.3 — approved; Phases 1–2 implemented (see §0 for as-built decisions) |
+| **Document status** | v1.4 — approved; Phases 1–3 implemented (see §0 for as-built decisions; integration API in [API.md](API.md)) |
 | **Date** | 2026-10-16 |
-| **Related** | [PRD.md](PRD.md) · [FEATURES.md](FEATURES.md) |
+| **Related** | [PRD.md](PRD.md) · [FEATURES.md](FEATURES.md) · [API.md](API.md) |
 
 ---
 
@@ -36,7 +36,7 @@
 
 ---
 
-## 0. As-built decisions (v1.2)
+## 0. As-built decisions (v1.2–v1.4)
 
 The product owner approved the design with these decisions. **Where this section conflicts with later sections, this section wins**; later sections describe the target architecture and the scale-out path.
 
@@ -50,7 +50,7 @@ The product owner approved the design with these decisions. **Where this section
 | Background jobs | Postgres `jobs` table with `FOR UPDATE SKIP LOCKED`, retries with exponential back-off, singleton keys and `:failed` handlers. The worker runs **inside the web process** by default (`RUN_WORKER_IN_PROCESS=true`) or standalone via `npm run worker` |
 | Code execution | **Judge0** (hosted CE via RapidAPI or self-hosted) behind an executor interface (`src/lib/exec`). Later: AWS-hosted sandbox. A `local-dev` executor exists for development/CI only and is refused in production. Problems are stdin/stdout so one test set serves Python, JavaScript, Java and C++ |
 | Interview modality | **Text and voice.** Voice uses the browser Web Speech API (speech-to-text in Chrome/Edge/Safari, text-to-speech everywhere); the transcript is editable before sending and is what gets evaluated |
-| GitHub | **Public repositories only** (REST API; optional `GITHUB_TOKEN` for rate limits) |
+| Git hosts | **Public repositories only** on GitHub, GitLab (nested groups) and Bitbucket — `src/lib/github/index.ts` parses all three into `{host, owner, repo, branch, subPath}` and uses each host's public REST API (optional `GITHUB_TOKEN` for GitHub rate limits) |
 | Round order | Technical/Functional → Managerial (when applicable) → **HR always last**; order is fixed in the editor |
 | Compensation | HR round does **not** ask compensation by default (org setting, off). Salary history is never asked |
 | HR knowledge base | Small-KB fast path only: the whole KB (≤ 120k chars) is placed in the cached HR dossier; vector/FTS retrieval deferred |
@@ -61,6 +61,13 @@ The product owner approved the design with these decisions. **Where this section
 | PDF export | Print-optimised server-rendered report (`/print/candidates/[id]`) using the browser's Save-as-PDF — no headless Chromium on the server. Shared with the public share page (`/r/[token]`) via one `ReportDocument` component |
 | Model overrides | Org settings hold per-tier model and interviewer-effort overrides; the gateway refreshes them at most once a minute and falls back to environment defaults |
 | Problem lookup | `services/problems.getProblem` resolves bank problems and validated custom problems; `pickProblemForDrive` prefers the drive's custom problems |
+| Phase 3 data | `api_keys` (SHA-256 key hash, scopes, last used, revoked), `webhooks` (URL, secret, events, active), `webhook_deliveries` (payload, status, attempts, response; purged after 30 days), `proctor_snapshots` (JPEG `bytea`, presence-check JSON, flagged), `candidate_feedback` (per-round 1–5 ratings + comment), `candidacies.feedback_summary/feedback_released_at`, `round_sessions.language`, `resumes.ocr_used`, `exercise_responses.whiteboard` (shapes JSON) + `whiteboard_png` — migrations `0002_phase3.sql`, `0003_whiteboard.sql` |
+| Languages | `core/languages.ts` lists 12 languages with BCP-47 speech locales; the drive config holds `languages`, the session stores the chosen one; the interviewer system prompt carries a language rule; evidence normalisation is Unicode-aware (`\p{L}\p{M}\p{N}`) so non-Latin quotes verify |
+| OCR | `ai/ocr.ts` sends image-only PDFs (document block) and PNG/JPEG (image block) to the analyzer tier for transcription before normal resume parsing |
+| Whiteboard | Client SVG editor; shapes + rendered PNG saved via `PUT …/whiteboard`. The PNG is attached as an image block to the interviewer's next turn and to the evaluator's evidence bundle |
+| Proctoring | Opt-in per drive and per candidate consent (server-enforced). Snapshots are rate-limited per session and checked by a `proctor-check` job (utility tier: person count, face visible, phone/second screen) — no face recognition or identity matching |
+| Integrations | Scoped API keys (Bearer `hbe_…`) for `/api/v1`; webhooks emitted from the domain services via `emitEvent` → `webhook_deliveries` row + `deliver-webhook` job (HMAC-SHA256 over `timestamp.body`, 6 attempts with back-off, no redirects). SSRF guard: HTTPS + non-internal host on save, DNS re-check at send time in production |
+| Feedback & fairness | Survey and candidate-facing feedback in `services/feedback.ts` (AI draft from round-report narrative only → recruiter edit → release). Fairness monitor computes per-cohort pass rates and four-fifths impact ratios (`core/fairness.ts`) over process cohorts only; no demographic data is collected |
 
 ### 0.1 Source map
 
@@ -76,7 +83,10 @@ The product owner approved the design with these decisions. **Where this section
 | Recruiter UI (drives, editor, reports, decisions, settings) | `src/app/(staff)/app/*`, `src/components/staff/*` |
 | API routes | `src/app/api/*` |
 | Analytics, usage, comparison, share/export, custom problems | `src/lib/services/{analytics,share,problems}.ts`, `src/lib/core/metrics.ts`, `src/components/charts.tsx`, `src/components/report/*` |
-| End-to-end checks | `scripts/smoke.ts` (HTTP, all three rounds; `SMOKE_ROLE=manager` for the manager track), `scripts/smoke-phase2.ts` (Phase 2 features), `e2e/ui-check.ts` (browser walkthrough; `PHASE2=1`) |
+| Integrations (API keys, REST v1, webhooks) | `src/lib/services/integrations.ts`, `src/lib/core/webhook-sign.ts`, `src/lib/integrations-shared.ts`, `src/app/api/v1/*`, `src/app/api/settings/{api-keys,webhooks}/*`, `src/components/staff/integrations-admin.tsx` |
+| Languages, OCR, whiteboard, proctoring | `src/lib/core/languages.ts`, `src/lib/ai/{ocr,proctor}.ts`, `src/lib/services/proctor.ts`, `src/components/room/{whiteboard,webcam}.tsx` |
+| Feedback & fairness | `src/lib/services/feedback.ts`, `src/lib/ai/feedback.ts`, `src/lib/core/fairness.ts`, `src/app/(staff)/app/drives/[id]/fairness`, `src/components/{candidate/feedback-survey,staff/candidate-feedback-panel}.tsx` |
+| End-to-end checks | `scripts/smoke.ts` (HTTP, all three rounds; `SMOKE_ROLE=manager` for the manager track), `scripts/smoke-phase2.ts` (Phase 2 features), `scripts/smoke-phase3.ts` (Phase 3 features incl. a local signed-webhook receiver), `e2e/ui-check.ts` (browser walkthrough; `PHASE2=1`), `e2e/ui-phase3.ts` (whiteboard, language lobby, integrations, fairness) |
 
 ---
 

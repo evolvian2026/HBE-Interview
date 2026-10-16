@@ -40,12 +40,12 @@ export function ProjectsStep({ token, projects, githubUsername, links }: { token
   return (
     <div className="space-y-5">
       <div>
-        <h2 className="text-lg font-semibold">Link your projects on GitHub</h2>
+        <h2 className="text-lg font-semibold">Link your project repositories</h2>
         <p className="text-sm text-slate-600">
-          The AI looks at the code of your <b>public</b> repositories and asks you about it — what you built and why. If a project isn&apos;t on GitHub, tell us why; that&apos;s fine.
+          The AI looks at the code of your <b>public</b> repositories and asks you about it — what you built and why. If a project isn&apos;t public, tell us why; that&apos;s fine.
         </p>
       </div>
-      <Field label="Your GitHub username" hint="Used to identify your commits.">
+      <Field label="Your GitHub / GitLab / Bitbucket username" hint="Used to identify your commits.">
         <Input value={user} onChange={(e) => setUser(e.target.value)} placeholder="octocat" className="max-w-xs" />
       </Field>
       {rows.length === 0 && <p className="text-sm text-slate-500">No projects were listed on your profile. You can continue without linking a repository.</p>}
@@ -54,8 +54,8 @@ export function ProjectsStep({ token, projects, githubUsername, links }: { token
           <p className="text-sm font-medium">{r.projectName}</p>
           <div className="flex flex-wrap gap-2">
             <Select value={r.mode} onChange={(e) => update(i, { mode: e.target.value as Row["mode"] })} className="max-w-56">
-              <option value="url">Public GitHub repository</option>
-              <option value="none">Not on GitHub / private</option>
+              <option value="url">Public repository (GitHub, GitLab, Bitbucket)</option>
+              <option value="none">Not public / not hosted</option>
             </Select>
             {r.mode === "url" ? (
               <Input className="min-w-64 flex-1" placeholder="https://github.com/owner/repo" value={r.url} onChange={(e) => update(i, { url: e.target.value })} />

@@ -24,12 +24,14 @@ import type { DriveConfig, EvidenceItem, ParamScore, Recommendation, RoundType }
 import { RECOMMENDATION_LABEL, ROUND_LABEL } from "../core/types";
 import { writtenExerciseInfo } from "../content";
 import { getProblem } from "./problems";
+import { languageInfo } from "../core/languages";
 import { isMock, modelFor } from "../ai/gateway";
 import type { RepoInsight } from "../ai/analyzers";
 import { enqueue } from "../jobs/queue";
 import { getSettings } from "../settings";
 import { audit } from "../audit";
 import { notifyCandidateNextRound } from "./notify";
+import { emitEvent } from "./integrations";
 
 /* ----------------------------- Evidence bundle ---------------------------- */
 
@@ -42,7 +44,7 @@ interface BundleExtras {
   candidateBySeq: Map<number, string>;
 }
 
-function integritySummary(events: (typeof schema.integrityEvents.$inferSelect)[], generated: GeneratedFlag[] = []): BundleExtras["integrity"] {
+function integritySummary(events: (typeof schema.integrityEvents.$inferSelect)[], generated: GeneratedFlag[] = [], camera: { total: number; flagged: number } = { total: 0, flagged: 0 }): BundleExtras["integrity"] {
   const counts: Record<string, number> = {};
   let blurMs = 0;
   let bigPastes = 0;
@@ -56,11 +58,12 @@ function integritySummary(events: (typeof schema.integrityEvents.$inferSelect)[]
   let concern: BundleExtras["integrity"]["concern"] = "none";
   const highGen = generated.filter((g) => g.likelihood === "high").length;
   const score =
-    (bigPastes >= 3 ? 2 : bigPastes >= 1 ? 1 : 0) + (blurMs > 5 * 60_000 ? 2 : (counts.blur ?? 0) >= 5 ? 1 : 0) + (flags ? 2 : 0) + (highGen >= 2 ? 2 : highGen || generated.length >= 2 ? 1 : 0);
+    (bigPastes >= 3 ? 2 : bigPastes >= 1 ? 1 : 0) + (blurMs > 5 * 60_000 ? 2 : (counts.blur ?? 0) >= 5 ? 1 : 0) + (flags ? 2 : 0) + (highGen >= 2 ? 2 : highGen || generated.length >= 2 ? 1 : 0) +
+    (camera.total && camera.flagged / camera.total >= 0.25 ? 2 : camera.flagged >= 2 ? 1 : 0) + ((counts.camera_off ?? 0) > 0 ? 1 : 0);
   if (score >= 4) concern = "high";
   else if (score >= 2) concern = "medium";
   else if (score >= 1) concern = "low";
-  const summary = `Tab/window focus lost ${counts.blur ?? 0} time(s) (${Math.round(blurMs / 1000)}s total); ${counts.paste ?? 0} paste event(s), ${bigPastes} of 200+ characters; ${flags} interviewer flag(s)${counts.compliance_block ? `; ${counts.compliance_block} interviewer message(s) blocked by the compliance filter` : ""}${generated.length ? `; ${generated.length} answer(s) read as possibly AI-generated or scripted (${generated.map((g) => `${g.ref} ${g.likelihood}`).join(", ")})` : ""}.`;
+  const summary = `Tab/window focus lost ${counts.blur ?? 0} time(s) (${Math.round(blurMs / 1000)}s total); ${counts.paste ?? 0} paste event(s), ${bigPastes} of 200+ characters; ${flags} interviewer flag(s)${counts.compliance_block ? `; ${counts.compliance_block} interviewer message(s) blocked by the compliance filter` : ""}${generated.length ? `; ${generated.length} answer(s) read as possibly AI-generated or scripted (${generated.map((g) => `${g.ref} ${g.likelihood}`).join(", ")})` : ""}${camera.total ? `; webcam: ${camera.flagged} of ${camera.total} snapshot(s) flagged (not exactly one person / no face / phone or second screen)` : ""}${counts.camera_off ? `; camera became unavailable ${counts.camera_off} time(s)` : ""}.`;
   return { concern, summary, counts: { ...counts, blurSeconds: Math.round(blurMs / 1000), bigPastes, generated: generated.length }, generated };
 }
 
@@ -157,9 +160,19 @@ async function buildBundle(ctx: SessionContext): Promise<{ bundle: EvidenceBundl
       })),
     { sessionId, candidacyId: ctx.candidacy.id },
   ).catch(() => [] as GeneratedFlag[]);
-  const integrity = integritySummary(events, generated);
+  const snaps = await db.select({ flagged: schema.proctorSnapshots.flagged, check: schema.proctorSnapshots.check }).from(schema.proctorSnapshots).where(eq(schema.proctorSnapshots.sessionId, sessionId));
+  const checked = snaps.filter((s) => s.check);
+  const integrity = integritySummary(events, generated, { total: checked.length, flagged: checked.filter((s) => s.flagged).length });
+  const boards = exResponses.filter((r) => r.kind === "system_design" && r.whiteboardPng && ((r.whiteboard as unknown[] | null)?.length ?? 0) > 0);
+  for (const b of boards) {
+    const labels = ((b.whiteboard as { label?: string; text?: string }[]) ?? []).map((s) => s.label ?? s.text).filter(Boolean);
+    artifactParts.push(`### System design whiteboard\nThe candidate drew a diagram (image attached). Labels on it: ${labels.join(", ") || "(none)"}.`);
+    artifactTexts.push(labels.join(" "));
+  }
   const bundle: EvidenceBundle = {
     roundType: round.type,
+    images: boards.map((b) => ({ label: "System design whiteboard", data: b.whiteboardPng!.toString("base64") })),
+    language: languageInfo(ctx.session.language).label,
     roleProfileText: JSON.stringify({ ...ctx.config.roleProfile, title: ctx.config.title }, null, 1),
     weights: round.weights,
     sectionsText: state.sections.map((s) => `- ${s.title}: ${s.status}, ${s.askedQ} exchange(s)`).join("\n") + `\nEnd reason: ${ctx.session.endReason ?? "completed"}; skips used: ${state.skipsUsed}.`,
@@ -317,6 +330,7 @@ export async function evaluateRoundJob(payload: { sessionId: string }) {
     })
     .where(eq(schema.roundReports.sessionId, ctx.session.id));
 
+  await emitEvent("round.evaluated", { candidacyId: ctx.candidacy.id, driveId: ctx.candidacy.driveId, roundIndex: ctx.session.roundIndex, roundType: round.type, score, recommendation, confidence });
   await afterRoundEvaluated(ctx.candidacy.id, ctx.session.roundIndex, recommendation);
 }
 
@@ -376,6 +390,7 @@ export async function advanceCandidacy(candidacyId: string, fromRoundIndex: numb
     .set({ stage: "round_available", currentRoundIndex: fromRoundIndex + 1, roundAvailableUntil: expiry, reminderSentAt: null, updatedAt: new Date() })
     .where(eq(schema.candidacies.id, candidacyId));
   await db.insert(schema.gateDecisions).values({ candidacyId, fromRoundIndex, decision: "advance", mode: opts.mode, decidedBy: opts.userId ?? null, reason: opts.reason ?? null });
+  await emitEvent("gate.decided", { candidacyId, fromRoundIndex, decision: "advance", mode: opts.mode });
   await notifyCandidateNextRound(candidacyId).catch((e) => console.error("notify failed", e));
 }
 
@@ -394,6 +409,7 @@ export async function decideGate(candidacyId: string, decision: "advance" | "hol
       .set({ stage: decision === "hold" ? "on_hold" : "rejected", updatedAt: new Date() })
       .where(eq(schema.candidacies.id, candidacyId));
     await db.insert(schema.gateDecisions).values({ candidacyId, fromRoundIndex: from, decision, mode: "manual", decidedBy: userId, reason: reason ?? null });
+    await emitEvent("gate.decided", { candidacyId, fromRoundIndex: from, decision, mode: "manual" });
   }
   await audit({ type: "staff", id: userId }, `gate.${decision}`, "candidacy", candidacyId, { fromRoundIndex: from, reason });
 }
@@ -480,6 +496,7 @@ export async function combinedReportJob(payload: { candidacyId: string }) {
     .insert(schema.combinedReports)
     .values({ candidacyId: payload.candidacyId, ...values })
     .onConflictDoUpdate({ target: schema.combinedReports.candidacyId, set: values });
+  await emitEvent("candidate.completed", { candidacyId: payload.candidacyId, finalScore: result.finalScore, recommendation: result.recommendation, partial: result.partial });
 }
 
 export async function combinedReportFailed(payload: { candidacyId: string; error?: string }) {

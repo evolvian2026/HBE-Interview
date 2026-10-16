@@ -100,6 +100,9 @@ export const candidacies = pgTable(
     expiresAt: ts("expires_at"),
     roundAvailableUntil: ts("round_available_until"),
     reminderSentAt: ts("reminder_sent_at"),
+    /** Candidate-facing feedback summary, released by a recruiter (I-9). */
+    feedbackSummary: jsonb("feedback_summary"),
+    feedbackReleasedAt: ts("feedback_released_at"),
     finalStatus: text("final_status"),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
@@ -129,6 +132,7 @@ export const resumes = pgTable("resumes", {
   jdMatch: jsonb("jd_match"),
   claims: jsonb("claims"),
   riskSignals: jsonb("risk_signals"),
+  ocrUsed: boolean("ocr_used").notNull().default(false),
   confirmedAt: ts("confirmed_at"),
   createdAt: createdAt(),
   updatedAt: updatedAt(),
@@ -160,6 +164,7 @@ export const roundSessions = pgTable(
     status: text("status").notNull().default("lobby"),
     endReason: text("end_reason"),
     mode: text("mode").notNull().default("text").$type<"text" | "voice">(),
+    language: text("language").notNull().default("en"),
     state: jsonb("state").notNull(),
     startedAt: ts("started_at"),
     endedAt: ts("ended_at"),
@@ -219,6 +224,9 @@ export const exerciseResponses = pgTable(
     kind: text("kind").notNull(),
     refId: text("ref_id").notNull(),
     content: jsonb("content").notNull(),
+    /** System-design whiteboard (F-10): vector shapes + rendered PNG shown to the interviewer and evaluator. */
+    whiteboard: jsonb("whiteboard"),
+    whiteboardPng: bytea("whiteboard_png"),
     submittedAt: ts("submitted_at"),
     updatedAt: updatedAt(),
   },
@@ -382,4 +390,67 @@ export const codingProblems = pgTable("coding_problems", {
   createdBy: uuid("created_by").references(() => users.id),
   createdAt: createdAt(),
   updatedAt: updatedAt(),
+});
+
+/* ------------------------------- Phase 3 ---------------------------------- */
+
+/** API keys for the integrations REST API (only a SHA-256 hash is stored). */
+export const apiKeys = pgTable("api_keys", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  name: text("name").notNull(),
+  prefix: text("prefix").notNull(),
+  keyHash: text("key_hash").notNull().unique(),
+  scopes: jsonb("scopes").$type<string[]>().notNull().default([]),
+  createdBy: uuid("created_by").references(() => users.id),
+  lastUsedAt: ts("last_used_at"),
+  revokedAt: ts("revoked_at"),
+  createdAt: createdAt(),
+});
+
+/** Outbound webhook endpoints (payloads are HMAC-SHA256 signed with the secret). */
+export const webhooks = pgTable("webhooks", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  url: text("url").notNull(),
+  secret: text("secret").notNull(),
+  events: jsonb("events").$type<string[]>().notNull(),
+  active: boolean("active").notNull().default(true),
+  createdBy: uuid("created_by").references(() => users.id),
+  createdAt: createdAt(),
+});
+
+export const webhookDeliveries = pgTable("webhook_deliveries", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  webhookId: uuid("webhook_id").notNull().references(() => webhooks.id, { onDelete: "cascade" }),
+  event: text("event").notNull(),
+  payload: jsonb("payload").notNull(),
+  status: text("status").notNull().default("pending").$type<"pending" | "delivered" | "failed">(),
+  attempts: integer("attempts").notNull().default(0),
+  responseStatus: integer("response_status"),
+  error: text("error"),
+  deliveredAt: ts("delivered_at"),
+  createdAt: createdAt(),
+});
+
+/** Opt-in webcam snapshots (low-resolution JPEG) with an AI presence check — no face recognition. */
+export const proctorSnapshots = pgTable("proctor_snapshots", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  sessionId: uuid("session_id").notNull().references(() => roundSessions.id, { onDelete: "cascade" }),
+  image: bytea("image").notNull(),
+  mimeType: text("mime_type").notNull(),
+  check: jsonb("check"),
+  flagged: boolean("flagged").notNull().default(false),
+  createdAt: createdAt(),
+});
+
+/** Post-interview candidate experience survey. */
+export const candidateFeedback = pgTable("candidate_feedback", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  candidacyId: uuid("candidacy_id").notNull().references(() => candidacies.id, { onDelete: "cascade" }),
+  roundIndex: integer("round_index"),
+  overall: integer("overall").notNull(),
+  fairness: integer("fairness"),
+  clarity: integer("clarity"),
+  technical: integer("technical"),
+  comment: text("comment"),
+  createdAt: createdAt(),
 });

@@ -6,7 +6,9 @@ export type JobType =
   | "analyze-repo"
   | "evaluate-round"
   | "combined-report"
-  | "send-email";
+  | "send-email"
+  | "proctor-check"
+  | "deliver-webhook";
 
 /**
  * Enqueue a durable job. With a singleton key, a job that is already queued/running is not duplicated,

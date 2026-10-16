@@ -5,7 +5,8 @@ export function normalize(s: string): string {
     .toLowerCase()
     .replace(/[‘’]/g, "'")
     .replace(/[“”]/g, '"')
-    .replace(/[^a-z0-9'"\s]/g, " ")
+    // Unicode-aware: keep letters, combining marks and digits of any script (Hindi, Arabic, …).
+    .replace(/[^\p{L}\p{M}\p{N}'"\s]/gu, " ")
     .replace(/\s+/g, " ")
     .trim();
 }

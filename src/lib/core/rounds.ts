@@ -189,6 +189,8 @@ export function buildDefaultDriveConfig(title: string, jdText: string, profile: 
     nextRoundExpiryDays: 7,
     inviteExpiryDays: 14,
     reconnectWindowMin: 15,
+    languages: ["en"],
+    proctoring: { webcam: false, intervalSec: 90 },
   };
 }
 

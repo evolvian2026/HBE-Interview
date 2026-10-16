@@ -15,9 +15,11 @@ import { CandidateActions } from "@/components/staff/candidate-actions";
 import { OverrideForm } from "@/components/staff/override-form";
 import { NotesForm } from "@/components/staff/notes-form";
 import { SharePanel } from "@/components/staff/share-panel";
+import { CandidateFeedbackPanel } from "@/components/staff/candidate-feedback-panel";
 import { CodeReplay } from "@/components/staff/code-replay";
 import { ReevaluateButton } from "@/components/staff/reevaluate-button";
 import { audit } from "@/lib/audit";
+import { languageInfo } from "@/lib/core/languages";
 
 export const dynamic = "force-dynamic";
 
@@ -69,6 +71,14 @@ export default async function CandidatePage({ params }: { params: Promise<{ id: 
   const overrides = reportIds.length
     ? await db.select({ o: schema.scoreOverrides, u: schema.users }).from(schema.scoreOverrides).leftJoin(schema.users, eq(schema.scoreOverrides.userId, schema.users.id)).where(inArray(schema.scoreOverrides.reportId, reportIds)).orderBy(desc(schema.scoreOverrides.createdAt))
     : [];
+  const snapshots = sessionIds.length
+    ? await db
+        .select({ id: schema.proctorSnapshots.id, sessionId: schema.proctorSnapshots.sessionId, flagged: schema.proctorSnapshots.flagged, check: schema.proctorSnapshots.check, createdAt: schema.proctorSnapshots.createdAt })
+        .from(schema.proctorSnapshots)
+        .where(inArray(schema.proctorSnapshots.sessionId, sessionIds))
+        .orderBy(asc(schema.proctorSnapshots.createdAt))
+    : [];
+  const surveys = await db.select().from(schema.candidateFeedback).where(eq(schema.candidateFeedback.candidacyId, id)).orderBy(asc(schema.candidateFeedback.roundIndex));
   const shareLinks = await db.select().from(schema.shareLinks).where(eq(schema.shareLinks.candidacyId, id)).orderBy(desc(schema.shareLinks.createdAt));
   const profile = resume?.parsed as ParsedResume | null;
   const canDecide = hasRole(user, "hiring_manager");
@@ -183,7 +193,7 @@ export default async function CandidatePage({ params }: { params: Promise<{ id: 
               actions={
                 session && (
                   <span className="flex items-center gap-3 text-xs text-slate-500">
-                    {session.mode === "voice" ? "Voice" : "Text"} · {session.endReason ? `ended: ${session.endReason.replace("_", " ")}` : ""} {session.startedAt ? `· ${session.startedAt.toLocaleString()}` : ""}
+                    {session.mode === "voice" ? "Voice" : "Text"} · {languageInfo(session.language).label} · {session.endReason ? `ended: ${session.endReason.replace("_", " ")}` : ""} {session.startedAt ? `· ${session.startedAt.toLocaleString()}` : ""}
                     {rep && (rep.status === "ready" || rep.status === "failed") && hasRole(user, "recruiter") && <ReevaluateButton reportId={rep.id} />}
                   </span>
                 )
@@ -371,6 +381,10 @@ export default async function CandidatePage({ params }: { params: Promise<{ id: 
                             ))}
                         </dl>
                       )}
+                      {w.whiteboardPng && ((w.whiteboard as unknown[] | null)?.length ?? 0) > 0 && (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={`data:image/png;base64,${w.whiteboardPng.toString("base64")}`} alt="Candidate's system design whiteboard" className="mt-2 w-full max-w-3xl rounded border border-slate-200" />
+                      )}
                       {rs.exerciseAssessment && <p className="mt-2 rounded bg-slate-50 p-2 text-sm text-slate-700">AI assessment: {rs.exerciseAssessment}</p>}
                     </Panel>
                   ))}
@@ -390,6 +404,28 @@ export default async function CandidatePage({ params }: { params: Promise<{ id: 
                           </ul>
                         )}
                         <p className="mt-1 text-xs text-slate-400">Context only — not used in scoring.</p>
+                        {snapshots.some((x) => x.sessionId === session?.id) && (
+                          <details className="mt-2" open={snapshots.some((x) => x.sessionId === session?.id && x.flagged)}>
+                            <summary className="cursor-pointer text-xs text-brand-700">
+                              Webcam snapshots ({snapshots.filter((x) => x.sessionId === session?.id).length}, {snapshots.filter((x) => x.sessionId === session?.id && x.flagged).length} flagged)
+                            </summary>
+                            <div className="mt-2 grid grid-cols-3 gap-2 sm:grid-cols-4">
+                              {snapshots
+                                .filter((x) => x.sessionId === session?.id)
+                                .sort((p1, p2) => Number(p2.flagged) - Number(p1.flagged))
+                                .slice(0, 24)
+                                .map((x) => (
+                                  <figure key={x.id} className={cx("rounded border p-1", x.flagged ? "border-amber-400" : "border-slate-200")}>
+                                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                                    <img src={`/api/proctor/${x.id}`} alt={`Webcam snapshot at ${x.createdAt.toLocaleTimeString()}`} loading="lazy" className="w-full rounded" />
+                                    <figcaption className="mt-0.5 text-[10px] text-slate-500">
+                                      {x.createdAt.toLocaleTimeString()} · {(x.check as { note?: string } | null)?.note ?? "pending check"}
+                                    </figcaption>
+                                  </figure>
+                                ))}
+                            </div>
+                          </details>
+                        )}
                       </Panel>
                     )}
                   </div>
@@ -423,6 +459,7 @@ export default async function CandidatePage({ params }: { params: Promise<{ id: 
             <p className="text-sm text-slate-500">No resume yet.</p>
           ) : (
             <div className="space-y-3 text-sm">
+              {resume?.ocrUsed && <Badge tone="amber">Transcribed from a scan/photo (OCR) — verify key details</Badge>}
               <p>{profile.summary}</p>
               <p className="text-xs text-slate-500">
                 Experience: {profile.totalYears ?? "?"} yrs · leadership {profile.leadershipYears ?? "?"} yrs · {profile.experience.length} roles · {profile.projects.length} projects
@@ -490,6 +527,22 @@ export default async function CandidatePage({ params }: { params: Promise<{ id: 
         candidacyId={id}
         canShare={canDecide}
         links={shareLinks.map((l) => ({ id: l.id, masked: l.masked, hasPasscode: !!l.passcodeHash, expiresAt: l.expiresAt.toISOString(), revoked: !!l.revokedAt, views: l.views }))}
+      />
+
+      <CandidateFeedbackPanel
+        candidacyId={id}
+        canEdit={hasRole(user, "recruiter")}
+        canDraft={hasRole(user, "recruiter") && reports.some((r) => r.status === "ready")}
+        initial={(row.c.feedbackSummary as { strengths: string[]; growthAreas: string[]; note: string } | null) ?? null}
+        releasedAt={row.c.feedbackReleasedAt?.toISOString() ?? null}
+        surveys={surveys.map((f) => ({
+          round: f.roundIndex != null && rounds[f.roundIndex] ? ROUND_LABEL[rounds[f.roundIndex].type] : "—",
+          overall: f.overall,
+          fairness: f.fairness,
+          clarity: f.clarity,
+          technical: f.technical,
+          comment: f.comment,
+        }))}
       />
 
       {/* ------------------------ Notes & decision log ------------------------ */}

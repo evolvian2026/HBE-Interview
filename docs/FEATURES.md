@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Document status** | v1.3 — approved; Phases 1–2 built (as-built notes: ARCHITECTURE §0) |
+| **Document status** | v1.4 — approved; Phases 1–3 built (as-built notes: ARCHITECTURE §0; integration reference: [API.md](API.md)) |
 | **Date** | 2026-10-16 |
 | **Related** | [PRD.md](PRD.md) (product requirements) · [ARCHITECTURE.md](ARCHITECTURE.md) (technical architecture) |
 
@@ -29,6 +29,7 @@ This document specifies **how each feature behaves**: user stories, flows, scree
 15. [Notifications](#15-notifications)
 16. [Global error states & edge cases](#16-global-error-states--edge-cases)
 17. [Phase 2 features (v1.3)](#17-phase-2-features-v13)
+18. [Phase 3 features (v1.4)](#18-phase-3-features-v14)
 
 ---
 
@@ -885,3 +886,59 @@ Candidates can request extra time (+25% or +50%) through a link on the consent s
 | **Model admin** (L-4) | Settings → AI models | Per-stage model override and interviewer effort (applied within a minute); reports record the evaluator model |
 | **Re-evaluate** | Candidate → round header | Re-runs the evaluation for a round (e.g. after a model change) |
 | **Hiring-manager scoping** | Settings → Users | Hiring managers see and act only on drives assigned to them (pages and APIs) |
+
+---
+
+## 18. Phase 3 features (v1.4)
+
+### 18.1 Multilingual interviews (E-12)
+
+- **Setup:** Drive → Configure → *Interview languages* — any of 12 languages (English, Hindi, Bengali, Tamil, Telugu, Marathi, Gujarati, Kannada, Malayalam, Spanish, French, Arabic). English is the default; the first selected is pre-chosen for candidates.
+- **Candidate:** the round lobby shows an *Interview language* selector (native names, e.g. हिन्दी) when more than one is enabled. The interviewer speaks and writes in that language; coding problems, code and technical terms stay in English. Voice mode uses the language's speech locale for dictation and read-aloud; right-to-left scripts render correctly.
+- **Rules:** the language is fixed for the round once it starts (stored on the session). A language not enabled for the drive is rejected. Evidence verification is Unicode-aware, so quotes in any script are checked against the transcript. The evaluator scores content, never language fluency, unless the role requires that language.
+
+### 18.2 OCR for scanned resumes (C-7)
+
+- Image-only PDFs and PNG/JPEG photos of resumes are transcribed by the AI (document/image input) before parsing. If the scan is illegible the candidate is asked to upload a clearer copy.
+- The staff resume card shows an **OCR** badge so reviewers know the text came from a scan; the fairness monitor tracks OCR vs text resumes as a cohort.
+
+### 18.3 GitLab and Bitbucket repositories (D-6)
+
+- Candidates can link public repositories on github.com, gitlab.com and bitbucket.org (including `/tree/<branch>/<path>` links). Validation, file selection, commit-authorship statistics and the repository discussion behave the same on every host. Private repositories remain out of scope (decision §11-4).
+
+### 18.4 System-design whiteboard (F-10)
+
+- **Candidate:** the system-design panel has *Written design* and *Whiteboard* tabs. Tools: box, ellipse, arrow (with optional label, e.g. REST/async), text, pen, select/move, undo, delete, clear. The board autosaves (debounced) and shows *Saved · the interviewer can see this board*. Locked on submission.
+- **AI:** the rendered board is sent to the interviewer as an image with the next turn so it can ask about the diagram, and to the evaluator as evidence (with the shape labels as text).
+- **Staff:** the board image appears with the written response on the candidate page (the print/PDF export includes the written design only).
+
+### 18.5 Opt-in webcam presence proctoring (K-6)
+
+- **Setup:** Drive → Configure → *Webcam proctoring* (off by default) with a snapshot interval (30–600 s).
+- **Consent:** when enabled, consent includes a separate webcam checkbox and the lobby explains what is captured. Accepting requires the webcam consent too (enforced by the server).
+- **During the round:** a small self-view shows *Camera on*. A low-resolution JPEG is taken at the interval; the AI checks only *how many people are visible, whether a face is visible, and whether a phone/second screen is visible*. Camera turned off/denied is logged as an integrity event.
+- **Staff:** snapshot gallery inside the Integrity panel with flagged snapshots highlighted; counts feed the integrity concern level. Never part of the score.
+- **Not built (by design):** face matching, identity verification, emotion or attention analysis — these need biometric processing under DPDP/GDPR and are unreliable across skin tones and lighting.
+
+### 18.6 Integrations: REST API & webhooks (L-6)
+
+- **Settings → Integrations** (admin): create scoped API keys (`drives:read`, `candidates:read`, `candidates:write`) — the key is shown once, only its hash is stored; revoke at any time. Register webhook endpoints for `candidate.invited`, `round.completed`, `round.evaluated`, `gate.decided`, `candidate.completed`, `candidate.status_changed`; the signing secret is shown once; *Send test* delivers a signed `ping`; pause/resume/delete; the 15 most recent deliveries with status, attempts and response code.
+- **API:** list drives, list a drive's candidates with stage and final result, invite candidates (returns personal links), fetch a candidate's per-round status, scores and gate history. Evidence, transcripts and integrity details are not exposed.
+- **Delivery:** HMAC-SHA256 over `timestamp.body`, at-least-once with exponential back-off (6 attempts), unique delivery id, no redirects, HTTPS and no internal addresses in production. Delivery history is kept 30 days. Full reference: [API.md](API.md).
+
+### 18.7 Candidate feedback & fairness monitoring (K-7, I-9)
+
+- **Post-round survey:** after each round (on the completion card and on the candidate's page) an optional 30-second survey: overall, fairness/relevance, clarity, tools (1–5) and a comment. One response per round; never shown to the evaluator; never affects scores.
+- **Released feedback:** on the candidate page a recruiter clicks *Draft with AI* to turn the round reports' narrative into candidate-facing strengths, growth areas and a closing note (no scores, recommendations, integrity signals, compensation or decisions), edits it, and clicks *Release to candidate*. It then appears on the candidate's interview page; it can be updated or withdrawn. Drafting and release are audited.
+- **Fairness monitor** (Drive → Fairness): round pass rates (AI recommendation Hire/Strong Hire) and mean scores split by **process cohorts** — input mode, interview language, how they applied (open link vs invite), resume format (OCR vs text), drive version, and round. A cohort is flagged when its pass rate is below 80% of the best cohort's (four-fifths rule); cohorts under 5 rounds are not compared. Also shows evaluator-run disagreement rate and survey ratings per mode/language, and recent comments.
+- **Limits:** HBE Interview collects no demographic data, so it cannot test for bias by gender, caste, age, disability or other protected characteristics. Such audits need an independent, consented data source.
+
+### 18.8 Still out of scope after Phase 3
+
+| Item | Why |
+|---|---|
+| Private repositories (D-3) | Decision §11-4 (public only) |
+| Multiple organisations / tenancy | Decision §11-8 (single internal tool for now) — the next platform step |
+| Vendor-specific ATS connectors (Greenhouse, Lever, Darwinbox…) | Covered generically by the REST API and webhooks |
+| Identity verification / face matching | Biometric data; see 18.5 |
+| AWS code execution | Judge0 now, AWS later (decision §11-3) |

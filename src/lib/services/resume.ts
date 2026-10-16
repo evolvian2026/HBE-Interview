@@ -2,6 +2,7 @@ import { eq } from "drizzle-orm";
 import { db, schema } from "../db";
 import { extractResumeText } from "../parse";
 import { analyzeResume } from "../ai/analyzers";
+import { transcribeResume } from "../ai/ocr";
 import type { DriveConfig } from "../core/types";
 
 export async function parseResumeJob(payload: { resumeId: string }) {
@@ -23,8 +24,19 @@ export async function parseResumeJob(payload: { resumeId: string }) {
       return;
     }
   }
+  let ocrUsed = false;
+  if (text.replace(/\s/g, "").length < 300 && row.resume.mimeType !== "application/vnd.openxmlformats-officedocument.wordprocessingml.document") {
+    // Scanned PDF or photo: transcribe with the model's document/vision input.
+    const ocr = await transcribeResume(row.resume.fileData, row.resume.mimeType, { candidacyId: row.candidacy.id });
+    if (!ocr.legible) {
+      await fail(payload.resumeId, "We couldn't read this file as a resume. Please upload a clearer scan, or a text-based PDF or DOCX.");
+      return;
+    }
+    text = ocr.text;
+    ocrUsed = true;
+  }
   if (text.replace(/\s/g, "").length < 300) {
-    await fail(payload.resumeId, "We couldn't read text from this file (it may be a scanned image). Please upload a text-based PDF or DOCX.");
+    await fail(payload.resumeId, "We couldn't read enough text from this file. Please upload a clearer scan, or a text-based PDF or DOCX.");
     return;
   }
   const config = row.version.config as DriveConfig;
@@ -33,6 +45,7 @@ export async function parseResumeJob(payload: { resumeId: string }) {
     .update(schema.resumes)
     .set({
       rawText: text,
+      ocrUsed,
       status: "parsed",
       error: null,
       parsed: analysis.profile,

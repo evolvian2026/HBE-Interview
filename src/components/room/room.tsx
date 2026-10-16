@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { Badge, Button, Card, Logo, Textarea, cx } from "../ui";
 import { Markdown } from "./markdown";
@@ -12,8 +12,11 @@ import { PracticalFitPanel } from "./practical-fit-panel";
 import { RepoPanel } from "./repo-panel";
 import { PrioritizationPanel } from "./prioritization-panel";
 import { SnippetEditor } from "./snippet-editor";
+import { WebcamProctor } from "./webcam";
+import { FeedbackSurvey } from "../candidate/feedback-survey";
 import type { PublicState, TurnKind } from "@/lib/interview/orchestrator";
 import type { Workspace } from "@/lib/interview/exercises";
+import { languageInfo } from "@/lib/core/languages";
 
 interface ChatMessage {
   id: string;
@@ -33,9 +36,11 @@ interface Props {
   companyName: string;
   hasExercises: boolean;
   initialSessionId: string | null;
+  languages: string[];
+  webcam: { intervalSec: number } | null;
 }
 
-type IntegrityEvent = { type: "blur" | "paste" | "copy" | "fast_answer"; payload?: Record<string, string | number | boolean> };
+type IntegrityEvent = { type: "blur" | "paste" | "copy" | "fast_answer" | "camera_off"; payload?: Record<string, string | number | boolean> };
 
 function uuid() {
   return typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`;
@@ -66,13 +71,18 @@ export function InterviewRoom(props: Props) {
   const pastedChars = useRef(0);
   const chatEnd = useRef<HTMLDivElement>(null);
   const openedRef = useRef(false);
-  const support = useMemo(() => (typeof window === "undefined" ? { stt: false, tts: false } : voiceSupport()), []);
+  const [language, setLanguage] = useState<string>(props.languages[0] ?? "en");
+  const speechLang = languageInfo(language).speech;
+  // Detected after mount so server and first client render match (avoids a hydration mismatch in Chrome).
+  const [support, setSupport] = useState({ stt: false, tts: false });
+  useEffect(() => setSupport(voiceSupport()), []);
 
   const dictation = useDictation(
     useCallback((t: string) => {
       setInput((x) => (x ? `${x} ${t}` : t));
       if (!typingStart.current) typingStart.current = Date.now();
     }, []),
+    speechLang,
   );
 
   /* ------------------------------ Load & stream ------------------------------ */
@@ -81,6 +91,7 @@ export function InterviewRoom(props: Props) {
     setState(s);
     setTimeLeft(s.timeLeftSec);
     setMode(s.mode);
+    if (s.language) setLanguage(s.language);
   }, []);
 
   const sendTurn = useCallback(
@@ -113,7 +124,7 @@ export function InterviewRoom(props: Props) {
             throw Object.assign(new Error(String(d.message)), { retryable: !!d.retryable });
           }
         });
-        if (full && mode === "voice" && autoSpeak) speak(full);
+        if (full && mode === "voice" && autoSpeak) speak(full, speechLang);
         if (ended) setState((s) => (s ? { ...s, ended: true, status: "ended" } : s));
       } catch (e) {
         const err = e as Error & { retryable?: boolean; status?: number };
@@ -187,6 +198,10 @@ export function InterviewRoom(props: Props) {
     chatEnd.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
+  const onCameraOff = useCallback(() => {
+    integrity.current.push({ type: "camera_off" });
+  }, []);
+
   const onPaste = useCallback((length: number, target = "answer") => {
     integrity.current.push({ type: "paste", payload: { length, target } });
     if (target === "answer") pastedChars.current += length;
@@ -199,7 +214,7 @@ export function InterviewRoom(props: Props) {
     setError(null);
     try {
       if (mode === "voice") await navigator.mediaDevices?.getUserMedia({ audio: true }).then((s) => s.getTracks().forEach((t) => t.stop()));
-      const res = await fetch(`/api/c/${props.token}/rounds/${props.roundIndex}/start`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ mode }) });
+      const res = await fetch(`/api/c/${props.token}/rounds/${props.roundIndex}/start`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ mode, language }) });
       const data = await res.json();
       if (!res.ok) throw new Error(data?.error?.message ?? "Could not start the round");
       setSessionId(data.sessionId);
@@ -255,6 +270,19 @@ export function InterviewRoom(props: Props) {
             <Check ok={!props.hasExercises || wide} label={props.hasExercises ? "Screen is wide enough for the exercise panel (1024px+)" : "Screen size OK"} warn={props.hasExercises && !wide ? "Please use a laptop or desktop for this round." : undefined} />
             <Check ok={support.stt && support.tts} label="Voice mode available in this browser" warn={!support.stt ? "Voice input needs Chrome or Edge. You can still use text." : undefined} />
           </div>
+          {props.languages.length > 1 && (
+            <label className="mt-5 block text-sm">
+              <span className="mb-1 block font-medium">Interview language</span>
+              <select className="w-64 rounded-lg border border-slate-300 px-3 py-2 text-sm" value={language} onChange={(e) => setLanguage(e.target.value)}>
+                {props.languages.map((c) => (
+                  <option key={c} value={c}>
+                    {languageInfo(c).native} ({languageInfo(c).label})
+                  </option>
+                ))}
+              </select>
+              <span className="mt-1 block text-xs text-slate-500">The interviewer will speak and write in this language. Coding problems and technical terms stay in English.</span>
+            </label>
+          )}
           <fieldset className="mt-5">
             <legend className="mb-2 text-sm font-medium">How would you like to answer?</legend>
             <div className="grid gap-2 sm:grid-cols-2">
@@ -270,6 +298,7 @@ export function InterviewRoom(props: Props) {
           <ul className="mt-5 list-disc space-y-1 pl-5 text-xs text-slate-500">
             <li>The timer starts when you click Start. Your progress is saved continuously — if you lose connection, reopen your link within 15 minutes.</li>
             <li>You can skip up to 3 questions and pause twice (2 minutes each).</li>
+            {props.webcam && <li>Webcam proctoring is on: your browser will ask for camera access. A small photo is taken about every {props.webcam.intervalSec < 90 ? `${props.webcam.intervalSec} seconds` : `${Math.round(props.webcam.intervalSec / 60)} minutes`} and only checked for whether one person is present.</li>}
           </ul>
           {error && <p className="mt-3 text-sm text-red-600">{error.message}</p>}
           <div className="mt-5 flex gap-2">
@@ -303,6 +332,7 @@ export function InterviewRoom(props: Props) {
           ))}
         </ol>
         <div className="ml-auto flex items-center gap-2">
+          {props.webcam && <WebcamProctor base={base} intervalSec={props.webcam.intervalSec} active={!ended} onCameraOff={onCameraOff} />}
           {!ended && (
             <span className={cx("rounded-md px-2 py-1 font-mono text-sm", timeLeft <= 60 ? "bg-red-50 text-red-700" : timeLeft <= 300 ? "bg-amber-50 text-amber-800" : "bg-slate-100")}>
               {paused ? "Paused" : fmt(timeLeft)}
@@ -325,7 +355,7 @@ export function InterviewRoom(props: Props) {
             {messages.map((m) => (
               <div key={m.id} id={m.id} className={cx("flex", m.role === "candidate" ? "justify-end" : "justify-start")}>
                 <div className={cx("max-w-[85%] rounded-2xl px-4 py-2.5 text-sm", m.role === "candidate" ? "bg-brand-600 text-white" : "border border-slate-200 bg-white")}>
-                  {m.role === "ai" ? m.content ? <Markdown text={m.content} /> : <TypingDots /> : <p className="whitespace-pre-wrap">{m.content}</p>}
+                  {m.role === "ai" ? m.content ? <div dir="auto"><Markdown text={m.content} /></div> : <TypingDots /> : <p dir="auto" className="whitespace-pre-wrap">{m.content}</p>}
                 </div>
               </div>
             ))}
@@ -333,6 +363,9 @@ export function InterviewRoom(props: Props) {
               <Card>
                 <p className="font-medium">This round is complete — thank you!</p>
                 <p className="mt-1 text-sm text-slate-600">Your responses have been submitted. The hiring team will review them and let you know about next steps.</p>
+                <div className="mt-3">
+                  <FeedbackSurvey token={props.token} roundIndex={props.roundIndex} roundLabel={props.roundLabel} />
+                </div>
                 <Link href={`/c/${props.token}`} className="mt-3 inline-block text-sm font-medium text-brand-600 hover:underline">
                   Back to your interview page →
                 </Link>
@@ -360,6 +393,7 @@ export function InterviewRoom(props: Props) {
                 <>
                   {snippetOpen && <SnippetEditor onClose={() => setSnippetOpen(false)} onInsert={(f) => setInput((x) => `${x}${f}`)} />}
                   <Textarea
+                    dir="auto"
                     rows={3}
                     value={dictation.interim ? `${input} ${dictation.interim}`.trim() : input}
                     placeholder={mode === "voice" ? "Click the mic and speak — your words appear here. Edit if needed, then Send." : "Type your answer… (Enter to send, Shift+Enter for a new line)"}
@@ -389,7 +423,7 @@ export function InterviewRoom(props: Props) {
                     <Button variant="ghost" disabled={busy} onClick={() => setSnippetOpen((x) => !x)} title="Write a code or SQL snippet into your answer">
                       {"</>"} Code
                     </Button>
-                    <Button variant="ghost" disabled={!lastAi} onClick={() => lastAi && (mode === "voice" ? speak(lastAi.content) : document.getElementById(lastAi.id)?.scrollIntoView())}>
+                    <Button variant="ghost" disabled={!lastAi} onClick={() => lastAi && (mode === "voice" ? speak(lastAi.content, speechLang) : document.getElementById(lastAi.id)?.scrollIntoView())}>
                       Repeat
                     </Button>
                     <Button variant="ghost" disabled={busy || !state?.skipsLeft} onClick={() => confirm("Skip this question? Skipped questions count as not answered.") && sendTurn("skip", "")}>

@@ -37,6 +37,8 @@ export default async function RoundPage({ params }: { params: Promise<{ token: s
       companyName={settings.companyName}
       hasExercises={sections.some((s) => s.exercise && s.exercise !== "practical_fit")}
       initialSessionId={session?.id ?? null}
+      languages={(version.config as DriveConfig).languages ?? ["en"]}
+      webcam={(version.config as DriveConfig).proctoring?.webcam && (row.candidacy.consent as { webcam?: boolean } | null)?.webcam ? { intervalSec: (version.config as DriveConfig).proctoring!.intervalSec } : null}
     />
   );
 }

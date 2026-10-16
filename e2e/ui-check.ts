@@ -119,7 +119,7 @@ async function main() {
     await cpage.waitForSelector("text=Review your profile", { timeout: 60_000 });
     await shot(cpage, "12-candidate-profile");
     await cpage.click("text=Confirm profile");
-    await cpage.waitForSelector("text=Link your projects on GitHub");
+    await cpage.waitForSelector("text=Link your project repositories");
     await cpage.fill('input[placeholder="https://github.com/owner/repo"]', "https://github.com/ravik/orders-service");
     await shot(cpage, "13-candidate-projects");
     await cpage.click("text=Save and continue");

@@ -11,6 +11,8 @@ import { ConsentStep } from "@/components/candidate/consent-step";
 import { ResumeStep } from "@/components/candidate/resume-step";
 import { ProfileStep } from "@/components/candidate/profile-step";
 import { ProjectsStep } from "@/components/candidate/projects-step";
+import { FeedbackSurvey } from "@/components/candidate/feedback-survey";
+import { pendingSurveyRound, type ReleasedFeedback } from "@/lib/services/feedback";
 
 export const dynamic = "force-dynamic";
 
@@ -35,6 +37,8 @@ export default async function CandidateHub({ params }: { params: Promise<{ token
   const [resume] = await db.select().from(schema.resumes).where(eq(schema.resumes.candidacyId, candidacy.id));
   const rounds = await candidateRounds(candidacy, config);
   const needsProjects = needsProjectsStep(config);
+  const surveyRound = await pendingSurveyRound(candidacy.id);
+  const released = candidacy.feedbackReleasedAt ? (candidacy.feedbackSummary as ReleasedFeedback | null) : null;
 
   const steps = [
     { key: "consent", label: "Consent", done: candidacy.stage !== "invited" },
@@ -47,7 +51,7 @@ export default async function CandidateHub({ params }: { params: Promise<{ token
   let body: React.ReactNode;
   if (candidacy.stage === "declined") body = <p className="text-sm text-slate-600">You declined consent, so this interview can&apos;t continue. If this was a mistake, please contact the recruiter.</p>;
   else if (candidacy.stage === "expired" && !rounds.some((r) => r.status === "completed")) body = <p className="text-sm text-slate-600">This invitation has expired. Please contact the recruiter{settings.supportEmail ? ` at ${settings.supportEmail}` : ""}.</p>;
-  else if (candidacy.stage === "invited") body = <ConsentStep token={token} text={settings.consentText} companyName={settings.companyName} />;
+  else if (candidacy.stage === "invited") body = <ConsentStep token={token} text={settings.consentText} companyName={settings.companyName} webcamRequired={!!config.proctoring?.webcam} />;
   else if (candidacy.stage === "onboarding" && (!resume || ["uploaded", "parsing", "failed"].includes(resume.status)))
     body = <ResumeStep token={token} initialStatus={resume?.status ?? "none"} initialError={resume?.error} />;
   else if (candidacy.stage === "onboarding" && resume?.status === "parsed") body = <ProfileStep token={token} profile={resume.parsed as ParsedResume} />;
@@ -55,7 +59,7 @@ export default async function CandidateHub({ params }: { params: Promise<{ token
     const prof = resume.parsed as ParsedResume;
     const links: Record<string, string> = {};
     for (const p of prof.projects) {
-      const gh = [...p.links, ...prof.links].find((l) => /github\.com\/[^/]+\/[^/\s]+/.test(l));
+      const gh = [...p.links, ...prof.links].find((l) => /(github\.com|gitlab\.com|bitbucket\.org)\/[^/]+\/[^/\s]+/.test(l));
       if (gh && p.links.includes(gh)) links[p.name] = gh;
     }
     body = <ProjectsStep token={token} projects={prof.projects.map((p) => p.name).filter(Boolean)} githubUsername={candidate.githubUsername ?? prof.githubUsername ?? ""} links={links} />;
@@ -102,6 +106,33 @@ export default async function CandidateHub({ params }: { params: Promise<{ token
             );
           })}
         </ol>
+        {surveyRound != null && <FeedbackSurvey token={token} roundIndex={surveyRound} roundLabel={rounds[surveyRound]?.label} />}
+        {released && (
+          <div className="rounded-xl border border-emerald-200 bg-emerald-50/50 p-4">
+            <h3 className="font-semibold">Feedback from the hiring team</h3>
+            {released.strengths.length > 0 && (
+              <>
+                <p className="mt-2 text-sm font-medium text-slate-700">What went well</p>
+                <ul className="mt-1 list-disc space-y-1 pl-5 text-sm text-slate-700">
+                  {released.strengths.map((s, i) => (
+                    <li key={i}>{s}</li>
+                  ))}
+                </ul>
+              </>
+            )}
+            {released.growthAreas.length > 0 && (
+              <>
+                <p className="mt-3 text-sm font-medium text-slate-700">Areas to develop</p>
+                <ul className="mt-1 list-disc space-y-1 pl-5 text-sm text-slate-700">
+                  {released.growthAreas.map((s, i) => (
+                    <li key={i}>{s}</li>
+                  ))}
+                </ul>
+              </>
+            )}
+            {released.note && <p className="mt-3 text-sm text-slate-600">{released.note}</p>}
+          </div>
+        )}
         {candidacy.roundAvailableUntil && candidacy.stage === "round_available" && (
           <p className="text-xs text-slate-500">Please take your next round before {candidacy.roundAvailableUntil.toDateString()}.</p>
         )}

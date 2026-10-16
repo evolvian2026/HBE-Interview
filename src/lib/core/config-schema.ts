@@ -55,4 +55,6 @@ export const DriveConfigSchema = z.object({
   nextRoundExpiryDays: z.number().int().min(1).max(30),
   inviteExpiryDays: z.number().int().min(1).max(90),
   reconnectWindowMin: z.number().int().min(5).max(60),
+  languages: z.array(z.string().max(5)).min(1).max(12).optional(),
+  proctoring: z.object({ webcam: z.boolean(), intervalSec: z.number().int().min(30).max(600) }).optional(),
 });

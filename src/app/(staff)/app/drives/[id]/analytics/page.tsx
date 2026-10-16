@@ -23,9 +23,14 @@ export default async function AnalyticsPage({ params }: { params: Promise<{ id: 
       <PageHeader
         title={`Analytics: ${a.drive.title}`}
         subtitle={
-          <Link href={`/app/drives/${id}`} className="text-brand-600 hover:underline">
-            ← Back to drive
-          </Link>
+          <span className="flex gap-3">
+            <Link href={`/app/drives/${id}`} className="text-brand-600 hover:underline">
+              ← Back to drive
+            </Link>
+            <Link href={`/app/drives/${id}/fairness`} className="text-brand-600 hover:underline">
+              Fairness monitor
+            </Link>
+          </span>
         }
       />
       <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-6">

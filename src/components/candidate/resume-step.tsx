@@ -43,7 +43,7 @@ export function ResumeStep({ token, initialStatus, initialError }: { token: stri
   return (
     <div className="space-y-4">
       <h2 className="text-lg font-semibold">Upload your resume</h2>
-      <p className="text-sm text-slate-600">PDF or DOCX, up to 5 MB. The AI reads your skills, experience and projects to tailor your interview. You&apos;ll be able to review what it extracted.</p>
+      <p className="text-sm text-slate-600">PDF, DOCX, or a clear photo/scan (PNG, JPEG), up to 5 MB. The AI reads your skills, experience and projects to tailor your interview. You&apos;ll be able to review what it extracted.</p>
       {working ? (
         <div className="flex items-center gap-3 rounded-lg bg-brand-50 p-4 text-sm text-brand-700">
           <span className="h-4 w-4 animate-spin rounded-full border-2 border-brand-600 border-t-transparent" />
@@ -60,7 +60,7 @@ export function ResumeStep({ token, initialStatus, initialError }: { token: stri
           }}
         >
           <p className="text-sm text-slate-600">Drag and drop your resume here, or</p>
-          <input ref={fileRef} type="file" accept=".pdf,.docx" className="hidden" onChange={(e) => e.target.files?.[0] && upload(e.target.files[0])} />
+          <input ref={fileRef} type="file" accept=".pdf,.docx,.png,.jpg,.jpeg" className="hidden" onChange={(e) => e.target.files?.[0] && upload(e.target.files[0])} />
           <Button className="mt-3" disabled={busy} onClick={() => fileRef.current?.click()}>
             {busy ? "Uploading…" : "Choose file"}
           </Button>

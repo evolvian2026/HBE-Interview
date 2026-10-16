@@ -7,6 +7,7 @@ import type { DriveConfig, RoundType } from "../core/types";
 import { ROUND_LABEL } from "../core/types";
 import { audit } from "../audit";
 import { candidateLink, sendInviteEmail } from "./notify";
+import { emitEvent } from "./integrations";
 
 const emailOk = (e: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e);
 
@@ -39,25 +40,29 @@ async function createCandidacy(drive: typeof schema.drives.$inferSelect, name: s
       expiresAt: new Date(Date.now() + config.inviteExpiryDays * 86_400_000),
     })
     .returning();
+  await emitEvent("candidate.invited", { candidacyId: candidacy.id, driveId: drive.id, candidate: { name: candidate.name, email: candidate.email } });
   return { candidacy, created: true };
 }
 
-export async function inviteCandidates(driveId: string, list: { name: string; email: string }[], user: StaffUser) {
+export async function inviteCandidates(driveId: string, list: { name: string; email: string }[], user: { id: string | null }, via: "ui" | "api" = "ui") {
   const [drive] = await db.select().from(schema.drives).where(eq(schema.drives.id, driveId));
   if (!drive) throw new HttpError(404, "Drive not found");
   if (drive.status !== "active") throw new HttpError(400, "Publish (activate) the drive before inviting candidates.");
   const out: { name: string; email: string; link?: string; status: string }[] = [];
+  const ids: (string | undefined)[] = [];
   for (const item of list.slice(0, 200)) {
     if (!item.name?.trim() || !emailOk(item.email ?? "")) {
       out.push({ ...item, status: "invalid" });
+      ids.push(undefined);
       continue;
     }
     const { candidacy, created } = await createCandidacy(drive, item.name, item.email);
     if (created) await sendInviteEmail(candidacy.id).catch((e) => console.error("invite email failed", e));
+    ids.push(candidacy.id);
     out.push({ name: item.name, email: item.email, link: candidateLink(candidacy.accessToken), status: created ? "invited" : "already_invited" });
   }
-  await audit({ type: "staff", id: user.id }, "drive.invite", "drive", driveId, { count: out.length });
-  return out;
+  await audit({ type: "staff", id: user.id }, "drive.invite", "drive", driveId, { count: out.length, via });
+  return out.map((o, i) => ({ ...o, candidacyId: ids[i] }));
 }
 
 export async function registerOpen(openSlug: string, name: string, email: string) {
@@ -75,12 +80,12 @@ export async function registerOpen(openSlug: string, name: string, email: string
   return candidacy;
 }
 
-export async function recordConsent(candidacyId: string, accept: boolean, text: string, version: number, meta: { ip?: string | null; ua?: string | null }) {
+export async function recordConsent(candidacyId: string, accept: boolean, text: string, version: number, meta: { ip?: string | null; ua?: string | null; webcam?: boolean }) {
   await db
     .update(schema.candidacies)
     .set({
       stage: accept ? "onboarding" : "declined",
-      consent: { accepted: accept, version, textHash: text.length, at: new Date().toISOString(), ip: meta.ip ?? null, ua: meta.ua ?? null },
+      consent: { accepted: accept, version, textHash: text.length, at: new Date().toISOString(), ip: meta.ip ?? null, ua: meta.ua ?? null, webcam: !!meta.webcam },
       updatedAt: new Date(),
     })
     .where(eq(schema.candidacies.id, candidacyId));
@@ -104,6 +109,10 @@ export interface CandidateRoundView {
 
 export async function candidateRounds(candidacy: typeof schema.candidacies.$inferSelect, config: DriveConfig): Promise<CandidateRoundView[]> {
   const sessions = await db.select().from(schema.roundSessions).where(eq(schema.roundSessions.candidacyId, candidacy.id)).orderBy(asc(schema.roundSessions.roundIndex));
+  // The round awaiting review is the next one once the current round has ended; if the candidate was put on
+  // hold after being advanced (current round not yet taken), it is the current round itself.
+  const currentDone = sessions.some((x) => x.roundIndex === candidacy.currentRoundIndex && x.status === "ended");
+  const reviewIndex = currentDone ? candidacy.currentRoundIndex + 1 : candidacy.currentRoundIndex;
   return enabledRounds(config).map((r, i) => {
     const s = sessions.find((x) => x.roundIndex === i);
     let status: CandidateRoundView["status"] = "locked";
@@ -111,7 +120,7 @@ export async function candidateRounds(candidacy: typeof schema.candidacies.$infe
     else if (s) status = "in_progress";
     else if (i === candidacy.currentRoundIndex && ["ready", "round_available"].includes(candidacy.stage)) status = "available";
     else if (i === candidacy.currentRoundIndex && candidacy.stage === "expired") status = "expired";
-    else if (i === candidacy.currentRoundIndex + 1 && ["evaluating", "gate_pending", "on_hold"].includes(candidacy.stage)) status = "under_review";
+    else if (i === reviewIndex && ["evaluating", "gate_pending", "on_hold"].includes(candidacy.stage)) status = "under_review";
     return {
       index: i,
       type: r.type,

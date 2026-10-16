@@ -1,12 +1,13 @@
 # HBE Interview
 
-An AI-powered, multi-round interview platform. Candidates upload a resume, link their GitHub projects, and are interviewed by an AI through up to three rounds — **Technical / Functional** (resume deep-dive, GitHub project validation, concepts, system design, live coding), **Managerial** (senior roles: leadership, stakeholders, execution, strategy, ethics scenarios, written case) and **HR** (motivation, company values, behaviours, practical details, policy Q&A). Each round produces an evidence-backed scorecard; a combined report recommends Strong Hire / Hire / Lean No / No Hire for a human to decide.
+An AI-powered, multi-round interview platform. Candidates upload a resume, link their GitHub / GitLab / Bitbucket projects, and are interviewed by an AI through up to three rounds — **Technical / Functional** (resume deep-dive, GitHub project validation, concepts, system design, live coding), **Managerial** (senior roles: leadership, stakeholders, execution, strategy, ethics scenarios, written case) and **HR** (motivation, company values, behaviours, practical details, policy Q&A). Each round produces an evidence-backed scorecard; a combined report recommends Strong Hire / Hire / Lean No / No Hire for a human to decide.
 
 - Product requirements: [docs/PRD.md](docs/PRD.md)
 - Feature specification: [docs/FEATURES.md](docs/FEATURES.md)
 - Technical architecture: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — see **§0 As-built decisions**
+- Integration API & webhooks: [docs/API.md](docs/API.md)
 
-## Features (Phase 1)
+## Features
 
 | Area | What's included |
 |---|---|
@@ -18,6 +19,7 @@ An AI-powered, multi-round interview platform. Candidates upload a resume, link 
 | Evaluation | Multi-pass evaluator (2 runs + tie-break, median), server-side evidence verification, PII/protected-info redaction, knockouts, confidence, gates (auto/manual/always), combined report with focus areas for the human panel, recruiter overrides with audit trail |
 | Fairness & compliance | Protected-topic guardrails + HR compliance filter, integrity signals as context only, retention-based deletion, data deletion on request, salary history never asked (compensation off by default) |
 | Phase 2 | Drive analytics, AI usage & cost, side-by-side comparison, PDF export (named / masked / with transcripts), expiring passcode-protected share links, code replay, drag-and-drop prioritisation exercise, inline snippet editor, AI-generated answer flags, template library, CSV invites, expiry reminders, custom coding problems validated by a reference solution, per-stage model overrides, re-evaluation, hiring-manager drive assignment |
+| Phase 3 | Interviews in 12 languages (incl. Hindi, Tamil, Arabic; voice locales), OCR for scanned/photo resumes, GitLab & Bitbucket repos, system-design whiteboard seen by the AI, opt-in webcam presence checks (no face recognition), REST API with scoped keys and HMAC-signed webhooks, post-round candidate survey, recruiter-released candidate feedback, fairness monitor on process cohorts (four-fifths rule) |
 | Recruiter app | Drives list, drive editor, candidate table with round/final scores, practical fit and integrity, decisions queue, full candidate report with transcripts, code and repo analysis, notes, settings (company values, HR knowledge base, consent, retention, users & roles) |
 
 ## Tech stack
@@ -49,7 +51,7 @@ npm run dev                   # http://localhost:3000 → sign in with the admin
 | `ANTHROPIC_API_KEY` | Claude API key. Optional overrides: `AI_MODEL_INTERVIEWER`, `AI_MODEL_ANALYZER`, `AI_MODEL_EVALUATOR`, `AI_MODEL_UTILITY`, `AI_INTERVIEWER_EFFORT`, `AI_FALLBACKS` |
 | `CODE_EXECUTOR` | `judge0` (default) or `local-dev` |
 | `JUDGE0_URL`, `JUDGE0_API_KEY`, `JUDGE0_RAPIDAPI_HOST` | Judge0 CE (RapidAPI-hosted by default; leave the host empty for self-hosted with `X-Auth-Token`). `JUDGE0_LANGUAGE_IDS` overrides language ids, e.g. `{"python":92}` |
-| `GITHUB_TOKEN` | Optional; raises GitHub's rate limit (public repos only) |
+| `GITHUB_TOKEN` | Optional; raises GitHub's rate limit (public repos only; GitLab and Bitbucket public APIs need no token) |
 | `RUN_WORKER_IN_PROCESS` | `true` (default) runs background jobs inside the web server; set `false` and run `npm run worker` separately to scale them out |
 | `RESEND_API_KEY`, `EMAIL_FROM` | Optional email for invites / next-round notices (links can always be copied from the app) |
 
@@ -67,7 +69,9 @@ npm run typecheck
 npm run smoke        # full HTTP run of all three rounds (server started with AI_MOCK=true GITHUB_MOCK=true CODE_EXECUTOR=local-dev)
 SMOKE_ROLE=manager npm run smoke   # manager track (includes the prioritisation exercise)
 npm run smoke:phase2 # analytics, usage, compare, print, share links, custom problems, hiring-manager scoping
+npm run smoke:phase3 # API keys + REST v1, signed webhooks (local receiver), Hindi round, OCR, GitLab, whiteboard, webcam presence, survey, released feedback, fairness
 npm run ui-check     # browser walkthrough with screenshots (Playwright; set CHROMIUM_PATH, CANDIDATE_LINK, RESUME_PATH)
+P3_DRIVE_ID=… P3_CANDIDACY_ID=… npm run ui-check:phase3   # whiteboard, language lobby, integrations, fairness (IDs printed by smoke:phase3)
 ```
 
 ## How it works (short)
@@ -77,3 +81,4 @@ npm run ui-check     # browser walkthrough with screenshots (Playwright; set CHR
 3. Each **round** is driven by a server-side state machine; the AI interviewer proposes actions via tools (`record_assessment`, `advance_section`, `give_hint`, `end_interview`, …) which the server validates. Exercises open automatically in their sections.
 4. When a round ends, the **evaluator** scores each parameter twice (a third time on disagreement), verifies every evidence quote against the transcript or code, applies knockouts and computes the round score; the **gate** auto-advances or waits for the recruiter.
 5. After the last round, the **combined report** weights rounds by seniority and lists focus areas for the human panel. Recruiters can override any parameter with a reason.
+6. **Integrations** (Settings → Integrations): ATS/HRIS systems call `/api/v1` with a scoped API key and receive signed webhooks for invites, round completion/evaluation, gate decisions and final results — see [docs/API.md](docs/API.md).

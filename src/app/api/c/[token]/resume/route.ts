@@ -4,7 +4,7 @@ import { requireCandidacy } from "@/lib/auth/candidate";
 import { HttpError } from "@/lib/auth/staff";
 import { handle, json } from "@/lib/http";
 import { enqueue } from "@/lib/jobs/queue";
-import { detectResumeType, RESUME_MAX_BYTES } from "@/lib/parse";
+import { detectResumeType, RESUME_MAX_BYTES, RESUME_MIME } from "@/lib/parse";
 import { ParsedResumeSchema } from "@/lib/ai/analyzers";
 import { needsProjectsStep } from "@/lib/services/candidacy";
 import type { DriveConfig } from "@/lib/core/types";
@@ -30,9 +30,9 @@ export const POST = handle(async (req: Request, { params }: Ctx) => {
   if (file.size > RESUME_MAX_BYTES) throw new HttpError(400, "File is larger than 5 MB");
   const bytes = Buffer.from(await file.arrayBuffer());
   const kind = detectResumeType(file.name, bytes);
-  if (!kind) throw new HttpError(400, "Please upload a PDF or DOCX file");
-  const mime = kind === "pdf" ? "application/pdf" : "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
-  const values = { fileName: file.name, mimeType: mime, fileData: bytes, rawText: null, status: "uploaded" as const, error: null, parsed: null, edits: null, jdMatch: null, claims: null, riskSignals: null, updatedAt: new Date() };
+  if (!kind) throw new HttpError(400, "Please upload a PDF, DOCX, PNG or JPEG file");
+  const mime = RESUME_MIME[kind];
+  const values = { fileName: file.name, mimeType: mime, fileData: bytes, rawText: null, status: "uploaded" as const, error: null, ocrUsed: false, parsed: null, edits: null, jdMatch: null, claims: null, riskSignals: null, updatedAt: new Date() };
   const [r] = await db
     .insert(schema.resumes)
     .values({ candidacyId: candidacy.id, ...values })
