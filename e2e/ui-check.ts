@@ -59,6 +59,42 @@ async function main() {
   await page.waitForSelector("text=Company values");
   await shot(page, "07-settings");
 
+  // Phase 2 pages
+  if (process.env.PHASE2) {
+    await page.goto(`${driveUrl}/analytics`);
+    await page.waitForSelector("text=Score distributions");
+    await shot(page, "20-analytics");
+    await page.goto(`${BASE}/app/usage?range=all`);
+    await shot(page, "21-usage");
+    await page.goto(driveUrl);
+    const boxes = page.locator('input[name="ids"]');
+    if ((await boxes.count()) >= 2) {
+      await boxes.nth(0).check();
+      await boxes.nth(1).check();
+      await page.click("text=Compare selected");
+      await page.waitForSelector("text=Compare candidates");
+      await shot(page, "22-compare");
+    }
+    await page.goto(`${driveUrl}/problems`);
+    await shot(page, "23-custom-problems");
+    if (process.env.REPORT_CANDIDACY_ID) {
+      await page.goto(`${BASE}/print/candidates/${process.env.REPORT_CANDIDACY_ID}?masked=1`);
+      await page.waitForSelector("text=HBE Interview report");
+      await shot(page, "24-print-masked");
+    }
+    await page.goto(`${BASE}/app/drives/new`);
+    await shot(page, "25-templates");
+    if (process.env.PRIORITIZATION_LINK) {
+      const p2 = await ctx.newPage();
+      await p2.goto(process.env.PRIORITIZATION_LINK);
+      await p2.waitForSelector("text=Submit ranking", { timeout: 30_000 });
+      await p2.click("text=</> Code");
+      await p2.fill('textarea[placeholder="Write your snippet here…"]', "SELECT team, COUNT(*) FROM incidents GROUP BY team;");
+      await shot(p2, "26-room-prioritization-snippet");
+      await p2.close();
+    }
+  }
+
   // New candidate through the UI
   await page.goto(driveUrl);
   await page.fill("textarea", `Ravi Kumar, ravi.${Date.now()}@example.com`);

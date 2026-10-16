@@ -13,8 +13,26 @@ export function aiClient(): Anthropic {
   return client;
 }
 
+let overrides: { models: Partial<Record<ModelTier, string>>; effort?: string; at: number } = { models: {}, at: 0 };
+
+/** Refresh admin model overrides from settings (cached for 60 s). */
+export async function refreshModelOverrides() {
+  if (Date.now() - overrides.at < 60_000) return;
+  try {
+    const { getSettings } = await import("../settings");
+    const s = await getSettings();
+    overrides = { models: Object.fromEntries(Object.entries(s.models ?? {}).filter(([, v]) => v)) as Partial<Record<ModelTier, string>>, effort: s.interviewerEffort || undefined, at: Date.now() };
+  } catch {
+    overrides.at = Date.now();
+  }
+}
+
 export function modelFor(tier: ModelTier): string {
-  return env.models[tier];
+  return overrides.models[tier] || env.models[tier];
+}
+
+export function interviewerEffort(): "low" | "medium" | "high" {
+  return (overrides.effort as "low" | "medium" | "high" | undefined) ?? env.interviewerEffort;
 }
 
 export function isMock() {
@@ -93,6 +111,7 @@ function jsonFormat<T>(schema: z.ZodType<T>): Anthropic.Beta.BetaJSONOutputForma
 /** One schema-constrained model call, validated with Zod, with one repair attempt. */
 export async function structured<T>(opts: StructuredOptions<T>): Promise<T> {
   if (isMock()) return await opts.mock();
+  await refreshModelOverrides();
   const model = modelFor(opts.tier);
   const messages: Anthropic.Beta.BetaMessageParam[] = [{ role: "user", content: opts.user }];
   let lastError = "";

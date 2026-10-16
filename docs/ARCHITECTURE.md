@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Document status** | v1.2 — approved; Phase 1 implemented (see §0 for as-built decisions) |
+| **Document status** | v1.3 — approved; Phases 1–2 implemented (see §0 for as-built decisions) |
 | **Date** | 2026-10-16 |
 | **Related** | [PRD.md](PRD.md) · [FEATURES.md](FEATURES.md) |
 
@@ -57,6 +57,10 @@ The product owner approved the design with these decisions. **Where this section
 | Codebase | A single Next.js app (`src/app`, `src/lib`, `src/components`) rather than a monorepo; module boundaries are kept as folders (`lib/core` is pure and unit-tested) |
 | Hosting | **Render** web service (`render.yaml`); migrations + seed run on start; `/api/health` health check |
 | Mock mode | `AI_MOCK=true` runs the whole pipeline with deterministic mock AI (development, demos and CI); `GITHUB_MOCK=true` uses a synthetic repository |
+| Phase 2 data | `share_links` (SHA-256 token hash, bcrypt passcode, expiry, revocation, views), `coding_problems` (drive-scoped custom problems with reference solution and validation result), `users.drive_ids` (hiring-manager assignment), `candidacies.reminder_sent_at` — migration `drizzle/0001_phase2.sql` |
+| PDF export | Print-optimised server-rendered report (`/print/candidates/[id]`) using the browser's Save-as-PDF — no headless Chromium on the server. Shared with the public share page (`/r/[token]`) via one `ReportDocument` component |
+| Model overrides | Org settings hold per-tier model and interviewer-effort overrides; the gateway refreshes them at most once a minute and falls back to environment defaults |
+| Problem lookup | `services/problems.getProblem` resolves bank problems and validated custom problems; `pickProblemForDrive` prefers the drive's custom problems |
 
 ### 0.1 Source map
 
@@ -71,7 +75,8 @@ The product owner approved the design with these decisions. **Where this section
 | Candidate UI (onboarding, interview room, voice, editors) | `src/app/c/*`, `src/app/i/*`, `src/components/candidate/*`, `src/components/room/*` |
 | Recruiter UI (drives, editor, reports, decisions, settings) | `src/app/(staff)/app/*`, `src/components/staff/*` |
 | API routes | `src/app/api/*` |
-| End-to-end checks | `scripts/smoke.ts` (HTTP, all three rounds), `e2e/ui-check.ts` (browser walkthrough) |
+| Analytics, usage, comparison, share/export, custom problems | `src/lib/services/{analytics,share,problems}.ts`, `src/lib/core/metrics.ts`, `src/components/charts.tsx`, `src/components/report/*` |
+| End-to-end checks | `scripts/smoke.ts` (HTTP, all three rounds; `SMOKE_ROLE=manager` for the manager track), `scripts/smoke-phase2.ts` (Phase 2 features), `e2e/ui-check.ts` (browser walkthrough; `PHASE2=1`) |
 
 ---
 

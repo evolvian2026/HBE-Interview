@@ -10,6 +10,8 @@ import { CodingPanel } from "./coding-panel";
 import { TextExercisePanel } from "./text-exercise-panel";
 import { PracticalFitPanel } from "./practical-fit-panel";
 import { RepoPanel } from "./repo-panel";
+import { PrioritizationPanel } from "./prioritization-panel";
+import { SnippetEditor } from "./snippet-editor";
 import type { PublicState, TurnKind } from "@/lib/interview/orchestrator";
 import type { Workspace } from "@/lib/interview/exercises";
 
@@ -56,6 +58,7 @@ export function InterviewRoom(props: Props) {
   const [timeLeft, setTimeLeft] = useState<number>(props.durationMin * 60);
   const [autoSpeak, setAutoSpeak] = useState(true);
   const [starting, setStarting] = useState(false);
+  const [snippetOpen, setSnippetOpen] = useState(false);
   const base = sessionId ? `/api/c/${props.token}/sessions/${sessionId}` : "";
   const integrity = useRef<IntegrityEvent[]>([]);
   const blurAt = useRef<number | null>(null);
@@ -355,6 +358,7 @@ export function InterviewRoom(props: Props) {
                 <p className="py-3 text-center text-sm text-slate-600">Paused. Take a breath — click Resume when you&apos;re ready (auto-resumes after 2 minutes).</p>
               ) : (
                 <>
+                  {snippetOpen && <SnippetEditor onClose={() => setSnippetOpen(false)} onInsert={(f) => setInput((x) => `${x}${f}`)} />}
                   <Textarea
                     rows={3}
                     value={dictation.interim ? `${input} ${dictation.interim}`.trim() : input}
@@ -382,6 +386,9 @@ export function InterviewRoom(props: Props) {
                         {dictation.listening ? "● Stop mic" : "🎤 Speak"}
                       </Button>
                     )}
+                    <Button variant="ghost" disabled={busy} onClick={() => setSnippetOpen((x) => !x)} title="Write a code or SQL snippet into your answer">
+                      {"</>"} Code
+                    </Button>
                     <Button variant="ghost" disabled={!lastAi} onClick={() => lastAi && (mode === "voice" ? speak(lastAi.content) : document.getElementById(lastAi.id)?.scrollIntoView())}>
                       Repeat
                     </Button>
@@ -417,6 +424,9 @@ export function InterviewRoom(props: Props) {
             )}
             {(workspace.kind === "system_design" || workspace.kind === "domain_case" || workspace.kind === "mgmt_case") && (
               <TextExercisePanel key={workspace.title} ws={workspace} base={base} disabled={busy || paused} onPaste={(n) => onPaste(n, "exercise")} onSubmit={() => sendTurn("submitted", "I've submitted my written response.")} />
+            )}
+            {workspace.kind === "prioritization" && (
+              <PrioritizationPanel key={workspace.title} ws={workspace} base={base} disabled={busy || paused} onSubmit={() => sendTurn("submitted", "I've submitted my ranking and rationale.")} />
             )}
             {workspace.kind === "practical_fit" && <PracticalFitPanel ws={workspace} base={base} disabled={busy || paused} onConfirmed={() => sendTurn("submitted", "I've confirmed my details in the form.")} />}
             {workspace.kind === "repo" && <RepoPanel ws={workspace} />}

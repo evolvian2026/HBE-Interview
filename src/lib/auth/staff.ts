@@ -12,6 +12,8 @@ export interface StaffUser {
   email: string;
   name: string;
   role: StaffRole;
+  /** Assigned drives — only enforced for hiring managers. */
+  driveIds?: string[];
 }
 
 const COOKIE = "hbe_staff";
@@ -56,7 +58,7 @@ export async function getStaff(): Promise<StaffUser | null> {
     const { payload } = await jwtVerify(token, key());
     const [u] = await db.select().from(schema.users).where(eq(schema.users.id, String(payload.sub)));
     if (!u || !u.active) return null;
-    return { id: u.id, email: u.email, name: u.name, role: u.role };
+    return { id: u.id, email: u.email, name: u.name, role: u.role, driveIds: u.driveIds ?? [] };
   } catch {
     return null;
   }
@@ -97,4 +99,21 @@ export async function ensureBootstrapAdmin() {
     .insert(schema.users)
     .values({ email: env.adminEmail.toLowerCase(), name: "Administrator", passwordHash: await hashPassword(env.adminPassword), role: "admin" })
     .onConflictDoNothing();
+}
+
+/** Hiring managers only see drives they are assigned to; other roles see every drive. */
+export function canSeeDrive(user: StaffUser, driveId: string) {
+  return user.role !== "hiring_manager" || (user.driveIds ?? []).includes(driveId);
+}
+
+export function assertDriveAccess(user: StaffUser, driveId: string) {
+  if (!canSeeDrive(user, driveId)) throw new HttpError(403, "You are not assigned to this hiring drive");
+}
+
+/** Resolve a candidacy's drive and check access (route handlers). */
+export async function assertCandidacyAccess(user: StaffUser, candidacyId: string) {
+  const [c] = await db.select({ driveId: schema.candidacies.driveId }).from(schema.candidacies).where(eq(schema.candidacies.id, candidacyId));
+  if (!c) throw new HttpError(404, "Candidate not found");
+  assertDriveAccess(user, c.driveId);
+  return c.driveId;
 }

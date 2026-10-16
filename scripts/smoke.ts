@@ -112,7 +112,21 @@ async function runRound(token: string, index: number, candidacyId: string) {
       r = await turn(base, "submitted", "I've submitted my written response.");
       continue;
     }
-    if (r.ws?.kind === "practical_fit" && !(r.ws as { submitted?: boolean }).submitted) {
+    if (r.ws?.kind === "prioritization" && process.env.STOP_AT === "prioritization") {
+      console.log(`STOPPED_AT_PRIORITIZATION ${BASE}/c/${token}/round/${index}`);
+      process.exit(0);
+    }
+    if (r.ws?.kind === "prioritization" && !(r.ws as { submitted?: boolean }).submitted) {
+      const items = (r.ws as unknown as { items: { id: string; text: string }[] }).items;
+      const order = [...items].reverse();
+      await call("PUT", `${base}/exercise`, {
+        content: { order: order.map((i) => i.id).join(","), ranking: order.map((i, k) => `${k + 1}. ${i.text}`).join("\n"), summary: LONG("prioritisation") },
+      });
+      log("  prioritization ranked + submitted");
+      r = await turn(base, "submitted", "I've submitted my ranking and rationale.");
+      continue;
+    }
+        if (r.ws?.kind === "practical_fit" && !(r.ws as { submitted?: boolean }).submitted) {
       await call("PUT", `${base}/practical-fit`, {
         data: { currentLocation: "Pune", willingToRelocate: "yes", workModel: "hybrid", noticeDays: 45, noticeNegotiable: true, servingNotice: false, earliestJoiningDate: "2026-12-01", expectedCompMin: null, expectedCompMax: null, compCurrency: "INR", compPreferLater: false, otherOffers: "" },
       });
@@ -136,7 +150,9 @@ async function main() {
   const jd = `We are hiring a Senior Backend Engineer for our fintech payments platform. You will design and own Node.js and TypeScript services backed by PostgreSQL and Redis, running on AWS with Docker and Kubernetes.
 Responsibilities: design REST APIs and event-driven microservices with Kafka; lead design reviews and mentor 2-3 engineers; own reliability, observability and performance of payment flows.
 Requirements: 5-8 years of backend experience, strong system design, SQL, testing and CI/CD practices.`;
-  const { id: driveId } = await call<{ id: string }>("POST", "/api/drives", { title: "Senior Backend Engineer", jdText: jd });
+  const manager = process.env.SMOKE_ROLE === "manager";
+  const emJd = `We are hiring an Engineering Manager to lead a team of 8 engineers building our payments platform. Responsibilities: hire, grow and retain the team; own delivery of the roadmap with product; drive engineering quality, reliability and technical direction; manage performance and give regular feedback. Requirements: 8+ years in software engineering including 2+ years managing engineers; strong system design judgement; agile delivery, stakeholder management and hiring experience.`;
+  const { id: driveId } = await call<{ id: string }>("POST", "/api/drives", manager ? { title: "Engineering Manager", jdText: emJd } : { title: "Senior Backend Engineer", jdText: jd });
   log("drive created", driveId);
   await call("POST", `/api/drives/${driveId}/publish`, {});
   log("drive published");

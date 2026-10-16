@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Document status** | v1.2 — approved; Phase 1 built (as-built notes: ARCHITECTURE §0) |
+| **Document status** | v1.3 — approved; Phases 1–2 built (as-built notes: ARCHITECTURE §0) |
 | **Date** | 2026-10-16 |
 | **Related** | [PRD.md](PRD.md) (product requirements) · [ARCHITECTURE.md](ARCHITECTURE.md) (technical architecture) |
 
@@ -28,6 +28,7 @@ This document specifies **how each feature behaves**: user stories, flows, scree
 14. [Administration & org settings](#14-administration--org-settings)
 15. [Notifications](#15-notifications)
 16. [Global error states & edge cases](#16-global-error-states--edge-cases)
+17. [Phase 2 features (v1.3)](#17-phase-2-features-v13)
 
 ---
 
@@ -862,3 +863,25 @@ Candidates can request extra time (+25% or +50%) through a link on the consent s
 | Very long answers (> 4,000 chars) | Blocked at input with a counter |
 | Non-English answers | The AI asks once to continue in the interview language; communication is assessed accordingly (multilingual in P2) |
 | Time zone differences | All times are shown in the viewer's local time; stored in UTC |
+
+---
+
+## 17. Phase 2 features (v1.3)
+
+| Feature | Where | Behaviour |
+|---|---|---|
+| **Drive analytics** (J-7) | Drive → Analytics | KPI tiles (candidates, completion rate, average final score, AI scores kept vs overridden, gate agreement between manual decisions and the AI recommendation, median round length), funnel, drop-off by section, score histograms (final + each round) with the Hire band marked, average parameter scores per round, practical-fit mismatches, integrity levels. Every chart has a table view and per-mark tooltips |
+| **AI usage & cost** (L-3) | Admin → AI usage | Date-range presets; estimated cost by stage and model from recorded tokens (input, cache read/write, output), calls, errors, p50 latency, cost per completed round, share of input served from cache |
+| **Compare candidates** (J-6) | Drive → select 2–4 → Compare | Side-by-side final/round/parameter scores (highest bolded, overrides included), recommendation and confidence, top strengths and risks, practical fit, integrity |
+| **PDF export** (I-8) | Candidate → Export & share | Printer-friendly report (browser "Save as PDF") in three variants: named, identity-masked, with transcripts. Exports are audited |
+| **Share links** (I-8) | Candidate → Export & share | Read-only, expiring (1–30 days), optional passcode (5 attempts / 15 min), masked by default; view count; revocable; every view audited |
+| **Code replay** (F-6) | Candidate → Technical round → Live coding | Slider/playback over 10-second editor snapshots, runs and submissions with test results |
+| **Prioritisation exercise** (G-8) | Managerial round | Drag-and-drop ranking (keyboard up/down too) plus rationale; on by default for Manager/Director levels, optional for others; discussed by the AI and evaluated under Strategic Thinking |
+| **Inline snippet editor** (F-8) | Interview room → `</> Code` | Write a code/SQL snippet with a language tag and insert it into an answer as a fenced block |
+| **AI-generated answer flags** (K-3) | Integrity panel | Long answers with generic, scripted or pasted characteristics are flagged (medium/high) with a reason and message link; raises the integrity concern level; never affects scores |
+| **Template library** (A-9) | New hiring drive | 9 starter JDs (Backend, Frontend, Senior Backend, Data Analyst, DevOps/SRE, Engineering Manager, Account Executive, Support, HR Executive) |
+| **CSV invites & reminders** (B-2) | Drive → Invite candidates | CSV upload (name/email in any order, header optional, quoted fields); one reminder email 48 h before an invitation or next-round window expires |
+| **Custom coding problems** (A-8) | Drive → Coding problems | Statement, sample and hidden stdin/stdout tests and a reference solution; saved problems are live only after the reference solution passes every test in the sandbox; validated custom problems are preferred over the bank for that drive |
+| **Model admin** (L-4) | Settings → AI models | Per-stage model override and interviewer effort (applied within a minute); reports record the evaluator model |
+| **Re-evaluate** | Candidate → round header | Re-runs the evaluation for a round (e.g. after a model change) |
+| **Hiring-manager scoping** | Settings → Users | Hiring managers see and act only on drives assigned to them (pages and APIs) |

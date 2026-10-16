@@ -2,7 +2,7 @@ import Link from "next/link";
 import { desc, eq, inArray } from "drizzle-orm";
 import { notFound } from "next/navigation";
 import { db, schema } from "@/lib/db";
-import { hasRole, requireStaffPage } from "@/lib/auth/staff";
+import { canSeeDrive, hasRole, requireStaffPage } from "@/lib/auth/staff";
 import { env } from "@/lib/env";
 import { enabledRounds } from "@/lib/core/rounds";
 import { CATEGORY_LABEL, RECOMMENDATION_LABEL, ROUND_LABEL, SENIORITY_LABEL, type DriveConfig, type Recommendation } from "@/lib/core/types";
@@ -22,7 +22,7 @@ export default async function DrivePage({ params, searchParams }: { params: Prom
   const { id } = await params;
   const { stage = "all", sort = "recent" } = await searchParams;
   const [d] = await db.select().from(schema.drives).where(eq(schema.drives.id, id));
-  if (!d) notFound();
+  if (!d || !canSeeDrive(user, d.id)) notFound();
   const [version] = d.currentVersionId ? await db.select().from(schema.driveVersions).where(eq(schema.driveVersions.id, d.currentVersionId)) : [];
   const config = (version?.config ?? d.draft) as DriveConfig;
   const rounds = enabledRounds(config);
@@ -58,9 +58,17 @@ export default async function DrivePage({ params, searchParams }: { params: Prom
         actions={
           hasRole(user, "recruiter") && (
             <>
+              <LinkButton variant="secondary" href={`/app/drives/${d.id}/analytics`}>
+                Analytics
+              </LinkButton>
               <LinkButton variant="secondary" href={`/app/drives/${d.id}/edit`}>
                 Configure
               </LinkButton>
+              {config.roleProfile.category === "coding" && (
+                <LinkButton variant="secondary" href={`/app/drives/${d.id}/problems`}>
+                  Coding problems
+                </LinkButton>
+              )}
               <DriveActions driveId={d.id} status={d.status} published={!!d.currentVersionId} />
             </>
           )
@@ -107,12 +115,19 @@ export default async function DrivePage({ params, searchParams }: { params: Prom
       {list.length === 0 ? (
         <Empty>No candidates {stage !== "all" ? "in this stage" : "yet"}.</Empty>
       ) : (
+        <form method="get" action={`/app/drives/${d.id}/compare`}>
+        <div className="mb-2 flex justify-end">
+          <button type="submit" className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-800 hover:bg-slate-50">
+            Compare selected (2–4)
+          </button>
+        </div>
         <Card className="overflow-hidden">
           <div className="-m-5 overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
                 <tr>
-                  <th className="px-5 py-3">Candidate</th>
+                  <th className="w-8 py-3 pl-5"><span className="sr-only">Select</span></th>
+                  <th className="px-3 py-3">Candidate</th>
                   <th className="px-3 py-3">Stage</th>
                   {rounds.map((r) => (
                     <th key={r.type} className="px-3 py-3 text-right">
@@ -135,7 +150,10 @@ export default async function DrivePage({ params, searchParams }: { params: Prom
                   const worst = ["high", "medium", "low"].find((x) => integ.includes(x)) ?? (integ.length ? "none" : "");
                   return (
                     <tr key={c.id} className="hover:bg-slate-50">
-                      <td className="px-5 py-3">
+                      <td className="py-3 pl-5">
+                        <input type="checkbox" name="ids" value={c.id} aria-label={`Select ${cand.name} for comparison`} />
+                      </td>
+                      <td className="px-3 py-3">
                         <Link href={`/app/candidates/${c.id}`} className="font-medium hover:text-brand-700">
                           {cand.name}
                         </Link>
@@ -178,6 +196,7 @@ export default async function DrivePage({ params, searchParams }: { params: Prom
             </table>
           </div>
         </Card>
+        </form>
       )}
     </>
   );

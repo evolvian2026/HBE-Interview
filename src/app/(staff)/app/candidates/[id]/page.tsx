@@ -2,7 +2,7 @@ import Link from "next/link";
 import { asc, desc, eq, inArray } from "drizzle-orm";
 import { notFound } from "next/navigation";
 import { db, schema } from "@/lib/db";
-import { hasRole, requireStaffPage } from "@/lib/auth/staff";
+import { canSeeDrive, hasRole, requireStaffPage } from "@/lib/auth/staff";
 import { enabledRounds } from "@/lib/core/rounds";
 import { PARAMETERS } from "@/lib/core/rubrics";
 import { RECOMMENDATION_LABEL, ROUND_LABEL, type DriveConfig, type ParamScore, type Recommendation, type RoundType } from "@/lib/core/types";
@@ -14,6 +14,9 @@ import { FIT_TONE, REC_TONE, STAGE_LABEL, STAGE_TONE } from "@/components/labels
 import { CandidateActions } from "@/components/staff/candidate-actions";
 import { OverrideForm } from "@/components/staff/override-form";
 import { NotesForm } from "@/components/staff/notes-form";
+import { SharePanel } from "@/components/staff/share-panel";
+import { CodeReplay } from "@/components/staff/code-replay";
+import { ReevaluateButton } from "@/components/staff/reevaluate-button";
 import { audit } from "@/lib/audit";
 
 export const dynamic = "force-dynamic";
@@ -29,7 +32,7 @@ type RoundSpecific = {
   followUpQuestions?: string[];
   focusAreas?: string[];
   coding?: { problem: string; passed: number; total: number; hints: number; language: string } | null;
-  integrity?: { concern: string; summary: string };
+  integrity?: { concern: string; summary: string; generated?: { ref: string; likelihood: string; reason: string }[] };
   practicalFit?: Compatibility | null;
   disagreement?: boolean;
 };
@@ -46,7 +49,7 @@ export default async function CandidatePage({ params }: { params: Promise<{ id: 
     .innerJoin(schema.drives, eq(schema.candidacies.driveId, schema.drives.id))
     .innerJoin(schema.driveVersions, eq(schema.candidacies.driveVersionId, schema.driveVersions.id))
     .where(eq(schema.candidacies.id, id));
-  if (!row) notFound();
+  if (!row || !canSeeDrive(user, row.d.id)) notFound();
   await audit({ type: "staff", id: user.id }, "report.view", "candidacy", id);
   const config = row.v.config as DriveConfig;
   const rounds = enabledRounds(config);
@@ -66,6 +69,7 @@ export default async function CandidatePage({ params }: { params: Promise<{ id: 
   const overrides = reportIds.length
     ? await db.select({ o: schema.scoreOverrides, u: schema.users }).from(schema.scoreOverrides).leftJoin(schema.users, eq(schema.scoreOverrides.userId, schema.users.id)).where(inArray(schema.scoreOverrides.reportId, reportIds)).orderBy(desc(schema.scoreOverrides.createdAt))
     : [];
+  const shareLinks = await db.select().from(schema.shareLinks).where(eq(schema.shareLinks.candidacyId, id)).orderBy(desc(schema.shareLinks.createdAt));
   const profile = resume?.parsed as ParsedResume | null;
   const canDecide = hasRole(user, "hiring_manager");
   const cd = combined?.data as { executiveSummary?: string; strengths?: string[]; risks?: string[]; focusAreas?: string[]; contradictions?: string[]; reasons?: string[] } | null;
@@ -176,7 +180,14 @@ export default async function CandidatePage({ params }: { params: Promise<{ id: 
                   {session && session.status !== "ended" && <Badge tone="blue">in progress</Badge>}
                 </span>
               }
-              actions={session && <span className="text-xs text-slate-500">{session.mode === "voice" ? "Voice" : "Text"} · {session.endReason ? `ended: ${session.endReason.replace("_", " ")}` : ""} {session.startedAt ? `· ${session.startedAt.toLocaleString()}` : ""}</span>}
+              actions={
+                session && (
+                  <span className="flex items-center gap-3 text-xs text-slate-500">
+                    {session.mode === "voice" ? "Voice" : "Text"} · {session.endReason ? `ended: ${session.endReason.replace("_", " ")}` : ""} {session.startedAt ? `· ${session.startedAt.toLocaleString()}` : ""}
+                    {rep && (rep.status === "ready" || rep.status === "failed") && hasRole(user, "recruiter") && <ReevaluateButton reportId={rep.id} />}
+                  </span>
+                )
+              }
             >
               {!rep || rep.status !== "ready" ? (
                 <p className="text-sm text-slate-500">{rep?.status === "failed" ? rep.error : session ? "Report will appear here when the evaluation finishes." : "The candidate has not taken this round yet."}</p>
@@ -267,7 +278,18 @@ export default async function CandidatePage({ params }: { params: Promise<{ id: 
                           <p className="text-sm">
                             Hidden tests <b>{rs.coding.passed}/{rs.coding.total}</b> · {rs.coding.language} · hints used {rs.coding.hints}
                           </p>
-                          {finalSubmit && <pre className="mt-2 max-h-72 overflow-auto rounded bg-slate-900 p-2 text-xs text-slate-100">{finalSubmit.code}</pre>}
+                          <CodeReplay
+                            frames={runs
+                              .filter((x) => x.sessionId === session?.id)
+                              .map((x) => ({
+                                at: x.createdAt.toISOString(),
+                                kind: x.kind,
+                                language: x.language,
+                                code: x.code,
+                                ...(x.kind !== "snapshot" ? { passed: (x.results as { passed?: number } | null)?.passed, total: (x.results as { total?: number } | null)?.total } : {}),
+                              }))}
+                          />
+                          {!finalSubmit && <p className="mt-1 text-xs text-slate-500">No final submission.</p>}
                         </Panel>
                       )}
                     </div>
@@ -357,6 +379,16 @@ export default async function CandidatePage({ params }: { params: Promise<{ id: 
                     {rs.integrity && (
                       <Panel title={<span>Integrity signals <Badge tone={rs.integrity.concern === "high" ? "red" : rs.integrity.concern === "medium" ? "amber" : "slate"}>{rs.integrity.concern}</Badge></span>}>
                         <p className="text-sm text-slate-600">{rs.integrity.summary}</p>
+                        {!!rs.integrity.generated?.length && (
+                          <ul className="mt-2 space-y-1 text-xs text-slate-600">
+                            {rs.integrity.generated.map((g) => (
+                              <li key={g.ref}>
+                                <a href={`#${session?.id}-${g.ref}`} className="mr-1 rounded bg-slate-100 px-1 font-mono text-[10px] text-slate-500">{g.ref}</a>
+                                possibly AI-generated / scripted ({g.likelihood}) — {g.reason}
+                              </li>
+                            ))}
+                          </ul>
+                        )}
                         <p className="mt-1 text-xs text-slate-400">Context only — not used in scoring.</p>
                       </Panel>
                     )}
@@ -453,6 +485,12 @@ export default async function CandidatePage({ params }: { params: Promise<{ id: 
           )}
         </Card>
       </div>
+
+      <SharePanel
+        candidacyId={id}
+        canShare={canDecide}
+        links={shareLinks.map((l) => ({ id: l.id, masked: l.masked, hasPasscode: !!l.passcodeHash, expiresAt: l.expiresAt.toISOString(), revoked: !!l.revokedAt, views: l.views }))}
+      />
 
       {/* ------------------------ Notes & decision log ------------------------ */}
       <div className="grid gap-6 lg:grid-cols-2">

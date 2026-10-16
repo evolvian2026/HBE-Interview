@@ -9,7 +9,7 @@ export const SectionSchema = z.object({
   minQ: z.number().int().min(0).max(20),
   maxQ: z.number().int().min(1).max(30),
   enabled: z.boolean(),
-  exercise: z.enum(["coding", "system_design", "domain_case", "mgmt_case", "practical_fit"]).optional(),
+  exercise: z.enum(["coding", "system_design", "domain_case", "mgmt_case", "prioritization", "practical_fit"]).optional(),
 });
 
 export const RoundSchema = z.object({

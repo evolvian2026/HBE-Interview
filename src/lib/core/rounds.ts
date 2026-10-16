@@ -104,8 +104,8 @@ export function technicalSections(profile: RoleProfile): SectionConfig[] {
   ];
 }
 
-export function managerialSections(): SectionConfig[] {
-  return [
+export function managerialSections(seniority: Seniority = "senior"): SectionConfig[] {
+  const sections = [
     s("intro", "Introduction & leadership story", 4, 1, 3),
     s("people", "People leadership", 6, 2, 5),
     s("stakeholders", "Stakeholder management & influence", 5, 2, 4),
@@ -113,8 +113,11 @@ export function managerialSections(): SectionConfig[] {
     s("strategy", "Strategic thinking", 4, 1, 4),
     s("scenarios", "Situational scenarios", 6, 2, 5),
     s("case", "Written case exercise", 8, 2, 6, "mgmt_case"),
+    // Drag-and-drop prioritisation (G-8): on by default for people-manager levels, available to all.
+    { ...s("prioritize", "Prioritisation exercise", 5, 1, 4, "prioritization"), enabled: MANAGER_LEVELS.includes(seniority) },
     s("wrapup", "Wrap-up", 2, 1, 2),
   ];
+  return sections;
 }
 
 export function hrSections(seniority: Seniority): SectionConfig[] {
@@ -147,7 +150,7 @@ export function defaultDifficulty(seniority: Seniority): Difficulty[] {
 
 export function buildRound(type: RoundType, profile: RoleProfile): RoundConfig {
   const sections =
-    type === "technical" ? technicalSections(profile) : type === "managerial" ? managerialSections() : hrSections(profile.seniority);
+    type === "technical" ? technicalSections(profile) : type === "managerial" ? managerialSections(profile.seniority) : hrSections(profile.seniority);
   return {
     type,
     enabled: defaultRoundEnabled(type, profile.seniority),

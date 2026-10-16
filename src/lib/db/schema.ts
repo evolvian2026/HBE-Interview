@@ -32,6 +32,8 @@ export const users = pgTable("users", {
   passwordHash: text("password_hash").notNull(),
   role: text("role").notNull().$type<"admin" | "recruiter" | "hiring_manager" | "viewer">(),
   active: boolean("active").notNull().default(true),
+  /** Drives a hiring manager is assigned to (hiring managers only see these). */
+  driveIds: jsonb("drive_ids").$type<string[]>().notNull().default([]),
   createdAt: createdAt(),
 });
 
@@ -97,6 +99,7 @@ export const candidacies = pgTable(
     consent: jsonb("consent"),
     expiresAt: ts("expires_at"),
     roundAvailableUntil: ts("round_available_until"),
+    reminderSentAt: ts("reminder_sent_at"),
     finalStatus: text("final_status"),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
@@ -344,4 +347,39 @@ export const auditLog = pgTable("audit_log", {
   entityId: text("entity_id"),
   data: jsonb("data"),
   createdAt: createdAt(),
+});
+
+/* ------------------------------- Phase 2 ---------------------------------- */
+
+/** Expiring, read-only links to a candidate report for people without an account. */
+export const shareLinks = pgTable("share_links", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  candidacyId: uuid("candidacy_id").notNull().references(() => candidacies.id, { onDelete: "cascade" }),
+  tokenHash: text("token_hash").notNull().unique(),
+  passcodeHash: text("passcode_hash"),
+  masked: boolean("masked").notNull().default(true),
+  expiresAt: ts("expires_at").notNull(),
+  revokedAt: ts("revoked_at"),
+  views: integer("views").notNull().default(0),
+  createdBy: uuid("created_by").references(() => users.id),
+  createdAt: createdAt(),
+});
+
+/** Custom coding problems authored by recruiters, validated against a reference solution before use. */
+export const codingProblems = pgTable("coding_problems", {
+  id: text("id").primaryKey(),
+  driveId: uuid("drive_id").references(() => drives.id, { onDelete: "cascade" }),
+  title: text("title").notNull(),
+  difficulty: text("difficulty").notNull().$type<"easy" | "medium" | "hard">(),
+  tags: jsonb("tags").$type<string[]>().notNull().default([]),
+  statement: text("statement").notNull(),
+  samples: jsonb("samples").$type<{ input: string; output: string }[]>().notNull(),
+  hidden: jsonb("hidden").$type<{ input: string; output: string }[]>().notNull(),
+  referenceLanguage: text("reference_language").notNull(),
+  referenceCode: text("reference_code").notNull(),
+  validatedAt: ts("validated_at"),
+  validation: jsonb("validation"),
+  createdBy: uuid("created_by").references(() => users.id),
+  createdAt: createdAt(),
+  updatedAt: updatedAt(),
 });

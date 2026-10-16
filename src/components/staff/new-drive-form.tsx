@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button, Card, Field, Input, Textarea } from "../ui";
 import { api } from "../api";
+import { DRIVE_TEMPLATES } from "@/lib/content/templates";
 
 export function NewDriveForm() {
   const router = useRouter();
@@ -12,6 +13,26 @@ export function NewDriveForm() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   return (
+    <div className="space-y-6">
+    <Card title="Start from a template (optional)">
+      <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+        {DRIVE_TEMPLATES.map((t) => (
+          <button
+            key={t.id}
+            type="button"
+            onClick={() => {
+              setTitle(t.title);
+              setJd(t.jd);
+            }}
+            className="rounded-lg border border-slate-200 p-3 text-left text-sm hover:border-brand-500 hover:bg-brand-50/40"
+          >
+            <span className="block text-xs text-slate-500">{t.group}</span>
+            <span className="font-medium">{t.title}</span>
+          </button>
+        ))}
+      </div>
+      <p className="mt-2 text-xs text-slate-500">A template fills the title and JD below — edit them for your role before analysing.</p>
+    </Card>
     <Card>
       <form
         className="space-y-4"
@@ -40,5 +61,6 @@ export function NewDriveForm() {
         </Button>
       </form>
     </Card>
+    </div>
   );
 }

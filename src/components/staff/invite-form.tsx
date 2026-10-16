@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Badge, Button, Textarea } from "../ui";
 import { api } from "../api";
 import { CopyButton } from "./copy-button";
+import { csvToInvitees } from "@/lib/csv";
 
 interface Result {
   name: string;
@@ -21,6 +22,23 @@ export function InviteForm({ driveId }: { driveId: string }) {
   const [error, setError] = useState("");
   return (
     <div className="space-y-3">
+      <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
+        <label className="cursor-pointer rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm text-slate-800 hover:bg-slate-50">
+          Upload CSV
+          <input
+            type="file"
+            accept=".csv,text/csv"
+            className="hidden"
+            onChange={async (e) => {
+              const f = e.target.files?.[0];
+              if (!f) return;
+              setText(csvToInvitees(await f.text()).map((p) => `${p.name}, ${p.email}`).join("\n"));
+              e.target.value = "";
+            }}
+          />
+        </label>
+        <span>Columns: name, email (header row optional; up to 200 rows)</span>
+      </div>
       <Textarea rows={3} value={text} onChange={(e) => setText(e.target.value)} placeholder={"One per line: Name, email\nPriya Sharma, priya@example.com"} />
       <Button
         disabled={busy || !text.trim()}
@@ -64,3 +82,4 @@ export function InviteForm({ driveId }: { driveId: string }) {
     </div>
   );
 }
+

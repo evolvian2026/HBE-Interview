@@ -16,7 +16,7 @@ export const PUT = handle(async (req: Request, { params }: { params: Promise<{ t
   const state = session.state as SessionState;
   const sec = currentSection(state);
   const ex = sec ? state.exercises[sec.key] : undefined;
-  if (!ex || !["system_design", "domain_case", "mgmt_case"].includes(ex.kind)) throw new HttpError(409, "No written exercise is open right now");
+  if (!ex || !["system_design", "domain_case", "mgmt_case", "prioritization"].includes(ex.kind)) throw new HttpError(409, "No written exercise is open right now");
   if (ex.submittedAt) throw new HttpError(409, "Already submitted");
   const { content } = Body.parse(await req.json());
   await db

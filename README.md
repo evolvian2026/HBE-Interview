@@ -17,6 +17,7 @@ An AI-powered, multi-round interview platform. Candidates upload a resume, link 
 | Exercises | Monaco editor with Run (samples) / Submit (hidden tests) in Python, JavaScript, Java, C++ via Judge0; hints with score caps; system-design and written-case panels with autosave; HR practical-details form |
 | Evaluation | Multi-pass evaluator (2 runs + tie-break, median), server-side evidence verification, PII/protected-info redaction, knockouts, confidence, gates (auto/manual/always), combined report with focus areas for the human panel, recruiter overrides with audit trail |
 | Fairness & compliance | Protected-topic guardrails + HR compliance filter, integrity signals as context only, retention-based deletion, data deletion on request, salary history never asked (compensation off by default) |
+| Phase 2 | Drive analytics, AI usage & cost, side-by-side comparison, PDF export (named / masked / with transcripts), expiring passcode-protected share links, code replay, drag-and-drop prioritisation exercise, inline snippet editor, AI-generated answer flags, template library, CSV invites, expiry reminders, custom coding problems validated by a reference solution, per-stage model overrides, re-evaluation, hiring-manager drive assignment |
 | Recruiter app | Drives list, drive editor, candidate table with round/final scores, practical fit and integrity, decisions queue, full candidate report with transcripts, code and repo analysis, notes, settings (company values, HR knowledge base, consent, retention, users & roles) |
 
 ## Tech stack
@@ -64,6 +65,8 @@ npm run dev                   # http://localhost:3000 → sign in with the admin
 npm test             # unit tests: core domain logic, executor (4 languages), real Claude SDK path against a local stand-in
 npm run typecheck
 npm run smoke        # full HTTP run of all three rounds (server started with AI_MOCK=true GITHUB_MOCK=true CODE_EXECUTOR=local-dev)
+SMOKE_ROLE=manager npm run smoke   # manager track (includes the prioritisation exercise)
+npm run smoke:phase2 # analytics, usage, compare, print, share links, custom problems, hiring-manager scoping
 npm run ui-check     # browser walkthrough with screenshots (Playwright; set CHROMIUM_PATH, CANDIDATE_LINK, RESUME_PATH)
 ```
 

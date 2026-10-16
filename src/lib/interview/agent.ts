@@ -1,6 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
-import { aiClient, fallbackParams, isMock, modelFor, recordAiCall, untrusted } from "../ai/gateway";
-import { env } from "../env";
+import { aiClient, fallbackParams, interviewerEffort, isMock, modelFor, recordAiCall, refreshModelOverrides, untrusted } from "../ai/gateway";
 import { PARAMETERS } from "../core/rubrics";
 import { ROUND_LABEL, SENIORITY_LABEL, type RoundType } from "../core/types";
 import type { MessageRow } from "./load";
@@ -164,6 +163,7 @@ function withCacheOnLast(messages: Anthropic.Beta.BetaMessageParam[]): Anthropic
  */
 export async function runInterviewerTurn(input: TurnInput, exec: ToolExecutor, onText: (delta: string) => void): Promise<string> {
   if (isMock()) return mockTurn(input, exec, onText);
+  await refreshModelOverrides();
   const model = modelFor("interviewer");
   const system: Anthropic.Beta.BetaTextBlockParam[] = [
     { type: "text", text: personaSystem(input) },
@@ -186,7 +186,7 @@ export async function runInterviewerTurn(input: TurnInput, exec: ToolExecutor, o
       system,
       tools,
       messages,
-      output_config: { effort: env.interviewerEffort },
+      output_config: { effort: interviewerEffort() },
       ...fallbackParams(model),
     });
     stream.on("text", (delta) => {

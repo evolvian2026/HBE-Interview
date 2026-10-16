@@ -10,11 +10,13 @@ import {
   designPromptFor,
   domainCaseFor,
   mgmtCaseFor,
-  pickProblem,
-  problemById,
+  prioritizationSetFor,
+  PRIORITIZATION_SETS,
+  writtenExerciseInfo,
 } from "../content";
 import { currentSection, openExercise, type ExerciseState, type SessionState } from "../core/interview";
 import { emptyPracticalFit, type PracticalFitData } from "../core/practical-fit";
+import { getProblem, pickProblemForDrive } from "../services/problems";
 import type { ExerciseKind, Language } from "../core/types";
 import type { SessionContext } from "./load";
 import type { RepoInsight } from "../ai/analyzers";
@@ -28,7 +30,7 @@ export async function ensureExerciseOpen(ctx: SessionContext, state: SessionStat
   let note: string;
   const kind: ExerciseKind = sec.exercise;
   if (kind === "coding") {
-    const p = pickProblem({ difficulty: ctx.config.coding.difficulty, domain: profile.domain, skills: profile.mustHaveSkills, exclude: state.usedRefs });
+    const p = await pickProblemForDrive(ctx.candidacy.driveId, { difficulty: ctx.config.coding.difficulty, domain: profile.domain, skills: profile.mustHaveSkills, exclude: state.usedRefs });
     refId = p.id;
     note = `Coding problem "${p.title}" (${p.difficulty}) is now open in the candidate's editor.\n${p.statement}`;
   } else if (kind === "system_design") {
@@ -43,12 +45,16 @@ export async function ensureExerciseOpen(ctx: SessionContext, state: SessionStat
     const c = mgmtCaseFor(profile.track, profile.seniority, state.usedRefs);
     refId = c.id;
     note = `Written case "${c.title}" is now open in the case panel (about ${c.minutes} minutes): ${c.brief}`;
+  } else if (kind === "prioritization") {
+    const p = prioritizationSetFor(profile.track, state.usedRefs);
+    refId = p.id;
+    note = `Prioritisation exercise "${p.title}" is now open: ${p.brief} Items: ${p.items.map((i) => i.text).join("; ")}.`;
   } else {
     refId = "practical_fit";
     note = "The practical details form is now open for the candidate to fill in and confirm.";
   }
   const next = openExercise(state, kind, refId, now);
-  if (kind === "system_design" || kind === "domain_case" || kind === "mgmt_case") {
+  if (kind === "system_design" || kind === "domain_case" || kind === "mgmt_case" || kind === "prioritization") {
     await db
       .insert(schema.exerciseResponses)
       .values({ sessionId: ctx.session.id, kind, refId, content: {} })
@@ -94,7 +100,18 @@ export interface RepoWorkspace {
   repos: { projectName: string; url: string | null; questions: { question: string; filePath: string; snippet: string }[] }[];
 }
 
-export type Workspace = CodingWorkspace | TextExerciseWorkspace | PracticalFitWorkspace | RepoWorkspace | { kind: "none" };
+export interface PrioritizationWorkspace {
+  kind: "prioritization";
+  sectionKey: string;
+  title: string;
+  brief: string;
+  minutes: number;
+  items: { id: string; text: string }[];
+  content: Record<string, string>;
+  submitted: boolean;
+}
+
+export type Workspace = CodingWorkspace | TextExerciseWorkspace | PrioritizationWorkspace | PracticalFitWorkspace | RepoWorkspace | { kind: "none" };
 
 export async function workspaceFor(ctx: SessionContext, state: SessionState): Promise<Workspace> {
   const sec = currentSection(state);
@@ -116,7 +133,7 @@ export async function workspaceFor(ctx: SessionContext, state: SessionState): Pr
   const ex: ExerciseState | undefined = state.exercises[sec.key];
   if (!ex) return { kind: "none" };
   if (ex.kind === "coding") {
-    const p = problemById(ex.refId)!;
+    const p = (await getProblem(ex.refId))!;
     const [latest] = await db
       .select()
       .from(schema.codeRuns)
@@ -160,8 +177,12 @@ export async function workspaceFor(ctx: SessionContext, state: SessionState): Pr
     const d = DESIGN_PROMPTS.find((x) => x.id === ex.refId)!;
     return { kind: "system_design", sectionKey: sec.key, title: d.title, brief: d.brief, minutes: sec.minutes, template: DESIGN_TEMPLATE, content: (resp?.content as Record<string, string>) ?? {}, submitted: !!ex.submittedAt };
   }
+  if (ex.kind === "prioritization") {
+    const p = PRIORITIZATION_SETS.find((x) => x.id === ex.refId)!;
+    return { kind: "prioritization", sectionKey: sec.key, title: p.title, brief: p.brief, minutes: sec.minutes, items: p.items, content: (resp?.content as Record<string, string>) ?? {}, submitted: !!ex.submittedAt };
+  }
   const c = [...DOMAIN_CASES, ...MGMT_CASES].find((x) => x.id === ex.refId)!;
-  return { kind: ex.kind, sectionKey: sec.key, title: c.title, brief: c.brief, minutes: c.minutes, template: c.template, content: (resp?.content as Record<string, string>) ?? {}, submitted: !!ex.submittedAt };
+  return { kind: ex.kind as "domain_case" | "mgmt_case", sectionKey: sec.key, title: c.title, brief: c.brief, minutes: c.minutes, template: c.template, content: (resp?.content as Record<string, string>) ?? {}, submitted: !!ex.submittedAt };
 }
 
 /** A compact text description of the open exercise's current state, for the interviewer's live-state block. */
@@ -170,7 +191,7 @@ export async function exerciseStateForModel(ctx: SessionContext, state: SessionS
   const ex = sec ? state.exercises[sec.key] : undefined;
   if (!sec || !ex) return "";
   if (ex.kind === "coding") {
-    const p = problemById(ex.refId)!;
+    const p = (await getProblem(ex.refId))!;
     const runs = await db
       .select()
       .from(schema.codeRuns)
@@ -198,9 +219,6 @@ export async function exerciseStateForModel(ctx: SessionContext, state: SessionS
     .filter(([, v]) => v?.trim())
     .map(([k, v]) => `[${k}] ${v.slice(0, 1500)}`)
     .join("\n");
-  const title =
-    ex.kind === "system_design"
-      ? DESIGN_PROMPTS.find((x) => x.id === ex.refId)?.title
-      : [...DOMAIN_CASES, ...MGMT_CASES].find((x) => x.id === ex.refId)?.title;
+  const title = writtenExerciseInfo(ex.kind, ex.refId)?.title;
   return `Exercise: "${title}" (${ex.kind}). Submitted: ${ex.submittedAt ? "yes" : "no"}.\nCandidate's written response so far:\n${content || "(empty)"}`;
 }

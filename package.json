@@ -16,7 +16,8 @@
     "e2e": "playwright test",
     "smoke": "tsx scripts/smoke.ts",
     "ui-check": "tsx e2e/ui-check.ts",
-    "generate:problems": "python3 scripts/generate-problems.py src/lib/content/problems.json"
+    "generate:problems": "python3 scripts/generate-problems.py src/lib/content/problems.json",
+    "smoke:phase2": "tsx scripts/smoke-phase2.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.135.0",

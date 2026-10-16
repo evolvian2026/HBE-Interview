@@ -17,6 +17,9 @@ export interface OrgSettings {
   retentionDays: number;
   consentText: string;
   consentVersion: number;
+  /** Per-tier model overrides (empty = use environment defaults). */
+  models: { interviewer: string; analyzer: string; evaluator: string; utility: string };
+  interviewerEffort: "" | "low" | "medium" | "high";
 }
 
 export const DEFAULT_VALUES: OrgValue[] = [
@@ -38,7 +41,11 @@ export const DEFAULT_SETTINGS: OrgSettings = {
   retentionDays: 180,
   consentText: DEFAULT_CONSENT,
   consentVersion: 1,
+  models: { interviewer: "", analyzer: "", evaluator: "", utility: "" },
+  interviewerEffort: "",
 };
+
+export { MODEL_CHOICES } from "./settings-shared";
 
 export async function getSettings(): Promise<OrgSettings> {
   const [row] = await db.select().from(schema.settings).where(eq(schema.settings.key, "org"));

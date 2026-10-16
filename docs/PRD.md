@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Product** | HBE Interview: an AI-powered, multi-round interview platform |
-| **Document status** | v1.2 — approved by the product owner; Phase 1 built |
+| **Document status** | v1.3 — approved; Phase 1 and Phase 2 built |
 | **Date** | 2026-10-16 |
 | **Owner** | Product Architect / Product Owner |
 | **Companion documents** | [FEATURES.md](FEATURES.md) (detailed feature specification) · [ARCHITECTURE.md](ARCHITECTURE.md) (detailed technical architecture) |
@@ -13,6 +13,7 @@
 | Version | Date | Change |
 |---|---|---|
 | 1.0 | 2026-10-16 | Initial draft: resume parsing, GitHub validation, AI interview, live coding, scorecard |
+| 1.3 | 2026-10-16 | Phase 2 built: analytics, AI usage/cost, candidate comparison, PDF export, expiring share links, code replay, prioritisation exercise, inline snippet editor, AI-generated answer flags, template library, CSV invites, reminders, custom coding problems, model admin, hiring-manager drive assignment. Private repositories remain out of scope (decision §11-4) |
 | 1.2 | 2026-10-16 | Product owner decisions recorded (§11) and Phase 1 built: text + voice, Neon Postgres, Judge0, public repos, single internal organisation, HR always last, no compensation questions by default |
 | 1.1 | 2026-10-16 | Added the **multi-round interview pipeline** with a **Managerial Round** (for senior and higher roles) and an **HR Round** (all roles). Added a seniority-based round matrix, round gating, round-level and combined scorecards, and detailed architecture and feature documents |
 
@@ -446,7 +447,7 @@ Diagrams, component design, the interview state machine, data model, API specifi
 | Phase | Scope |
 |---|---|
 | **Phase 1 — MVP** | All P0 items: drives with the round pipeline, onboarding, resume parsing, public GitHub validation, Technical Round with live coding and system design, **Managerial Round** with written case, **HR Round** with practical fit and policy Q&A, round and combined reports, gating, dashboard and pipeline board, integrity signals, PII masking |
-| **Phase 2** | P1 items: voice mode, private repos, bulk invites and reminders, code replay, prioritization exercise, PDF export, comparison, analytics, template library, cross-round consistency checks, prompt/model admin |
+| **Phase 2 — built (v1.3)** | P1 items: bulk CSV invites and reminders (B-2), code replay (F-6), inline snippet editor (F-8), prioritisation exercise (G-8), PDF export and share links (I-8), comparison (J-6), analytics (J-7), template library (A-9), custom coding problems (A-8), AI-generated answer flags (K-3), cross-round contradictions in the combined report (K-5), usage metering (L-3), model admin (L-4), hiring-manager drive assignment. Voice moved to Phase 1. Private repositories (D-3) deferred per decision §11-4 |
 | **Phase 3** | P2 items: multilingual interviews, OCR, whiteboard, other git hosts, proctoring and identity verification, ATS/HRMS integrations, candidate feedback, bias audits |
 
 ### 10.1 Phase 1 build milestones

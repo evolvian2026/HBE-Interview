@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { requireStaff } from "@/lib/auth/staff";
 import { handle, json } from "@/lib/http";
-import { saveSettings } from "@/lib/settings";
+import { MODEL_CHOICES, saveSettings } from "@/lib/settings";
 import { audit } from "@/lib/audit";
 
 const Body = z.object({
@@ -12,6 +12,11 @@ const Body = z.object({
   askCompensation: z.boolean().optional(),
   retentionDays: z.number().int().min(30).max(730).optional(),
   consentText: z.string().min(50).max(8000).optional(),
+  models: z
+    .object({ interviewer: z.string().max(60), analyzer: z.string().max(60), evaluator: z.string().max(60), utility: z.string().max(60) })
+    .refine((m) => Object.values(m).every((v) => v === "" || MODEL_CHOICES.includes(v)), "Unknown model")
+    .optional(),
+  interviewerEffort: z.enum(["", "low", "medium", "high"]).optional(),
 });
 
 export const PUT = handle(async (req: Request) => {

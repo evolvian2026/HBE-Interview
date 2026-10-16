@@ -54,3 +54,20 @@ export async function notifyCandidateNextRound(candidacyId: string) {
     `<p>Hi ${row.cand.name},</p><p>Thank you for completing your previous round. Your next round for <b>${row.d.title}</b> at ${s.companyName} is now available${row.c.roundAvailableUntil ? ` until ${row.c.roundAvailableUntil.toDateString()}` : ""}.</p><p><a href="${candidateLink(row.c.accessToken)}">Continue your interview</a></p>`,
   );
 }
+
+/** Remind a candidate whose invitation or next-round window expires within 48 hours (B-2). */
+export async function sendReminderEmail(candidacyId: string) {
+  const [row] = await db
+    .select({ c: schema.candidacies, cand: schema.candidates, d: schema.drives })
+    .from(schema.candidacies)
+    .innerJoin(schema.candidates, eq(schema.candidacies.candidateId, schema.candidates.id))
+    .innerJoin(schema.drives, eq(schema.candidacies.driveId, schema.drives.id))
+    .where(eq(schema.candidacies.id, candidacyId));
+  if (!row) return;
+  const until = row.c.stage === "round_available" ? row.c.roundAvailableUntil : row.c.expiresAt;
+  await sendEmail(
+    row.cand.email,
+    `Reminder: your interview for ${row.d.title}`,
+    `<p>Hi ${row.cand.name},</p><p>This is a friendly reminder that your interview for <b>${row.d.title}</b> is waiting for you${until ? ` and is available until ${until.toDateString()}` : ""}.</p><p><a href="${candidateLink(row.c.accessToken)}">Continue your interview</a></p>`,
+  );
+}

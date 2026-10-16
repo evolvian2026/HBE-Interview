@@ -1,7 +1,7 @@
 import { and, asc, eq } from "drizzle-orm";
 import { db, schema } from "../db";
 import { loadMessages, loadSessionContext, type SessionContext } from "../interview/load";
-import { evaluateRound, findProtectedDisclosures, scrubPii, synthesizeCombined, type Evaluation, type EvidenceBundle } from "../ai/evaluation";
+import { detectGeneratedAnswers, evaluateRound, findProtectedDisclosures, scrubPii, synthesizeCombined, type Evaluation, type EvidenceBundle, type GeneratedFlag } from "../ai/evaluation";
 import { PARAMETERS, paramLabel } from "../core/rubrics";
 import { enabledRounds } from "../core/rounds";
 import { quoteMatches } from "../core/evidence";
@@ -22,7 +22,9 @@ import { checkCompatibility, type PracticalFitData } from "../core/practical-fit
 import type { SessionState } from "../core/interview";
 import type { DriveConfig, EvidenceItem, ParamScore, Recommendation, RoundType } from "../core/types";
 import { RECOMMENDATION_LABEL, ROUND_LABEL } from "../core/types";
-import { problemById, DESIGN_PROMPTS, DOMAIN_CASES, MGMT_CASES } from "../content";
+import { writtenExerciseInfo } from "../content";
+import { getProblem } from "./problems";
+import { isMock, modelFor } from "../ai/gateway";
 import type { RepoInsight } from "../ai/analyzers";
 import { enqueue } from "../jobs/queue";
 import { getSettings } from "../settings";
@@ -36,11 +38,11 @@ interface BundleExtras {
   artifactTexts: string[];
   maxHintLevel: number;
   coding: { problem: string; passed: number; total: number; hints: number; language: string } | null;
-  integrity: { concern: "none" | "low" | "medium" | "high"; summary: string; counts: Record<string, number> };
+  integrity: { concern: "none" | "low" | "medium" | "high"; summary: string; counts: Record<string, number>; generated: GeneratedFlag[] };
   candidateBySeq: Map<number, string>;
 }
 
-function integritySummary(events: (typeof schema.integrityEvents.$inferSelect)[]): BundleExtras["integrity"] {
+function integritySummary(events: (typeof schema.integrityEvents.$inferSelect)[], generated: GeneratedFlag[] = []): BundleExtras["integrity"] {
   const counts: Record<string, number> = {};
   let blurMs = 0;
   let bigPastes = 0;
@@ -52,12 +54,14 @@ function integritySummary(events: (typeof schema.integrityEvents.$inferSelect)[]
   }
   const flags = (counts.ai_flag_injection_attempt ?? 0) + (counts.ai_flag_conduct ?? 0);
   let concern: BundleExtras["integrity"]["concern"] = "none";
-  const score = (bigPastes >= 3 ? 2 : bigPastes >= 1 ? 1 : 0) + (blurMs > 5 * 60_000 ? 2 : (counts.blur ?? 0) >= 5 ? 1 : 0) + (flags ? 2 : 0);
+  const highGen = generated.filter((g) => g.likelihood === "high").length;
+  const score =
+    (bigPastes >= 3 ? 2 : bigPastes >= 1 ? 1 : 0) + (blurMs > 5 * 60_000 ? 2 : (counts.blur ?? 0) >= 5 ? 1 : 0) + (flags ? 2 : 0) + (highGen >= 2 ? 2 : highGen || generated.length >= 2 ? 1 : 0);
   if (score >= 4) concern = "high";
   else if (score >= 2) concern = "medium";
   else if (score >= 1) concern = "low";
-  const summary = `Tab/window focus lost ${counts.blur ?? 0} time(s) (${Math.round(blurMs / 1000)}s total); ${counts.paste ?? 0} paste event(s), ${bigPastes} of 200+ characters; ${flags} interviewer flag(s)${counts.compliance_block ? `; ${counts.compliance_block} interviewer message(s) blocked by the compliance filter` : ""}.`;
-  return { concern, summary, counts: { ...counts, blurSeconds: Math.round(blurMs / 1000), bigPastes } };
+  const summary = `Tab/window focus lost ${counts.blur ?? 0} time(s) (${Math.round(blurMs / 1000)}s total); ${counts.paste ?? 0} paste event(s), ${bigPastes} of 200+ characters; ${flags} interviewer flag(s)${counts.compliance_block ? `; ${counts.compliance_block} interviewer message(s) blocked by the compliance filter` : ""}${generated.length ? `; ${generated.length} answer(s) read as possibly AI-generated or scripted (${generated.map((g) => `${g.ref} ${g.likelihood}`).join(", ")})` : ""}.`;
+  return { concern, summary, counts: { ...counts, blurSeconds: Math.round(blurMs / 1000), bigPastes, generated: generated.length }, generated };
 }
 
 async function buildBundle(ctx: SessionContext): Promise<{ bundle: EvidenceBundle; extras: BundleExtras }> {
@@ -99,7 +103,7 @@ async function buildBundle(ctx: SessionContext): Promise<{ bundle: EvidenceBundl
   let maxHintLevel = 0;
   for (const ex of Object.values(state.exercises)) {
     if (ex.kind === "coding") {
-      const p = problemById(ex.refId);
+      const p = await getProblem(ex.refId);
       const submits = runs.filter((r) => r.kind === "submit" && r.problemId === ex.refId);
       const best = submits.sort((a, b) => ((b.results as { passed: number }).passed ?? 0) - ((a.results as { passed: number }).passed ?? 0))[0];
       const sampleRuns = runs.filter((r) => r.kind === "run").length;
@@ -116,14 +120,15 @@ async function buildBundle(ctx: SessionContext): Promise<{ bundle: EvidenceBundl
       }
     } else if (ex.kind !== "practical_fit") {
       const resp = exResponses.find((r) => r.kind === ex.kind);
-      const title = ex.kind === "system_design" ? DESIGN_PROMPTS.find((d) => d.id === ex.refId)?.title : [...DOMAIN_CASES, ...MGMT_CASES].find((c) => c.id === ex.refId)?.title;
-      const brief = ex.kind === "system_design" ? DESIGN_PROMPTS.find((d) => d.id === ex.refId)?.brief : [...DOMAIN_CASES, ...MGMT_CASES].find((c) => c.id === ex.refId)?.brief;
+      const info = writtenExerciseInfo(ex.kind, ex.refId);
+      const title = info?.title;
+      const brief = info?.brief;
       const content = Object.entries((resp?.content as Record<string, string>) ?? {})
         .filter(([, v]) => v?.trim())
         .map(([k, v]) => `[${k}] ${scrubPii(v, nameTokens)}`)
         .join("\n");
       artifactTexts.push(content);
-      artifactParts.push(`### ${ex.kind === "system_design" ? "System design" : "Written case"}: ${title}\nBrief: ${brief}\nCandidate's written response:\n${content || "(not attempted)"}`);
+      artifactParts.push(`### ${ex.kind === "system_design" ? "System design" : ex.kind === "prioritization" ? "Prioritisation exercise" : "Written case"}: ${title}\nBrief: ${brief}\nCandidate's written response:\n${content || "(not attempted)"}`);
     }
   }
   if (round.type === "hr") artifactParts.push("Practical details (notice period, location, work model, compensation) were captured separately and are NOT scored.");
@@ -140,7 +145,19 @@ async function buildBundle(ctx: SessionContext): Promise<{ bundle: EvidenceBundl
   }
 
   const claims = (ctx.analysis?.claims ?? []).filter((c) => c.round === round.type);
-  const integrity = integritySummary(events);
+  // Answers preceded by a large paste into the answer box (paste events logged within 3 minutes before the message).
+  const pastes = events.filter((e) => e.type === "paste" && ((e.payload as { length?: number; target?: string } | null)?.length ?? 0) >= 200 && (e.payload as { target?: string } | null)?.target !== "editor");
+  const generated = await detectGeneratedAnswers(
+    candMsgs
+      .filter((m) => !protectedRefs.has(`M${m.seq}`))
+      .map((m) => ({
+        ref: `M${m.seq}`,
+        content: candidateBySeq.get(m.seq) ?? "",
+        pasted: pastes.some((p) => p.createdAt <= m.createdAt && m.createdAt.getTime() - p.createdAt.getTime() < 180_000),
+      })),
+    { sessionId, candidacyId: ctx.candidacy.id },
+  ).catch(() => [] as GeneratedFlag[]);
+  const integrity = integritySummary(events, generated);
   const bundle: EvidenceBundle = {
     roundType: round.type,
     roleProfileText: JSON.stringify({ ...ctx.config.roleProfile, title: ctx.config.title }, null, 1),
@@ -294,7 +311,7 @@ export async function evaluateRoundJob(payload: { sessionId: string }) {
         disagreement,
       },
       runs: runs.map((r) => ({ scores: paramsOf(r), ethicsConcern: r.ethicsConcern })),
-      versions: { evaluator: process.env.AI_MOCK === "true" ? "mock" : process.env.AI_MODEL_EVALUATOR ?? "claude-opus-5-5", prompt: "evaluate_round@1" },
+      versions: { evaluator: isMock() ? "mock" : modelFor("evaluator"), prompt: "evaluate_round@1" },
       error: null,
       updatedAt: new Date(),
     })
@@ -356,7 +373,7 @@ export async function advanceCandidacy(candidacyId: string, fromRoundIndex: numb
   const expiry = new Date(Date.now() + row.config.nextRoundExpiryDays * 86_400_000);
   await db
     .update(schema.candidacies)
-    .set({ stage: "round_available", currentRoundIndex: fromRoundIndex + 1, roundAvailableUntil: expiry, updatedAt: new Date() })
+    .set({ stage: "round_available", currentRoundIndex: fromRoundIndex + 1, roundAvailableUntil: expiry, reminderSentAt: null, updatedAt: new Date() })
     .where(eq(schema.candidacies.id, candidacyId));
   await db.insert(schema.gateDecisions).values({ candidacyId, fromRoundIndex, decision: "advance", mode: opts.mode, decidedBy: opts.userId ?? null, reason: opts.reason ?? null });
   await notifyCandidateNextRound(candidacyId).catch((e) => console.error("notify failed", e));

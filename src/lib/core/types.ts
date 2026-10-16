@@ -51,7 +51,7 @@ export interface RoleProfile {
 }
 
 /** Kind of workspace exercise that a section opens. */
-export type ExerciseKind = "coding" | "system_design" | "domain_case" | "mgmt_case" | "practical_fit";
+export type ExerciseKind = "coding" | "system_design" | "domain_case" | "mgmt_case" | "prioritization" | "practical_fit";
 
 export interface SectionConfig {
   key: string;

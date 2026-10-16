@@ -1,8 +1,9 @@
-import { and, eq, lt, sql } from "drizzle-orm";
+import { and, eq, gt, inArray, isNull, lt, or, sql } from "drizzle-orm";
 import { db, schema } from "../db";
 import { getSettings } from "../settings";
 import { endSession } from "../interview/orchestrator";
 import { audit } from "../audit";
+import { sendReminderEmail } from "./notify";
 
 let lastPurge = 0;
 
@@ -29,7 +30,26 @@ export async function periodicMaintenance() {
     .update(schema.candidacies)
     .set({ stage: "expired", updatedAt: now })
     .where(and(eq(schema.candidacies.stage, "round_available"), lt(schema.candidacies.roundAvailableUntil, now)));
-  // 4) Retention purge (daily).
+  // 4) Reminders 48h before an invitation or next-round window expires (once per window).
+  const soon = new Date(now.getTime() + 48 * 3600_000);
+  const due = await db
+    .select({ id: schema.candidacies.id })
+    .from(schema.candidacies)
+    .where(
+      and(
+        isNull(schema.candidacies.reminderSentAt),
+        or(
+          and(inArray(schema.candidacies.stage, ["invited", "onboarding", "ready"]), gt(schema.candidacies.expiresAt, now), lt(schema.candidacies.expiresAt, soon)),
+          and(eq(schema.candidacies.stage, "round_available"), gt(schema.candidacies.roundAvailableUntil, now), lt(schema.candidacies.roundAvailableUntil, soon)),
+        ),
+      ),
+    )
+    .limit(50);
+  for (const c of due) {
+    await db.update(schema.candidacies).set({ reminderSentAt: now }).where(eq(schema.candidacies.id, c.id));
+    await sendReminderEmail(c.id).catch((e) => console.error("reminder failed", e));
+  }
+  // 5) Retention purge (daily).
   if (now.getTime() - lastPurge > 24 * 3600_000) {
     lastPurge = now.getTime();
     const settings = await getSettings();

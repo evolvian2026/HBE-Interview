@@ -23,7 +23,8 @@ import {
 import { paramIds } from "../core/rubrics";
 import { enabledRounds } from "../core/rounds";
 import { quoteMatches } from "../core/evidence";
-import { scenariosFor, problemById } from "../content";
+import { scenariosFor } from "../content";
+import { getProblem } from "../services/problems";
 import { checkCompliance } from "../ai/evaluation";
 import { executeTests } from "../exec";
 import { loadMessages, loadSessionContext, type SessionContext } from "./load";
@@ -441,7 +442,7 @@ async function autoSubmitCoding(sessionId: string, problemId: string) {
     .orderBy(desc(schema.codeRuns.createdAt))
     .limit(1);
   if (!latest || latest.kind === "submit") return;
-  const p = problemById(problemId);
+  const p = await getProblem(problemId);
   if (!p) return;
   const results = await executeTests(latest.language as Language, latest.code, p.hidden, { revealIO: false });
   await db.insert(schema.codeRuns).values({ sessionId, problemId, kind: "submit", language: latest.language, code: latest.code, results: { ...results, auto: true } });

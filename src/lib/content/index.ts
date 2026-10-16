@@ -343,3 +343,64 @@ export function mgmtCaseFor(track: Track, seniority: Seniority, exclude: string[
 export function scenariosFor(track: Track): Scenario[] {
   return SCENARIOS.filter((s) => s.tracks.includes(track));
 }
+
+/* ---------------------------- Prioritisation sets --------------------------- */
+
+export interface PrioritizationSet {
+  id: string;
+  title: string;
+  brief: string;
+  tracks: Track[];
+  items: { id: string; text: string }[];
+}
+
+export const PRIORITIZATION_SETS: PrioritizationSet[] = [
+  {
+    id: "pr-quarter-roadmap",
+    title: "Next-quarter roadmap",
+    brief: "You have 6 engineers for the next quarter and can realistically complete about half of these. Rank them from most to least important and explain your top and bottom choices.",
+    tracks: ["manager", "ic"],
+    items: [
+      { id: "sso", text: "Enterprise SSO needed to close a large deal" },
+      { id: "db", text: "Migrate off a database version losing support in 5 months" },
+      { id: "onboarding", text: "Onboarding redesign requested by marketing" },
+      { id: "ci", text: "Fix flaky CI costing ~6 engineer-hours a week" },
+      { id: "dashboard", text: "New analytics dashboard requested by the CEO" },
+      { id: "latency", text: "Cut checkout p95 latency by 40%" },
+      { id: "gdpr", text: "GDPR data-export tooling (legal deadline in 4 months)" },
+      { id: "hackathon", text: "Internal hackathon week" },
+    ],
+  },
+  {
+    id: "pr-team-health",
+    title: "Team health priorities",
+    brief: "You've just joined as the manager of a struggling team. Rank what you would address first, and explain your reasoning.",
+    tracks: ["manager"],
+    items: [
+      { id: "attrition", text: "Two senior engineers are interviewing elsewhere" },
+      { id: "oncall", text: "On-call load is concentrated on three people" },
+      { id: "roadmap", text: "The roadmap has no agreed priorities with product" },
+      { id: "quality", text: "Escaped defects doubled last quarter" },
+      { id: "hiring", text: "Three open positions have been unfilled for 4 months" },
+      { id: "process", text: "Stand-ups and planning take 6+ hours a week" },
+    ],
+  },
+];
+
+export function prioritizationSetFor(track: Track, exclude: string[]): PrioritizationSet {
+  return PRIORITIZATION_SETS.find((p) => p.tracks.includes(track) && !exclude.includes(p.id)) ?? PRIORITIZATION_SETS[0];
+}
+
+/** Title and brief of a written exercise (design prompt, case or prioritisation set) by id. */
+export function writtenExerciseInfo(kind: string, refId: string): { title: string; brief: string } | null {
+  if (kind === "system_design") {
+    const d = DESIGN_PROMPTS.find((x) => x.id === refId);
+    return d ? { title: d.title, brief: d.brief } : null;
+  }
+  if (kind === "prioritization") {
+    const p = PRIORITIZATION_SETS.find((x) => x.id === refId);
+    return p ? { title: p.title, brief: `${p.brief}\nItems: ${p.items.map((i) => i.text).join("; ")}` } : null;
+  }
+  const c = [...DOMAIN_CASES, ...MGMT_CASES].find((x) => x.id === refId);
+  return c ? { title: c.title, brief: c.brief } : null;
+}

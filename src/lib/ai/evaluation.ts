@@ -235,3 +235,37 @@ export function scrubPii(text: string, nameTokens: string[]): string {
   }
   return out;
 }
+
+/* ------------------- Likely AI-generated / read-out answers ------------------- */
+
+export const GeneratedSchema = z.object({
+  flagged: z.array(z.object({ ref: z.string(), likelihood: z.enum(["medium", "high"]), reason: z.string() })),
+});
+export type GeneratedFlag = z.infer<typeof GeneratedSchema>["flagged"][number];
+
+const TELLTALE = /\b(delve|in conclusion|it'?s important to note|as an ai|certainly!|here'?s a (comprehensive|detailed)|in summary,|furthermore,|moreover,)\b/i;
+
+/**
+ * Flag answers that read like generated or scripted text (K-3). Signals only — shown to reviewers as
+ * integrity context, never used in scoring. Only long answers are checked.
+ */
+export async function detectGeneratedAnswers(messages: { ref: string; content: string; pasted: boolean }[], ctx: CallContext): Promise<GeneratedFlag[]> {
+  const long = messages.filter((m) => m.content.split(/\s+/).length >= 60);
+  if (!long.length) return [];
+  return (
+    await structured({
+      stage: "generated_answer_check",
+      tier: "utility",
+      system: `You review a candidate's interview answers for signs they were produced by an AI assistant or read from a prepared script rather than spoken/typed spontaneously: generic, polished essay structure; no personal specifics; textbook phrasing; answering a different question than asked; abrupt style shifts compared with the candidate's other answers. Answers marked [pasted] were pasted into the answer box. Be conservative: only flag answers with clear signs; ordinary well-structured answers are fine. Return refs with likelihood "medium" or "high" and a one-line reason.`,
+      user: untrusted("answers", long.map((m) => `[${m.ref}]${m.pasted ? " [pasted]" : ""} ${m.content}`).join("\n\n")),
+      schema: GeneratedSchema,
+      maxTokens: 2000,
+      ctx,
+      mock: () => ({
+        flagged: long
+          .filter((m) => TELLTALE.test(m.content) || (m.pasted && m.content.split(/\s+/).length > 120))
+          .map((m) => ({ ref: m.ref, likelihood: m.pasted && TELLTALE.test(m.content) ? ("high" as const) : ("medium" as const), reason: m.pasted ? "Long pasted answer with generic phrasing" : "Generic, essay-like phrasing" })),
+      }),
+    })
+  ).flagged.filter((f) => long.some((m) => m.ref === f.ref));
+}

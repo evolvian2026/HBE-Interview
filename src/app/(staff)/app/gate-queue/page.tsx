@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { and, desc, eq, inArray } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
-import { requireStaffPage } from "@/lib/auth/staff";
+import { canSeeDrive, requireStaffPage } from "@/lib/auth/staff";
 import { ROUND_LABEL, RECOMMENDATION_LABEL, type Recommendation, type RoundType } from "@/lib/core/types";
 import { Badge, Card, Empty, PageHeader } from "@/components/ui";
 import { REC_TONE } from "@/components/labels";
@@ -9,14 +9,15 @@ import { REC_TONE } from "@/components/labels";
 export const dynamic = "force-dynamic";
 
 export default async function GateQueuePage() {
-  await requireStaffPage();
-  const rows = await db
+  const user = await requireStaffPage();
+  const allRows = await db
     .select({ c: schema.candidacies, cand: schema.candidates, d: schema.drives })
     .from(schema.candidacies)
     .innerJoin(schema.candidates, eq(schema.candidacies.candidateId, schema.candidates.id))
     .innerJoin(schema.drives, eq(schema.candidacies.driveId, schema.drives.id))
     .where(inArray(schema.candidacies.stage, ["gate_pending", "on_hold"]))
     .orderBy(desc(schema.candidacies.updatedAt));
+  const rows = allRows.filter((r) => canSeeDrive(user, r.d.id));
   const ids = rows.map((r) => r.c.id);
   const reports = ids.length ? await db.select().from(schema.roundReports).where(inArray(schema.roundReports.candidacyId, ids)) : [];
   const auto = await db
@@ -71,11 +72,11 @@ export default async function GateQueuePage() {
         </div>
       )}
       <h2 className="mb-3 mt-10 text-sm font-semibold text-slate-700">Recently auto-advanced</h2>
-      {auto.length === 0 ? (
+      {auto.filter((a) => canSeeDrive(user, a.c.driveId)).length === 0 ? (
         <p className="text-sm text-slate-500">None yet.</p>
       ) : (
         <ul className="space-y-1 text-sm">
-          {auto.map(({ g, cand, c }) => (
+          {auto.filter((a) => canSeeDrive(user, a.c.driveId)).map(({ g, cand, c }) => (
             <li key={g.id}>
               <Link href={`/app/candidates/${c.id}`} className="text-brand-700 hover:underline">
                 {cand.name}

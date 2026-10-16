@@ -7,7 +7,15 @@ import { api } from "../api";
 
 type Role = "admin" | "recruiter" | "hiring_manager" | "viewer";
 
-export function UsersAdmin({ users, meId }: { users: { id: string; name: string; email: string; role: Role; active: boolean }[]; meId: string }) {
+export function UsersAdmin({
+  users,
+  drives,
+  meId,
+}: {
+  users: { id: string; name: string; email: string; role: Role; active: boolean; driveIds: string[] }[];
+  drives: { id: string; title: string }[];
+  meId: string;
+}) {
   const router = useRouter();
   const [f, setF] = useState({ name: "", email: "", password: "", role: "recruiter" as Role });
   const [error, setError] = useState("");
@@ -27,6 +35,7 @@ export function UsersAdmin({ users, meId }: { users: { id: string; name: string;
             <th className="py-2">Name</th>
             <th>Email</th>
             <th>Role</th>
+            <th>Assigned drives</th>
             <th>Status</th>
             <th />
           </tr>
@@ -43,6 +52,27 @@ export function UsersAdmin({ users, meId }: { users: { id: string; name: string;
                   <option value="hiring_manager">Hiring manager</option>
                   <option value="viewer">Viewer</option>
                 </Select>
+              </td>
+              <td className="py-2">
+                {u.role === "hiring_manager" ? (
+                  <details>
+                    <summary className="cursor-pointer text-xs text-brand-700">{u.driveIds.length} of {drives.length} drives</summary>
+                    <div className="mt-1 max-h-40 space-y-1 overflow-y-auto rounded border border-slate-200 p-2">
+                      {drives.map((d) => (
+                        <label key={d.id} className="flex items-center gap-1 text-xs">
+                          <input
+                            type="checkbox"
+                            checked={u.driveIds.includes(d.id)}
+                            onChange={(e) => update(u.id, { driveIds: e.target.checked ? [...u.driveIds, d.id] : u.driveIds.filter((x) => x !== d.id) })}
+                          />
+                          {d.title}
+                        </label>
+                      ))}
+                    </div>
+                  </details>
+                ) : (
+                  <span className="text-xs text-slate-400">All</span>
+                )}
               </td>
               <td>
                 <Badge tone={u.active ? "green" : "slate"}>{u.active ? "active" : "inactive"}</Badge>

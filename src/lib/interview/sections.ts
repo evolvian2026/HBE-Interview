@@ -19,6 +19,7 @@ export const SECTION_GUIDE: Record<RoundType, Record<string, { objective: string
     execution: { objective: "Assess execution and delivery ownership: planning, risk management, recovering a failing project, accountability. Use STAR probing and ask for metrics.", param: "execution" },
     strategy: { objective: "Assess strategic thinking: trade-off decisions, tech debt vs features, decisions with incomplete data, aligning work to business goals.", param: "strategy" },
     scenarios: { objective: "Present the situational scenarios from the dossier one at a time (always include the ethics scenario). Probe options considered, stakeholders affected, the decision, risks and communication plan. Do not signal a 'right' answer.", param: "judgement" },
+    prioritize: { objective: "The prioritisation exercise is shown to the candidate: they rank the initiatives by dragging and add a rationale. Let them work, then ask about their top and bottom choices, what they would say no to, and how they would communicate the trade-offs.", param: "strategy" },
     case: { objective: "The written case is shown in the case panel. Let the candidate work (keep messages short), answer clarifying questions, then after submission ask 2–4 probing questions about their plan.", param: "execution" },
     wrapup: { objective: "Ask whether the candidate has questions; answer from the role profile only. Thank them, explain next steps and call end_interview.", param: "stakeholder" },
   },
