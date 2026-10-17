@@ -72,6 +72,8 @@ async function main() {
   const db = new pg.Client({ connectionString: process.env.DATABASE_URL });
   await db.connect();
   const q = async <T = Record<string, unknown>>(sql: string, args: unknown[] = []) => (await db.query(sql, args)).rows as T[];
+  // This script starts ~60 SSO flows; clear the per-IP window so back-to-back runs don't trip the limit.
+  await q("delete from rate_limits where key like 'sso-start:%'");
   const stamp = Date.now();
   const domain = `acme-${stamp}.com`;
   const idp = await startMockIdp(4610);

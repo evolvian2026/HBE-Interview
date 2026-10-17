@@ -15,7 +15,8 @@ const back = (path: string, msg: string) => NextResponse.redirect(new URL(`${pat
 export async function GET(req: Request) {
   const url = new URL(req.url);
   const test = url.searchParams.get("test") === "1";
-  if ((await hit(`sso-start:${clientIp(req)}`, 15 * 60)) > 60) return back("/login", "Too many sign-in attempts — please wait a few minutes.");
+  // Generous per-IP cap: a whole office behind one NAT address signs in through here, and the IdP does the real checks.
+  if ((await hit(`sso-start:${clientIp(req)}`, 15 * 60)) > 300) return back("/login", "Too many sign-in attempts — please wait a few minutes.");
   let cfg;
   if (test) {
     const user = await getStaff();
