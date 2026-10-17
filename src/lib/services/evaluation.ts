@@ -33,6 +33,7 @@ import { orgOfCandidacy } from "../tenancy";
 import { audit } from "../audit";
 import { notifyCandidateNextRound } from "./notify";
 import { emitEvent } from "./integrations";
+import { maybeSampleForCalibration } from "./calibration";
 
 /* ----------------------------- Evidence bundle ---------------------------- */
 
@@ -331,6 +332,7 @@ export async function evaluateRoundJob(payload: { sessionId: string }) {
     })
     .where(eq(schema.roundReports.sessionId, ctx.session.id));
 
+  await maybeSampleForCalibration(ctx.session.id);
   await emitEvent(ctx.candidacy.orgId, "round.evaluated", { candidacyId: ctx.candidacy.id, driveId: ctx.candidacy.driveId, roundIndex: ctx.session.roundIndex, roundType: round.type, score, recommendation, confidence });
   await afterRoundEvaluated(ctx.candidacy.id, ctx.session.roundIndex, recommendation);
 }

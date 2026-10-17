@@ -1,7 +1,9 @@
 import Link from "next/link";
 import { and, desc, eq, inArray } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
-import { canSeeDrive, requireStaffPage } from "@/lib/auth/staff";
+import { canSeeDrive, hasRole, requireStaffPage } from "@/lib/auth/staff";
+import { disagreementsAmong } from "@/lib/services/calibration";
+import { pendingAccommodations } from "@/lib/services/accommodations";
 import { ROUND_LABEL, RECOMMENDATION_LABEL, type Recommendation, type RoundType } from "@/lib/core/types";
 import { Badge, Card, Empty, PageHeader } from "@/components/ui";
 import { REC_TONE } from "@/components/labels";
@@ -20,6 +22,8 @@ export default async function GateQueuePage() {
   const rows = allRows.filter((r) => canSeeDrive(user, r.d));
   const ids = rows.map((r) => r.c.id);
   const reports = ids.length ? await db.select().from(schema.roundReports).where(inArray(schema.roundReports.candidacyId, ids)) : [];
+  const disagreed = await disagreementsAmong(ids);
+  const adjustments = hasRole(user, "recruiter") ? (await pendingAccommodations(user.orgId)).filter((x) => canSeeDrive(user, { id: x.driveId, orgId: user.orgId })) : [];
   const auto = await db
     .select({ g: schema.gateDecisions, cand: schema.candidates, c: schema.candidacies })
     .from(schema.gateDecisions)
@@ -31,6 +35,20 @@ export default async function GateQueuePage() {
   return (
     <>
       <PageHeader title="Decisions" subtitle="Candidates whose last round needs a human decision before the next round unlocks." />
+      {adjustments.length > 0 && (
+        <Card title={`Adjustment requests (${adjustments.length})`} className="mb-6">
+          <ul className="space-y-1 text-sm">
+            {adjustments.map((x) => (
+              <li key={x.a.candidacyId}>
+                <Link href={`/app/candidates/${x.a.candidacyId}#adjustments`} className="font-medium text-brand-700 hover:underline">
+                  {x.name}
+                </Link>{" "}
+                — {x.driveTitle} · asked {x.a.createdAt.toLocaleDateString()}
+              </li>
+            ))}
+          </ul>
+        </Card>
+      )}
       {rows.length === 0 ? (
         <Empty>Nothing waiting for a decision.</Empty>
       ) : (
@@ -48,6 +66,11 @@ export default async function GateQueuePage() {
                       {d.title} · after round {c.currentRoundIndex + 1}
                       {rep ? ` (${ROUND_LABEL[rep.roundType as RoundType]})` : ""} {c.stage === "on_hold" && "· on hold"}
                     </p>
+                    {disagreed.has(c.id) && (
+                      <p className="mt-1">
+                        <Badge tone="amber">A blind human review disagreed with the AI</Badge>
+                      </p>
+                    )}
                     {rep?.status === "ready" && (
                       <div className="mt-2 space-y-1 text-sm">
                         <p className="text-slate-700">{rep.summary}</p>

@@ -21,6 +21,11 @@ import { CodeReplay } from "@/components/staff/code-replay";
 import { ReevaluateButton } from "@/components/staff/reevaluate-button";
 import { audit } from "@/lib/audit";
 import { languageInfo } from "@/lib/core/languages";
+import { reviewsForCandidacy } from "@/lib/services/calibration";
+import { getAccommodation } from "@/lib/services/accommodations";
+import { AccommodationPanel } from "@/components/staff/accommodation-panel";
+import { RequestCalibrationButton } from "@/components/staff/request-calibration-button";
+import type { SessionState } from "@/lib/core/interview";
 
 export const dynamic = "force-dynamic";
 
@@ -84,6 +89,10 @@ export default async function CandidatePage({ params }: { params: Promise<{ id: 
   const shareLinks = await db.select().from(schema.shareLinks).where(eq(schema.shareLinks.candidacyId, id)).orderBy(desc(schema.shareLinks.createdAt));
   const profile = resume?.parsed as ParsedResume | null;
   const canDecide = hasRole(user, "hiring_manager");
+  const calibration = canDecide ? await reviewsForCandidacy(id) : [];
+  // Adjustment requests can hold health information: recruiters and admins only.
+  const accommodation = hasRole(user, "recruiter") ? await getAccommodation(id) : null;
+  const [decider] = accommodation?.decidedBy ? await db.select({ name: schema.users.name }).from(schema.users).where(eq(schema.users.id, accommodation.decidedBy)) : [];
   const cd = combined?.data as { executiveSummary?: string; strengths?: string[]; risks?: string[]; focusAreas?: string[]; contradictions?: string[]; reasons?: string[] } | null;
 
   return (
@@ -173,6 +182,26 @@ export default async function CandidatePage({ params }: { params: Promise<{ id: 
         {fit?.compatibility != null && <PracticalFit compat={fit.compatibility as Compatibility} data={fit.data as Record<string, unknown>} />}
       </Card>
 
+      {accommodation && (
+        <div id="adjustments">
+          <AccommodationPanel
+            candidacyId={id}
+            a={{
+              status: accommodation.status,
+              extraTimePct: accommodation.extraTimePct,
+              extraBreaks: accommodation.extraBreaks,
+              details: accommodation.details,
+              approvedExtraTimePct: accommodation.approvedExtraTimePct,
+              approvedExtraBreaks: accommodation.approvedExtraBreaks,
+              decisionNote: accommodation.decisionNote,
+              decidedBy: decider?.name ?? null,
+              decidedAt: accommodation.decidedAt?.toISOString() ?? null,
+              createdAt: accommodation.createdAt.toISOString(),
+            }}
+          />
+        </div>
+      )}
+
       {/* ------------------------------ Rounds ------------------------------ */}
       {rounds.map((r, i) => {
         const session = sessions.find((s) => s.roundIndex === i);
@@ -204,7 +233,9 @@ export default async function CandidatePage({ params }: { params: Promise<{ id: 
                 session && (
                   <span className="flex items-center gap-3 text-xs text-slate-500">
                     {session.mode === "voice" ? "Voice" : "Text"} · {languageInfo(session.language).label} · {session.endReason ? `ended: ${session.endReason.replace("_", " ")}` : ""} {session.startedAt ? `· ${session.startedAt.toLocaleString()}` : ""}
+                    {hasRole(user, "recruiter") && (session.state as SessionState).adjust && <Badge tone="blue">adjusted timing</Badge>}
                     {rep && (rep.status === "ready" || rep.status === "failed") && hasRole(user, "recruiter") && <ReevaluateButton reportId={rep.id} />}
+                    {rep?.status === "ready" && canDecide && (rep.calibrationRequestedAt ? !calibration.some((c) => c.r.reportId === rep.id) && <Badge>blind review queued</Badge> : <RequestCalibrationButton reportId={rep.id} />)}
                   </span>
                 )
               }
@@ -439,6 +470,24 @@ export default async function CandidatePage({ params }: { params: Promise<{ id: 
                       </Panel>
                     )}
                   </div>
+                  {calibration.filter((c) => c.r.reportId === rep.id).map(({ r: cr, reviewer }) => (
+                    <div key={cr.id} className={cx("rounded-lg border p-3 text-sm", cr.disagrees ? "border-amber-300 bg-amber-50" : "border-emerald-200 bg-emerald-50/50")}>
+                      <p className="font-medium">
+                        {cr.disagrees ? "A blind human review disagreed with the AI" : "A blind human review agreed with the AI"} <span className="font-normal text-slate-600">— {reviewer ?? "former user"}, {cr.createdAt.toLocaleDateString()}{cr.blind ? "" : " (not blind: the reviewer had seen this report)"}</span>
+                      </p>
+                      <p className="mt-1">
+                        Reviewer: <b>{RECOMMENDATION_LABEL[cr.recommendation as Recommendation]}</b> · AI: <b>{RECOMMENDATION_LABEL[cr.ai.recommendation as Recommendation]}</b>
+                      </p>
+                      <ul className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-700">
+                        {Object.entries(cr.scores).map(([pid, h]) => (
+                          <li key={pid}>
+                            {PARAMETERS[r.type].find((p) => p.id === pid)?.label ?? pid}: {h} vs AI {cr.ai.scores[pid] ?? "—"}
+                          </li>
+                        ))}
+                      </ul>
+                      {cr.notes && <p className="mt-1 text-xs text-slate-600">Reviewer notes: {cr.notes}</p>}
+                    </div>
+                  ))}
                   {rs.disagreement && <p className="text-xs text-slate-500">Evaluator runs disagreed on at least one parameter; a third run was used and the median taken.</p>}
                 </div>
               )}

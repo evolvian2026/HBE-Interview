@@ -62,6 +62,13 @@ export function SettingsForm({ initial }: { initial: OrgSettings }) {
           <Field label="Data retention (days after the candidacy closes)" hint="Resumes, transcripts, code and reports are deleted automatically after this period.">
             <Input type="number" min={30} max={730} className="max-w-40" value={s.retentionDays} onChange={(e) => set("retentionDays", Number(e.target.value))} />
           </Field>
+          <Field label="Blind calibration reviews (% of evaluated rounds)" hint="This share of rounds is picked at random for a person to score without seeing the AI's scores, so you can check the AI against your reviewers (Calibration). 0 turns sampling off.">
+            <Input type="number" min={0} max={100} className="max-w-40" value={s.calibration.sampleRate} onChange={(e) => set("calibration", { ...s.calibration, sampleRate: Math.max(0, Math.min(100, Math.round(Number(e.target.value) || 0))) })} />
+          </Field>
+          <label className="flex items-start gap-2 text-sm">
+            <input type="checkbox" className="mt-1" checked={s.calibration.includeLowConfidence} onChange={(e) => set("calibration", { ...s.calibration, includeLowConfidence: e.target.checked })} />
+            <span>Always ask for a blind review when the AI&apos;s evaluation has <b>low confidence</b>.</span>
+          </label>
           <Field label={`Candidate consent text (version ${s.consentVersion}; editing creates a new version)`}>
             <Textarea rows={6} value={s.consentText} onChange={(e) => set("consentText", e.target.value)} />
           </Field>
@@ -74,7 +81,7 @@ export function SettingsForm({ initial }: { initial: OrgSettings }) {
             try {
               const r = await api<OrgSettings>("/api/settings", {
                 method: "PUT",
-                body: { companyName: s.companyName, companyBlurb: s.companyBlurb, supportEmail: s.supportEmail, values: s.values.filter((v) => v.name.trim()), askCompensation: s.askCompensation, require2fa: s.require2fa, retentionDays: s.retentionDays, consentText: s.consentText },
+                body: { companyName: s.companyName, companyBlurb: s.companyBlurb, supportEmail: s.supportEmail, values: s.values.filter((v) => v.name.trim()), askCompensation: s.askCompensation, require2fa: s.require2fa, retentionDays: s.retentionDays, consentText: s.consentText, calibration: s.calibration },
               });
               setS(r);
               setMsg("Saved.");

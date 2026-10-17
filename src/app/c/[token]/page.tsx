@@ -14,6 +14,8 @@ import { ProfileStep } from "@/components/candidate/profile-step";
 import { ProjectsStep } from "@/components/candidate/projects-step";
 import { FeedbackSurvey } from "@/components/candidate/feedback-survey";
 import { YourData } from "@/components/candidate/your-data";
+import { AccommodationCard } from "@/components/candidate/accommodation-card";
+import { getAccommodation } from "@/lib/services/accommodations";
 import { pendingDeletion } from "@/lib/services/data-rights";
 import { pendingSurveyRound, type ReleasedFeedback } from "@/lib/services/feedback";
 
@@ -43,6 +45,9 @@ export default async function CandidateHub({ params }: { params: Promise<{ token
   const needsProjects = needsProjectsStep(config);
   const surveyRound = await pendingSurveyRound(candidacy.id);
   const deletion = await pendingDeletion(candidacy.id);
+  const accommodation = await getAccommodation(candidacy.id);
+  const timeFactor = accommodation?.status === "approved" ? 1 + (accommodation.approvedExtraTimePct ?? 0) / 100 : 1;
+  const canAskAdjustments = !["invited", "declined", "expired", "rejected", "completed", "shortlisted"].includes(candidacy.stage);
   const released = candidacy.feedbackReleasedAt ? (candidacy.feedbackSummary as ReleasedFeedback | null) : null;
 
   const steps = [
@@ -94,7 +99,7 @@ export default async function CandidateHub({ params }: { params: Promise<{ token
                       Round {r.index + 1}: {r.label}
                     </p>
                     <p className="text-xs text-slate-500">
-                      ~{r.durationMin} min · {r.sections.join(" · ")}
+                      ~{r.status === "completed" || r.status === "in_progress" ? r.durationMin : Math.round(r.durationMin * timeFactor)} min · {r.sections.join(" · ")}
                     </p>
                   </div>
                   <div className="flex items-center gap-3">
@@ -160,6 +165,26 @@ export default async function CandidateHub({ params }: { params: Promise<{ token
         ))}
       </ol>
       <Card>{body}</Card>
+      {(canAskAdjustments || accommodation) && candidacy.stage !== "invited" && (
+        <AccommodationCard
+          token={token}
+          companyName={settings.companyName}
+          current={
+            accommodation
+              ? {
+                  status: accommodation.status,
+                  extraTimePct: accommodation.extraTimePct,
+                  extraBreaks: accommodation.extraBreaks,
+                  details: accommodation.details,
+                  approvedExtraTimePct: accommodation.approvedExtraTimePct,
+                  approvedExtraBreaks: accommodation.approvedExtraBreaks,
+                  decisionNote: accommodation.decisionNote,
+                }
+              : null
+          }
+          canChange={canAskAdjustments}
+        />
+      )}
       {candidacy.stage !== "invited" && <YourData token={token} companyName={settings.companyName} pendingDueAt={deletion?.dueAt.toISOString() ?? null} />}
     </Shell>
   );

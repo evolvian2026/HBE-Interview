@@ -19,6 +19,7 @@ import {
   useHint,
   useSkip,
   LIMITS,
+  pauseLimits,
   type SessionState,
 } from "../core/interview";
 import { paramIds } from "../core/rubrics";
@@ -36,6 +37,7 @@ import { runInterviewerTurn, type ToolOutcome } from "./agent";
 import { SENIORITY_LABEL, type Language } from "../core/types";
 import { audit } from "../audit";
 import { emitEvent } from "../services/integrations";
+import { adjustmentFor } from "../services/accommodations";
 
 export interface PublicState {
   sessionId: string;
@@ -75,7 +77,7 @@ export function publicState(session: { id: string; roundType: string; status: st
     timeLeftSec: session.status === "active" ? timeLeftSec(session.deadlineAt, now, state) : 0,
     serverNow: now.toISOString(),
     paused: !!state.pause.pausedAt,
-    pausesLeft: LIMITS.maxPauses - state.pause.count,
+    pausesLeft: pauseLimits(state).maxPauses - state.pause.count,
     skipsLeft: LIMITS.maxSkips - state.skipsUsed,
     ended: session.status === "ended",
   };
@@ -139,7 +141,9 @@ export async function startRound(candidacyId: string, roundIndex: number, mode: 
   const allowed = (cand.version.config as { languages?: string[] }).languages ?? ["en"];
   if (!allowed.includes(language)) throw new HttpError(400, "This interview language is not available for this role.");
   const now = new Date();
-  let state = startFirstSection(initState(round, paramIds(round.type)), now);
+  // An approved accommodation lengthens the clock (round and every section) and the pause allowance.
+  const adjust = await adjustmentFor(candidacyId);
+  let state = startFirstSection(initState(round, paramIds(round.type), adjust), now);
   if (round.type === "managerial") {
     const track = (cand.version.config as { roleProfile: { track: "ic" | "manager" } }).roleProfile.track;
     const pool = scenariosFor(track);
@@ -147,7 +151,7 @@ export async function startRound(candidacyId: string, roundIndex: number, mode: 
     const others = pool.filter((s) => !s.ethics).sort(() => Math.random() - 0.5);
     state = { ...state, plan: { scenarios: [...others.slice(0, 2), ethics[Math.floor(Math.random() * ethics.length)]].filter(Boolean).map((s) => s.id) } };
   }
-  const deadline = new Date(now.getTime() + round.durationMin * 60_000);
+  const deadline = new Date(now.getTime() + round.durationMin * (adjust?.timeFactor ?? 1) * 60_000);
   const [created] = await db
     .insert(schema.roundSessions)
     .values({

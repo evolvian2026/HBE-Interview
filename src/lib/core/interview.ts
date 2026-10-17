@@ -48,6 +48,14 @@ export interface SessionState {
   plan?: Record<string, string[]>;
   /** Candidate questions the AI could not answer (HR/wrap-up), for recruiter follow-up. */
   followUpQuestions?: string[];
+  /** Approved accommodation applied when the round started: longer clock and/or more and longer pauses. */
+  adjust?: Adjustment;
+}
+
+export interface Adjustment {
+  timeFactor: number;
+  maxPauses: number;
+  maxPauseSec: number;
 }
 
 export const LIMITS = {
@@ -59,13 +67,19 @@ export const LIMITS = {
   disconnectGraceSec: 60,
 };
 
-export function initState(round: RoundConfig, params: string[]): SessionState {
+/** Pause limits for this session (standard, or extended by an accommodation). */
+export function pauseLimits(state: SessionState) {
+  return { maxPauses: state.adjust?.maxPauses ?? LIMITS.maxPauses, maxPauseSec: state.adjust?.maxPauseSec ?? LIMITS.maxPauseSec };
+}
+
+export function initState(round: RoundConfig, params: string[], adjust?: Adjustment): SessionState {
+  const factor = adjust?.timeFactor ?? 1;
   const sections = round.sections
     .filter((s) => s.enabled)
     .map<SectionState>((s) => ({
       key: s.key,
       title: s.title,
-      minutes: s.minutes,
+      minutes: Math.round(s.minutes * factor * 10) / 10,
       minQ: s.minQ,
       maxQ: s.maxQ,
       exercise: s.exercise,
@@ -88,6 +102,7 @@ export function initState(round: RoundConfig, params: string[]): SessionState {
     seq: 0,
     wrapping: false,
     ended: false,
+    ...(adjust ? { adjust } : {}),
   };
 }
 
@@ -242,7 +257,7 @@ export function uncoveredParameters(state: SessionState, weights: Record<string,
 
 export function startPause(state: SessionState, now: Date): { state: SessionState; error?: string } {
   if (state.pause.pausedAt) return { state, error: "Already paused" };
-  if (state.pause.count >= LIMITS.maxPauses) return { state, error: "No pauses left in this round" };
+  if (state.pause.count >= pauseLimits(state).maxPauses) return { state, error: "No pauses left in this round" };
   const s = clone(state);
   s.pause.count += 1;
   s.pause.pausedAt = now.toISOString();
@@ -253,7 +268,7 @@ export function startPause(state: SessionState, now: Date): { state: SessionStat
 export function endPause(state: SessionState, now: Date): { state: SessionState; pausedSec: number } {
   if (!state.pause.pausedAt) return { state, pausedSec: 0 };
   const s = clone(state);
-  const pausedSec = Math.min(LIMITS.maxPauseSec, Math.max(0, (now.getTime() - Date.parse(s.pause.pausedAt!)) / 1000));
+  const pausedSec = Math.min(pauseLimits(state).maxPauseSec, Math.max(0, (now.getTime() - Date.parse(s.pause.pausedAt!)) / 1000));
   s.pause.usedSec += pausedSec;
   delete s.pause.pausedAt;
   const sec = s.sections[s.current];

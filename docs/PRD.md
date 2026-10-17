@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Product** | HBE Interview: an AI-powered, multi-round interview platform |
-| **Document status** | v1.7 — approved; Phases 1–6 built |
+| **Document status** | v1.8 — approved; Phases 1–7 built |
 | **Date** | 2026-10-16 |
 | **Owner** | Product Architect / Product Owner |
 | **Companion documents** | [FEATURES.md](FEATURES.md) (detailed feature specification) · [ARCHITECTURE.md](ARCHITECTURE.md) (detailed technical architecture) |
@@ -12,6 +12,7 @@
 
 | Version | Date | Change |
 |---|---|---|
+| 1.8 | 2026-10-17 | Phase 7 built — human oversight of the AI and fair access: **blind calibration reviews** (a sample of AI-evaluated rounds, every low-confidence evaluation, or any round on request, scored by a person who can't see the AI's scores or the candidate's name), a **calibration dashboard** (agreement per parameter, bias, weighted kappa, recommendation confusion matrix, by evaluator version, drift alerts, CSV export) and disagreement flags on reports and Decisions; **candidate accommodations** (extra time and extra breaks requested by the candidate, decided by recruiters, applied to the interview clock, private from decision makers and the AI) |
 | 1.7 | 2026-10-17 | Phase 6 built — enterprise identity and branding: **single sign-on** over OpenID Connect (Google Workspace, Microsoft Entra ID, Okta, any OIDC provider) with verified email domains (DNS TXT or platform confirmation), test sign-in, optional just-in-time accounts, and organisation-enforced SSO with a platform-admin break-glass; **per-organisation branding** (logo and accessible brand colour) on candidate pages and the interview room |
 | 1.6 | 2026-10-17 | Phase 5 built — production readiness: login throttling and account lockout (shared across instances), session revocation, password policy, security headers (CSP, HSTS, frame-ancestors), cross-site request guard; **two-factor sign-in** (TOTP + recovery codes, organisation-enforceable, admin reset); **audit log** viewer and CSV export; **candidate data rights** (self-service download, deletion requests fulfilled within 30 days, automatic at the due date); **operations** dashboard (job queue, failed-job retry, worker heartbeat in /api/health); WCAG 2.1 AA accessibility pass |
 | 1.5 | 2026-10-16 | Phase 4 built — the deferred decisions §11-3 and §11-8: **multiple organisations** (tenant isolation on every page, API, webhook and job; per-org settings, values, consent, KB, users, API keys, webhooks, retention and usage; platform console to create/suspend organisations, switch into them and set AI budget alerts; platform-wide model settings), **AWS Lambda code executor** (SigV4 Invoke, container image, isolated-VPC CloudFormation template; Judge0 remains the default), **HR knowledge-base search** for large policy sets (Postgres full-text passages per question), whiteboard in the PDF export |
@@ -456,6 +457,7 @@ Diagrams, component design, the interview state machine, data model, API specifi
 | **Phase 4 — built (v1.5)** | Deferred decisions delivered: multiple organisations with a platform console (§11-8), AWS Lambda code execution (§11-3), HR knowledge-base search for large policy sets, whiteboard in PDF export. Still out of scope: private repositories (§11-4), identity verification, demographic bias audits |
 | **Phase 5 — built (v1.6)** | Production readiness: security hardening, two-factor sign-in, audit log, candidate data rights (access and erasure), operations dashboard and health monitoring, accessibility (WCAG 2.1 AA automated checks) |
 | **Phase 6 — built (v1.7)** | Enterprise identity and branding: OIDC single sign-on with verified domains, test sign-in, just-in-time accounts and SSO enforcement; organisation logo and brand colour on candidate-facing pages. Not built: SAML 2.0, SCIM provisioning, custom domains, Postgres row-level security |
+| **Phase 7 — built (v1.8)** | Human oversight and fair access: blind calibration reviews, AI–human agreement dashboard with drift alerts, disagreement flags; candidate accommodations (extra time, extra breaks) applied to the interview clock. Not built: holding auto-advance until a sampled round is reviewed, inter-rater agreement between people, automatic recalibration of the evaluator |
 
 ### 10.1 Phase 1 build milestones
 

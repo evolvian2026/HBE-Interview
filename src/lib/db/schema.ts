@@ -315,6 +315,9 @@ export const roundReports = pgTable("round_reports", {
   runs: jsonb("runs"),
   versions: jsonb("versions"),
   error: text("error"),
+  /** Set when the round is picked for a blind human calibration review (sampled or requested). */
+  calibrationRequestedAt: ts("calibration_requested_at"),
+  calibrationReason: text("calibration_reason").$type<"sample" | "low_confidence" | "requested">(),
   createdAt: createdAt(),
   updatedAt: updatedAt(),
 });
@@ -578,3 +581,52 @@ export const ssoConfigs = pgTable("sso_configs", {
   updatedAt: updatedAt(),
 });
 
+
+/* ------------------------------- Phase 7 ---------------------------------- */
+
+/**
+ * A human's blind scoring of a round the AI evaluated (calibration). The reviewer scores from the evidence without
+ * seeing the AI's scores; `ai` freezes the AI's scores at submission so later overrides or re-evaluations don't move
+ * the comparison.
+ */
+export const calibrationReviews = pgTable(
+  "calibration_reviews",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    orgId: orgRef(),
+    reportId: uuid("report_id").notNull().references(() => roundReports.id, { onDelete: "cascade" }),
+    candidacyId: uuid("candidacy_id").notNull().references(() => candidacies.id, { onDelete: "cascade" }),
+    driveId: uuid("drive_id").notNull().references(() => drives.id, { onDelete: "cascade" }),
+    roundType: text("round_type").notNull().$type<"technical" | "managerial" | "hr">(),
+    reviewerId: uuid("reviewer_id").references(() => users.id, { onDelete: "set null" }),
+    /** Parameter id → 1–5. */
+    scores: jsonb("scores").notNull().$type<Record<string, number>>(),
+    recommendation: text("recommendation").notNull(),
+    notes: text("notes"),
+    /** The AI's scores, recommendation and evaluator version when the review was submitted. */
+    ai: jsonb("ai").notNull().$type<{ scores: Record<string, number>; recommendation: string; evaluator: string; prompt: string }>(),
+    /** False when the reviewer had opened the full (AI-scored) report for this candidate before reviewing. */
+    blind: boolean("blind").notNull(),
+    disagrees: boolean("disagrees").notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [uniqueIndex("calibration_report_reviewer").on(t.reportId, t.reviewerId), index("calibration_org_created").on(t.orgId, t.createdAt)],
+);
+
+/** A candidate's request for interview adjustments (extra time, extra breaks). Never shown to the AI. */
+export const accommodations = pgTable("accommodations", {
+  candidacyId: uuid("candidacy_id").primaryKey().references(() => candidacies.id, { onDelete: "cascade" }),
+  orgId: orgRef(),
+  extraTimePct: integer("extra_time_pct").notNull().default(0),
+  extraBreaks: boolean("extra_breaks").notNull().default(false),
+  /** Free text from the candidate; may contain health information, so only recruiters and admins see it. */
+  details: text("details"),
+  status: text("status").notNull().default("pending").$type<"pending" | "approved" | "declined">(),
+  approvedExtraTimePct: integer("approved_extra_time_pct"),
+  approvedExtraBreaks: boolean("approved_extra_breaks"),
+  decisionNote: text("decision_note"),
+  decidedBy: uuid("decided_by").references(() => users.id, { onDelete: "set null" }),
+  decidedAt: ts("decided_at"),
+  createdAt: createdAt(),
+  updatedAt: updatedAt(),
+});

@@ -1,5 +1,6 @@
 import { eq } from "drizzle-orm";
 import { db, schema } from "./db";
+import { DEFAULT_CALIBRATION, type CalibrationSettings } from "./core/calibration";
 
 export interface OrgValue {
   name: string;
@@ -19,6 +20,8 @@ export interface OrgSettings {
   consentVersion: number;
   /** Staff must use two-factor sign-in (TOTP). */
   require2fa: boolean;
+  /** Blind human reviews of AI-evaluated rounds (human oversight of the AI's scoring). */
+  calibration: CalibrationSettings;
 }
 
 /** Platform-wide settings, managed by platform admins (models are a cost/quality decision for the operator). */
@@ -48,6 +51,7 @@ export const DEFAULT_SETTINGS: OrgSettings = {
   consentText: DEFAULT_CONSENT,
   consentVersion: 1,
   require2fa: false,
+  calibration: DEFAULT_CALIBRATION,
 };
 
 export const DEFAULT_PLATFORM_SETTINGS: PlatformSettings = {

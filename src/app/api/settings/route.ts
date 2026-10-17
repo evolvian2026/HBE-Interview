@@ -13,6 +13,7 @@ const Body = z.object({
   require2fa: z.boolean().optional(),
   retentionDays: z.number().int().min(30).max(730).optional(),
   consentText: z.string().min(50).max(8000).optional(),
+  calibration: z.object({ sampleRate: z.number().int().min(0).max(100), includeLowConfidence: z.boolean() }).optional(),
 });
 
 export const PUT = handle(async (req: Request) => {

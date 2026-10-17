@@ -40,6 +40,9 @@ interface Props {
   webcam: { intervalSec: number } | null;
   /** Hiring organisation's logo/name (branded header). */
   brand?: { name: string; logoUrl: string | null };
+  /** Pause allowance, and the approved extra time already folded into durationMin (accommodation). */
+  pauses: { count: number; minutes: number };
+  extraTimePct: number;
 }
 
 type IntegrityEvent = { type: "blur" | "paste" | "copy" | "fast_answer" | "camera_off"; payload?: Record<string, string | number | boolean> };
@@ -299,7 +302,10 @@ export function InterviewRoom(props: Props) {
           </fieldset>
           <ul className="mt-5 list-disc space-y-1 pl-5 text-xs text-slate-500">
             <li>The timer starts when you click Start. Your progress is saved continuously — if you lose connection, reopen your link within 15 minutes.</li>
-            <li>You can skip up to 3 questions and pause twice (2 minutes each).</li>
+            <li>{`You can skip up to 3 questions and pause ${props.pauses.count === 2 ? "twice" : `${props.pauses.count} times`} (${props.pauses.minutes} minutes each).`}</li>
+            {(props.extraTimePct > 0 || props.pauses.count > 2) && (
+              <li>{`Your approved adjustments apply to this round${props.extraTimePct > 0 ? `: ${props.extraTimePct}% extra time` : ""}${props.pauses.count > 2 ? `${props.extraTimePct > 0 ? " and" : ":"} extra breaks` : ""}.`}</li>
+            )}
             {props.webcam && <li>Webcam proctoring is on: your browser will ask for camera access. A small photo is taken about every {props.webcam.intervalSec < 90 ? `${props.webcam.intervalSec} seconds` : `${Math.round(props.webcam.intervalSec / 60)} minutes`} and only checked for whether one person is present.</li>}
           </ul>
           {error && <p className="mt-3 text-sm text-red-600">{error.message}</p>}
@@ -390,7 +396,7 @@ export function InterviewRoom(props: Props) {
           {!ended && (
             <div className="border-t border-slate-200 bg-white p-3">
               {paused ? (
-                <p className="py-3 text-center text-sm text-slate-600">Paused. Take a breath — click Resume when you&apos;re ready (auto-resumes after 2 minutes).</p>
+                <p className="py-3 text-center text-sm text-slate-600">Paused. Take a breath — click Resume when you&apos;re ready {`(auto-resumes after ${props.pauses.minutes} minutes).`}</p>
               ) : (
                 <>
                   {snippetOpen && <SnippetEditor onClose={() => setSnippetOpen(false)} onInsert={(f) => setInput((x) => `${x}${f}`)} />}

@@ -38,6 +38,10 @@ export async function exportCandidateData(candidacyId: string) {
   const code = sids.length ? await db.select({ sessionId: schema.codeRuns.sessionId, kind: schema.codeRuns.kind, language: schema.codeRuns.language, code: schema.codeRuns.code, createdAt: schema.codeRuns.createdAt }).from(schema.codeRuns).where(and(inArray(schema.codeRuns.sessionId, sids), inArray(schema.codeRuns.kind, ["run", "submit"]))).orderBy(asc(schema.codeRuns.createdAt)) : [];
   const [fit] = await db.select({ data: schema.practicalFit.data }).from(schema.practicalFit).where(eq(schema.practicalFit.candidacyId, candidacyId));
   const survey = await db.select({ roundIndex: schema.candidateFeedback.roundIndex, overall: schema.candidateFeedback.overall, fairness: schema.candidateFeedback.fairness, clarity: schema.candidateFeedback.clarity, technical: schema.candidateFeedback.technical, comment: schema.candidateFeedback.comment }).from(schema.candidateFeedback).where(eq(schema.candidateFeedback.candidacyId, candidacyId));
+  const [adj] = await db
+    .select({ requested: { extraTimePct: schema.accommodations.extraTimePct, extraBreaks: schema.accommodations.extraBreaks, details: schema.accommodations.details }, status: schema.accommodations.status, approvedExtraTimePct: schema.accommodations.approvedExtraTimePct, approvedExtraBreaks: schema.accommodations.approvedExtraBreaks, note: schema.accommodations.decisionNote })
+    .from(schema.accommodations)
+    .where(eq(schema.accommodations.candidacyId, candidacyId));
   return {
     exportedAt: new Date().toISOString(),
     organisation: row.org,
@@ -58,6 +62,7 @@ export async function exportCandidateData(candidacyId: string) {
       code: code.filter((c) => c.sessionId === s.id).map(({ kind, language, code: src, createdAt }) => ({ kind, language, code: src, at: createdAt })),
     })),
     practicalDetails: fit?.data ?? null,
+    adjustmentRequest: adj ?? null,
     surveyAnswers: survey,
     feedbackReleasedToYou: row.c.feedbackReleasedAt ? row.c.feedbackSummary : null,
     note: "This file contains the personal data you provided and your interview record. Internal evaluations (scores and recruiter notes) are available from the hiring organisation on request.",

@@ -23,6 +23,7 @@ An AI-powered, multi-round interview platform. Candidates upload a resume, link 
 | Phase 4 | **Multiple organisations** with full data isolation (per-org settings, values, consent, KB, users, API keys, webhooks, retention, usage); **platform console** to create, enter and suspend organisations, set AI budget alerts and platform-wide models; **AWS Lambda code executor** (isolated VPC, CloudFormation template); **HR knowledge-base search** for large policy sets; whiteboard in PDF export |
 | Phase 5 | Production readiness: sign-in throttling and lockout, session revocation, password policy, security headers and CSRF guard; **two-factor sign-in** (org-enforceable); **audit log** with CSV export; **candidate data rights** (download, deletion within 30 days); **operations** dashboard and health monitoring; WCAG 2.1 AA accessibility checks |
 | Phase 6 | **Single sign-on** (OpenID Connect: Google Workspace, Microsoft Entra ID, Okta, …) with verified email domains, test sign-in, optional just-in-time accounts and organisation-enforced SSO; **branding** (logo and brand colour) on candidate pages and the interview room |
+| Phase 7 | **Blind calibration reviews** of the AI's scoring with an agreement dashboard and drift alerts; **candidate accommodations** (extra time, extra breaks) applied to the interview clock |
 | Recruiter app | Drives list, drive editor, candidate table with round/final scores, practical fit and integrity, decisions queue, full candidate report with transcripts, code and repo analysis, notes, settings (company values, HR knowledge base, consent, retention, users & roles) |
 
 ## Tech stack
@@ -83,6 +84,8 @@ npm run smoke:phase5 # headers, CSRF, lockout, session revocation, 2FA, data rig
 npm run ui-check:phase5  # security/2FA, audit log, data requests, candidate data section, operations
 npm run smoke:phase6 # SSO against a local mock identity provider (forged tokens, replay, takeover, enforcement), branding
 npm run ui-check:phase6  # SSO and branding settings, SSO sign-in step, branded candidate pages
+npm run smoke:phase7 # calibration sampling, blind reviews, agreement stats, isolation; accommodations end to end
+npm run ui-check:phase7  # blind review, reveal, calibration dashboard, adjustment request/decision, adjusted lobby
 npm run mock-oidc    # standalone mock OIDC provider on :4610 for trying SSO locally
 npm run a11y         # axe-core WCAG 2.1 AA checks on staff and candidate screens
 ```

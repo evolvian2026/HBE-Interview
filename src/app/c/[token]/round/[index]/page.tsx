@@ -7,6 +7,8 @@ import { ROUND_LABEL, type DriveConfig } from "@/lib/core/types";
 import { getSettings } from "@/lib/settings";
 import { getBranding } from "@/lib/branding";
 import { InterviewRoom } from "@/components/room/room";
+import { LIMITS, pauseLimits, type SessionState } from "@/lib/core/interview";
+import { adjustmentFor } from "@/lib/services/accommodations";
 
 export const dynamic = "force-dynamic";
 
@@ -27,6 +29,10 @@ export default async function RoundPage({ params }: { params: Promise<{ token: s
   const settings = await getSettings(row.candidacy.orgId);
   const brand = await getBranding(row.candidacy.orgId);
   const sections = round.sections.filter((s) => s.enabled);
+  // A started round keeps the adjustment it started with; otherwise show what would apply now.
+  const adjust = session ? (session.state as SessionState).adjust : await adjustmentFor(row.candidacy.id);
+  const limits = adjust ? pauseLimits({ adjust } as SessionState) : { maxPauses: LIMITS.maxPauses, maxPauseSec: LIMITS.maxPauseSec };
+  const factor = adjust?.timeFactor ?? 1;
   return (
     <div style={brand.style as React.CSSProperties}>
     <InterviewRoom
@@ -35,7 +41,9 @@ export default async function RoundPage({ params }: { params: Promise<{ token: s
       roundIndex={i}
       roundLabel={ROUND_LABEL[round.type]}
       roundType={round.type}
-      durationMin={round.durationMin}
+      durationMin={Math.round(round.durationMin * factor)}
+      extraTimePct={Math.round((factor - 1) * 100)}
+      pauses={{ count: limits.maxPauses, minutes: Math.round(limits.maxPauseSec / 60) }}
       sections={sections.map((s) => s.title)}
       personaName={round.personaName}
       companyName={settings.companyName}

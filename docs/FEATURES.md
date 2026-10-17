@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Document status** | v1.7 — approved; Phases 1–6 built (as-built notes: ARCHITECTURE §0; integration reference: [API.md](API.md)) |
+| **Document status** | v1.8 — approved; Phases 1–7 built (as-built notes: ARCHITECTURE §0; integration reference: [API.md](API.md)) |
 | **Date** | 2026-10-16 |
 | **Related** | [PRD.md](PRD.md) (product requirements) · [ARCHITECTURE.md](ARCHITECTURE.md) (technical architecture) |
 
@@ -33,6 +33,7 @@ This document specifies **how each feature behaves**: user stories, flows, scree
 19. [Phase 4 features (v1.5)](#19-phase-4-features-v15)
 20. [Phase 5 features (v1.6)](#20-phase-5-features-v16)
 21. [Phase 6 features (v1.7)](#21-phase-6-features-v17)
+22. [Phase 7 features (v1.8)](#22-phase-7-features-v18)
 
 ---
 
@@ -1077,3 +1078,46 @@ Candidates can request extra time (+25% or +50%) through a link on the consent s
 | SCIM user provisioning / deprovisioning | Just-in-time creation only; leavers are deactivated in Settings → Users or blocked at the provider |
 | Custom domains for candidate links | Candidate links stay on the app's own domain |
 | Branded emails | Invitation and reminder emails carry the organisation name, not the logo |
+
+---
+
+## 22. Phase 7 features (v1.8)
+
+### 22.1 Blind calibration reviews
+
+- **Which rounds:** *Settings → Compliance & privacy*: a percentage of evaluated rounds (default 10%) is picked at random, plus (on by default) every evaluation the AI marked **low confidence**. A hiring manager or above can also click **Ask for a blind review** on any round in a candidate report. Picking is deterministic per round, so re-evaluating doesn't re-roll it.
+- **Calibration → Waiting for a blind review** lists the picked rounds from drives the person can see. The review page shows the role, the rubric (each parameter's description and 1/3/5 anchors), the transcript, the final code (with hidden-test results), written answers and the whiteboard. The AI's scores, recommendation, summary, justifications and flags are hidden, and the candidate appears as *Candidate 1A2B3C*.
+- **Scoring:** 1–5 per weighted parameter (or *Not enough evidence*), an overall recommendation and optional notes. Each person reviews a round once. After submitting, the reviewer sees their scores beside the AI's.
+- **Blind or not:** if the reviewer had already opened the candidate's full report, the review is saved as *not blind*. Statistics use blind reviews only unless switched.
+- **Disagreement:** a gap of 2+ points on any parameter, or the reviewer and the AI on different sides of the hire line (Strong Hire/Hire vs Lean No/No Hire). The candidate report shows each review (agreed/disagreed, scores side by side, notes) to hiring managers and above. *Decisions* marks candidates with a disagreeing review.
+- Reviews freeze the AI's own scores (before any human override) and the evaluator version at the time of review. Reviewing never changes the candidate's scores or stage; overrides remain a separate, audited action.
+
+### 22.2 Calibration dashboard
+
+- **Calibration** (recruiters and admins; hiring managers see the queue only), filterable by 30/90/365 days and by round. It shows:
+  - reviews and disagreement rate;
+  - per round and parameter: pairs, AI average, reviewer average, *AI − people* (positive means the AI is more generous), exact agreement, within-one-point agreement and quadratic weighted kappa;
+  - a recommendation confusion matrix with exact and same-side-of-the-hire-line rates;
+  - the same statistics by evaluator model and prompt version;
+  - the latest disagreements, with links.
+- **Drift alerts:** with 10+ reviews, a parameter alerts when the AI is within one point of reviewers less than 80% of the time, or when the average gap reaches 0.5 points. The suggested actions are rubric weights, manual gates for that round, or an evaluator review.
+- **Export CSV:** one row per parameter scored, with both scores, both recommendations, the evaluator version and the blind flag (formula-safe cells; audited).
+
+### 22.3 Candidate accommodations
+
+- **Requesting:** after consent, while rounds are still ahead, the candidate page offers *Adjustments for your interview*:
+  - extra time: 25%, 50% or double;
+  - extra breaks: 4 pauses of up to 10 minutes instead of 2 of 2 minutes;
+  - a free-text note.
+  The candidate is told that a diagnosis isn't needed and that the request never reaches the AI or the evaluation. They see its status, and changing a request sends it back for a decision.
+- **Deciding:** recruiters and admins see pending requests on *Decisions* and in the candidate report. They can approve as asked or with a different amount, or decline (a note to the candidate is required). The candidate is emailed either way.
+- **Privacy:** the request is visible only to recruiters and admins. Hiring managers and viewers see nothing, not even that a request exists. The audit log records that a request or decision happened, never its text. The request is in the candidate's data download and is deleted with the candidacy.
+- **Effect:** applies to rounds started after approval. The round clock and every section's time budget are multiplied by the extra-time factor, the pause allowance is extended, and the lobby states the adjustment. Rounds already started keep the timing they started with. Recruiters see an *adjusted timing* badge on such rounds. Scores aren't adjusted, because the rubric judges the content of answers, not speed.
+
+### 22.4 Not built yet
+
+| Item | Note |
+|---|---|
+| Hold auto-advance until a sampled round is reviewed | Today sampling is retrospective; set the drive's gate to manual for the same effect |
+| Agreement between people (two reviewers on the same round) | Several people can review a round, but only AI–human agreement is reported |
+| Automatic evaluator recalibration | Drift is surfaced to people; the rubric and prompts are changed deliberately |
