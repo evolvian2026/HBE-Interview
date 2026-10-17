@@ -19,14 +19,14 @@ export function OverrideForm({ reportId, parameter, current }: { reportId: strin
     );
   return (
     <div className="mt-2 w-56 space-y-2 rounded-lg border border-slate-200 bg-white p-2 shadow-sm">
-      <Select value={score} onChange={(e) => setScore(Number(e.target.value))}>
+      <Select aria-label="New score (1–5)" value={score} onChange={(e) => setScore(Number(e.target.value))}>
         {[1, 2, 3, 4, 5].map((s) => (
           <option key={s} value={s}>
             {s}
           </option>
         ))}
       </Select>
-      <Textarea rows={3} placeholder="Reason (min 20 characters)" value={reason} onChange={(e) => setReason(e.target.value)} />
+      <Textarea rows={3} aria-label="Reason for the override" placeholder="Reason (min 20 characters)" value={reason} onChange={(e) => setReason(e.target.value)} />
       {error && <p className="text-xs text-red-600">{error}</p>}
       <div className="flex gap-1">
         <Button

@@ -63,11 +63,11 @@ export function CandidateFeedbackPanel({
           {canEdit ? (
             <>
               <label className="block text-sm">
-                <span className="font-medium">What went well</span> <span className="text-xs text-slate-400">(one per line)</span>
+                <span className="font-medium">What went well</span> <span className="text-xs text-slate-500">(one per line)</span>
                 <Textarea rows={3} value={s.strengths} onChange={(e) => setS({ ...s, strengths: e.target.value })} />
               </label>
               <label className="block text-sm">
-                <span className="font-medium">Areas to develop</span> <span className="text-xs text-slate-400">(one per line)</span>
+                <span className="font-medium">Areas to develop</span> <span className="text-xs text-slate-500">(one per line)</span>
                 <Textarea rows={3} value={s.growth} onChange={(e) => setS({ ...s, growth: e.target.value })} />
               </label>
               <label className="block text-sm">

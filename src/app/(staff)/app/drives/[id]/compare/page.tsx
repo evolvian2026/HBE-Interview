@@ -122,7 +122,7 @@ export default async function ComparePage({ params, searchParams }: { params: Pr
                           {x.roundScore?.toFixed(0)} · {RECOMMENDATION_LABEL[x.recommendation as Recommendation]}
                         </span>
                       ) : (
-                        <span key={p.c.id} className="text-slate-400">
+                        <span key={p.c.id} className="text-slate-500">
                           not evaluated
                         </span>
                       );
@@ -141,7 +141,7 @@ export default async function ComparePage({ params, searchParams }: { params: Pr
                           cells={vals.map((v, j) => (
                             <span key={j} className={cx("tabular-nums", v != null && v === bb && "font-semibold text-slate-900")}>
                               {v ?? "—"}
-                              {v != null && <span className="text-slate-400">/5</span>}
+                              {v != null && <span className="text-slate-500">/5</span>}
                             </span>
                           ))}
                         />

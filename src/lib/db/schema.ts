@@ -51,6 +51,18 @@ export const users = pgTable("users", {
   passwordHash: text("password_hash").notNull(),
   role: text("role").notNull().$type<"admin" | "recruiter" | "hiring_manager" | "viewer">(),
   active: boolean("active").notNull().default(true),
+  /** Bumped to revoke every session of the user (password change, deactivation, role change, 2FA reset). */
+  sessionVersion: integer("session_version").notNull().default(0),
+  failedLogins: integer("failed_logins").notNull().default(0),
+  lockedUntil: ts("locked_until"),
+  /** TOTP secret, AES-256-GCM encrypted with a key derived from SESSION_SECRET. */
+  totpSecret: text("totp_secret"),
+  totpEnabledAt: ts("totp_enabled_at"),
+  /** Last accepted TOTP time step — a code can't be replayed within its window. */
+  totpLastStep: integer("totp_last_step"),
+  /** SHA-256 hashes of unused one-time recovery codes. */
+  recoveryCodes: jsonb("recovery_codes").$type<string[]>().notNull().default([]),
+  passwordChangedAt: ts("password_changed_at"),
   /** Drives a hiring manager is assigned to (hiring managers only see these). */
   driveIds: jsonb("drive_ids").$type<string[]>().notNull().default([]),
   createdAt: createdAt(),
@@ -502,3 +514,33 @@ export const kbChunks = pgTable(
   },
   (t) => [index("kb_chunks_fts").using("gin", sql`to_tsvector('simple', ${t.content})`), index("kb_chunks_org").on(t.orgId)],
 );
+
+/* ------------------------------- Phase 5 ---------------------------------- */
+
+/** Fixed-window counters shared by every app instance (login, 2FA, registration, share passcodes…). */
+export const rateLimits = pgTable("rate_limits", {
+  key: text("key").primaryKey(),
+  count: integer("count").notNull().default(0),
+  windowStart: ts("window_start").notNull().defaultNow(),
+});
+
+/** Candidate data-rights requests (deletion); exports are self-service and only audited. */
+export const dataRequests = pgTable(
+  "data_requests",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    orgId: orgRef(),
+    candidacyId: uuid("candidacy_id"),
+    candidateEmail: text("candidate_email").notNull(),
+    type: text("type").notNull().$type<"deletion">(),
+    status: text("status").notNull().default("pending").$type<"pending" | "completed" | "rejected">(),
+    reason: text("reason"),
+    resolution: text("resolution"),
+    resolvedBy: uuid("resolved_by").references(() => users.id, { onDelete: "set null" }),
+    dueAt: ts("due_at").notNull(),
+    resolvedAt: ts("resolved_at"),
+    createdAt: createdAt(),
+  },
+  (t) => [index("data_requests_org_status").on(t.orgId, t.status)],
+);
+

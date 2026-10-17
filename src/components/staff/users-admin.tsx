@@ -12,7 +12,7 @@ export function UsersAdmin({
   drives,
   meId,
 }: {
-  users: { id: string; name: string; email: string; role: Role; active: boolean; driveIds: string[]; platformAdmin?: boolean }[];
+  users: { id: string; name: string; email: string; role: Role; active: boolean; driveIds: string[]; platformAdmin?: boolean; has2fa?: boolean }[];
   drives: { id: string; title: string }[];
   meId: string;
 }) {
@@ -48,7 +48,7 @@ export function UsersAdmin({
               </td>
               <td>{u.email}</td>
               <td>
-                <Select className="w-40" value={u.role} disabled={u.id === meId} onChange={(e) => update(u.id, { role: e.target.value })}>
+                <Select className="w-40" aria-label={`Role of ${u.name}`} value={u.role} disabled={u.id === meId} onChange={(e) => update(u.id, { role: e.target.value })}>
                   <option value="admin">Admin</option>
                   <option value="recruiter">Recruiter</option>
                   <option value="hiring_manager">Hiring manager</option>
@@ -73,13 +73,19 @@ export function UsersAdmin({
                     </div>
                   </details>
                 ) : (
-                  <span className="text-xs text-slate-400">All</span>
+                  <span className="text-xs text-slate-500">All</span>
                 )}
               </td>
               <td>
-                <Badge tone={u.active ? "green" : "slate"}>{u.active ? "active" : "inactive"}</Badge>
+                <Badge tone={u.active ? "green" : "slate"}>{u.active ? "active" : "inactive"}</Badge>{" "}
+                <Badge tone={u.has2fa ? "green" : "slate"}>{u.has2fa ? "2FA on" : "2FA off"}</Badge>
               </td>
               <td className="text-right">
+                {u.id !== meId && u.has2fa && (
+                  <Button variant="ghost" onClick={() => confirm(`Reset ${u.name}'s two-factor sign-in (lost phone)? They'll be signed out and set it up again.`) && update(u.id, { reset2fa: true })}>
+                    Reset 2FA
+                  </Button>
+                )}
                 {u.id !== meId && (
                   <Button variant="ghost" onClick={() => update(u.id, { active: !u.active })}>
                     {u.active ? "Deactivate" : "Activate"}
@@ -91,10 +97,10 @@ export function UsersAdmin({
         </tbody>
       </table>
       <div className="mt-4 grid gap-2 md:grid-cols-5">
-        <Input placeholder="Name" value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} />
-        <Input placeholder="Email" type="email" value={f.email} onChange={(e) => setF({ ...f, email: e.target.value })} />
-        <Input placeholder="Temporary password (8+)" type="password" value={f.password} onChange={(e) => setF({ ...f, password: e.target.value })} />
-        <Select value={f.role} onChange={(e) => setF({ ...f, role: e.target.value as Role })}>
+        <Input placeholder="Name" aria-label="Name" value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} />
+        <Input placeholder="Email" aria-label="Email" type="email" value={f.email} onChange={(e) => setF({ ...f, email: e.target.value })} />
+        <Input placeholder="Temporary password (10+)" aria-label="Temporary password" type="password" value={f.password} onChange={(e) => setF({ ...f, password: e.target.value })} />
+        <Select aria-label="Role for the new user" value={f.role} onChange={(e) => setF({ ...f, role: e.target.value as Role })}>
           <option value="recruiter">Recruiter</option>
           <option value="hiring_manager">Hiring manager</option>
           <option value="viewer">Viewer</option>

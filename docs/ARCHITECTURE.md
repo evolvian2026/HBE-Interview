@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Document status** | v1.5 — approved; Phases 1–4 implemented (see §0 for as-built decisions; integration API in [API.md](API.md)) |
+| **Document status** | v1.6 — approved; Phases 1–5 implemented (see §0 for as-built decisions; integration API in [API.md](API.md)) |
 | **Date** | 2026-10-16 |
 | **Related** | [PRD.md](PRD.md) · [FEATURES.md](FEATURES.md) · [API.md](API.md) |
 
@@ -36,7 +36,7 @@
 
 ---
 
-## 0. As-built decisions (v1.2–v1.5)
+## 0. As-built decisions (v1.2–v1.6)
 
 The product owner approved the design with these decisions. **Where this section conflicts with later sections, this section wins**; later sections describe the target architecture and the scale-out path.
 
@@ -63,6 +63,13 @@ The product owner approved the design with these decisions. **Where this section
 | Problem lookup | `services/problems.getProblem` resolves bank problems and validated custom problems; `pickProblemForDrive` prefers the drive's custom problems |
 | Phase 3 data | `api_keys` (SHA-256 key hash, scopes, last used, revoked), `webhooks` (URL, secret, events, active), `webhook_deliveries` (payload, status, attempts, response; purged after 30 days), `proctor_snapshots` (JPEG `bytea`, presence-check JSON, flagged), `candidate_feedback` (per-round 1–5 ratings + comment), `candidacies.feedback_summary/feedback_released_at`, `round_sessions.language`, `resumes.ocr_used`, `exercise_responses.whiteboard` (shapes JSON) + `whiteboard_png` — migrations `0002_phase3.sql`, `0003_whiteboard.sql` |
 | Phase 4 data | `organizations` (name, slug, status, AI budget), `org_id` columns (see Tenancy), `users.platform_admin`, `kb_chunks`; settings keys `org:{id}` and `platform` — migration `0004_phase4_tenancy.sql` creates the default organisation `00000000-0000-4000-8000-000000000001` and backfills all existing rows into it |
+| Phase 5 data | `rate_limits` (fixed-window counters keyed e.g. `login:email:…`), `data_requests` (deletion requests; no FK to the candidacy so the proof survives the purge), `users.session_version`, `failed_logins`, `locked_until`, `totp_secret` (AES-256-GCM, key derived from `SESSION_SECRET`), `totp_enabled_at`, `totp_last_step`, `recovery_codes` (SHA-256), `password_changed_at`; settings key `worker:heartbeat` — migration `0005_phase5_security.sql` |
+| Staff sessions (v1.6) | HS256 JWT cookie (12 h, HttpOnly, SameSite=Lax, Secure in production) carrying `sv` = `users.session_version`; `getStaff` rejects tokens whose `sv` differs, so bumping the version revokes all sessions. Password-accepted-but-2FA-pending uses a separate 5-minute `hbe_mfa` cookie scoped to `/api/auth`. `requireStaff` also rejects a mismatched Origin (CSRF) and, when the organisation requires 2FA and the user hasn't enrolled, everything except enrolment |
+| Rate limiting | Postgres upsert counters (`security/rate-limit.ts`) so limits hold across instances: login (100/IP, 10/account per 15 min), 2FA codes (8 per user per 15 min), re-authentication, open registration (10/IP/h), share passcodes (5/link, 30/IP per 15 min), data export (5/h). Expired windows pruned daily |
+| Two-factor | RFC 6238 TOTP (SHA-1, 6 digits, 30 s, ±1 step, replay-protected by last step) and 10 single-use recovery codes, in `core/totp.ts` (verified against the RFC 6238/4226 vectors) |
+| Security headers | `next.config.ts` `headers()` — CSP without nonces (Next.js guide), `'unsafe-eval'` and `ws:` only in development, HSTS and `upgrade-insecure-requests` only in production |
+| Data rights | `services/data-rights.ts`: JSON export of candidate-provided data and the interview record (no internal scores/notes); deletion requests due in 30 days, staff delete/decline (with reason, emailed), daily auto-fulfilment of overdue requests through `purgeCandidacy` |
+| Operations | `services/ops.ts`: queue stats, failed-job retry/discard, worker heartbeat (every 30 s, stored in `settings`, so it works with a separate worker process), daily pruning of done (7 d) and failed (30 d) jobs; `/api/health` exposes heartbeat age and queue lag |
 | Languages | `core/languages.ts` lists 12 languages with BCP-47 speech locales; the drive config holds `languages`, the session stores the chosen one; the interviewer system prompt carries a language rule; evidence normalisation is Unicode-aware (`\p{L}\p{M}\p{N}`) so non-Latin quotes verify |
 | OCR | `ai/ocr.ts` sends image-only PDFs (document block) and PNG/JPEG (image block) to the analyzer tier for transcription before normal resume parsing |
 | Whiteboard | Client SVG editor; shapes + rendered PNG saved via `PUT …/whiteboard`. The PNG is attached as an image block to the interviewer's next turn and to the evaluator's evidence bundle |
@@ -82,6 +89,8 @@ The product owner approved the design with these decisions. **Where this section
 | Code execution | `src/lib/exec/{index,runner,aws,sigv4}.ts`, `infra/aws-executor/*` (handler, Dockerfile, CloudFormation) |
 | Tenancy & platform | `src/lib/tenancy.ts`, `src/lib/auth/staff.ts` (guards), `src/lib/services/platform.ts`, `src/app/(staff)/app/platform`, `src/app/api/platform/*` |
 | HR KB search | `src/lib/core/kb.ts`, `src/lib/services/kb.ts`, `src/app/api/settings/kb/search` |
+| Security, 2FA, sessions | `src/lib/security/*`, `src/lib/core/{totp,password}.ts`, `src/app/api/auth/*`, `src/app/(staff)/app/security`, `next.config.ts` |
+| Audit, data rights, operations | `src/lib/services/{audit-log,data-rights,ops}.ts`, `src/app/(staff)/app/{audit,data-requests,platform/ops}`, `src/app/api/{audit,data-requests,platform/jobs}/*`, `src/app/api/c/[token]/{data,deletion}` |
 | Candidate UI (onboarding, interview room, voice, editors) | `src/app/c/*`, `src/app/i/*`, `src/components/candidate/*`, `src/components/room/*` |
 | Recruiter UI (drives, editor, reports, decisions, settings) | `src/app/(staff)/app/*`, `src/components/staff/*` |
 | API routes | `src/app/api/*` |
@@ -89,7 +98,7 @@ The product owner approved the design with these decisions. **Where this section
 | Integrations (API keys, REST v1, webhooks) | `src/lib/services/integrations.ts`, `src/lib/core/webhook-sign.ts`, `src/lib/integrations-shared.ts`, `src/app/api/v1/*`, `src/app/api/settings/{api-keys,webhooks}/*`, `src/components/staff/integrations-admin.tsx` |
 | Languages, OCR, whiteboard, proctoring | `src/lib/core/languages.ts`, `src/lib/ai/{ocr,proctor}.ts`, `src/lib/services/proctor.ts`, `src/components/room/{whiteboard,webcam}.tsx` |
 | Feedback & fairness | `src/lib/services/feedback.ts`, `src/lib/ai/feedback.ts`, `src/lib/core/fairness.ts`, `src/app/(staff)/app/drives/[id]/fairness`, `src/components/{candidate/feedback-survey,staff/candidate-feedback-panel}.tsx` |
-| End-to-end checks | `scripts/smoke.ts` (HTTP, all three rounds; `SMOKE_ROLE=manager` for the manager track), `scripts/smoke-phase2.ts` (Phase 2 features), `scripts/smoke-phase3.ts` (Phase 3 features incl. a local signed-webhook receiver), `e2e/ui-check.ts` (browser walkthrough; `PHASE2=1`), `e2e/ui-phase3.ts` (whiteboard, language lobby, integrations, fairness), `scripts/smoke-phase4.ts` (cross-tenant isolation over every staff page and ID-based route, REST API, webhooks, switching, suspension, KB search, export), `scripts/check-aws-executor.ts` (Lambda executor through the app's client), `e2e/ui-phase4.ts` |
+| End-to-end checks | `scripts/smoke.ts` (HTTP, all three rounds; `SMOKE_ROLE=manager` for the manager track), `scripts/smoke-phase2.ts` (Phase 2 features), `scripts/smoke-phase3.ts` (Phase 3 features incl. a local signed-webhook receiver), `e2e/ui-check.ts` (browser walkthrough; `PHASE2=1`), `e2e/ui-phase3.ts` (whiteboard, language lobby, integrations, fairness), `scripts/smoke-phase4.ts` (cross-tenant isolation over every staff page and ID-based route, REST API, webhooks, switching, suspension, KB search, export), `scripts/check-aws-executor.ts` (Lambda executor through the app's client), `e2e/ui-phase4.ts`, `scripts/smoke-phase5.ts` (headers, CSRF, lockout, session revocation, 2FA lifecycle and enforcement, data rights, audit/CSV, operations), `e2e/ui-phase5.ts`, `e2e/a11y-check.ts` (axe-core WCAG 2.1 AA) |
 
 ---
 

@@ -49,3 +49,11 @@ export function csvToInvitees(text: string, max = 200): { name: string; email: s
     .filter((p) => p.email.includes("@"))
     .slice(0, max);
 }
+
+/** One CSV cell for export: JSON for objects, formula-looking text neutralised (CSV injection), always quoted. */
+export function csvCell(v: unknown): string {
+  const s = v == null ? "" : typeof v === "string" ? v : JSON.stringify(v);
+  const safe = /^[=+\-@\t\r]/.test(s) ? `'${s}` : s;
+  return `"${safe.replace(/"/g, '""')}"`;
+}
+

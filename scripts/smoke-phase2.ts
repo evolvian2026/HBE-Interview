@@ -92,9 +92,9 @@ async function main() {
 
   // Hiring manager drive scoping
   const email = `hm.${Date.now()}@hbe.local`;
-  const { id: hmId } = await admin.json<{ id: string }>("POST", "/api/settings/users", { name: "Hiring Manager", email, password: "manager123", role: "hiring_manager" });
+  const { id: hmId } = await admin.json<{ id: string }>("POST", "/api/settings/users", { name: "Hiring Manager", email, password: "Panel-Review-42", role: "hiring_manager" });
   const hm = new Client();
-  await hm.json("POST", "/api/auth/login", { email, password: "manager123" });
+  await hm.json("POST", "/api/auth/login", { email, password: "Panel-Review-42" });
   const denied = await hm.req("GET", `/app/candidates/${a.id}`);
   check(denied.status === 404 || denied.text.includes("not found") || denied.text.includes("NEXT_HTTP_ERROR_FALLBACK;404"), "unassigned hiring manager cannot open the candidate");
   const deniedApi = await hm.req("POST", `/api/candidacies/${a.id}/notes`, { text: "hello" });

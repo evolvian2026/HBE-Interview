@@ -4,6 +4,7 @@ import { HttpError, hashPassword, type StaffUser } from "../auth/staff";
 import { saveSettings } from "../settings";
 import { estimateCost } from "../core/metrics";
 import { slugify } from "../tenancy";
+import { passwordProblem } from "../core/password";
 import { audit } from "../audit";
 
 const monthStart = () => {
@@ -83,6 +84,8 @@ export async function createOrg(input: NewOrgInput, by: StaffUser) {
   const slug = slugify(input.slug || input.name);
   if (slug.length < 2) throw new HttpError(400, "Choose a longer organisation name or slug");
   const email = input.admin.email.trim().toLowerCase();
+  const problem = passwordProblem(input.admin.password, email, input.admin.name);
+  if (problem) throw new HttpError(400, `First admin's password: ${problem}`);
   const passwordHash = await hashPassword(input.admin.password);
   const org = await db.transaction(async (tx) => {
     const [taken] = await tx.select({ id: schema.users.id }).from(schema.users).where(eq(schema.users.email, email));

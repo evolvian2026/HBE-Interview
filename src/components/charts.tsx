@@ -40,7 +40,7 @@ export function BarList({ rows, max, caption, labelWidth = "w-44" }: { rows: Bar
               <span className={cx("shrink-0 truncate text-slate-600", labelWidth)} title={r.label}>
                 {r.label}
               </span>
-              <span className="group relative flex h-6 flex-1 items-center" tabIndex={0} aria-label={`${r.label}: ${text}`}>
+              <span className="group relative flex h-6 flex-1 items-center" tabIndex={0} role="img" aria-label={`${r.label}: ${text}`}>
                 <span
                   className="h-4 rounded-r-[4px] transition-opacity group-hover:opacity-80 group-focus:opacity-80"
                   style={{ width: `${pct}%`, minWidth: r.value > 0 ? 3 : 0, background: SERIES }}
@@ -81,7 +81,7 @@ export function Histogram({
           </div>
         )}
         {bins.map((b, i) => (
-          <div key={b.label} className="group relative flex h-full flex-1 items-end justify-center" tabIndex={0} aria-label={`${b.label}: ${b.count}`}>
+          <div key={b.label} className="group relative flex h-full flex-1 items-end justify-center" tabIndex={0} role="img" aria-label={`${b.label}: ${b.count}`}>
             {i === peak && b.count > 0 && (
               <span className="absolute text-[10px] tabular-nums text-slate-700" style={{ bottom: `calc(${(b.count / top) * 100}% + 2px)` }}>
                 {b.count}

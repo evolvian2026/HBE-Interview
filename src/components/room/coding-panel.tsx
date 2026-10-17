@@ -9,7 +9,7 @@ import type { RunSummary } from "@/lib/exec";
 
 const Editor = dynamic(() => import("@monaco-editor/react").then((m) => m.default), {
   ssr: false,
-  loading: () => <div className="grid h-full place-items-center text-sm text-slate-400">Loading editor…</div>,
+  loading: () => <div className="grid h-full place-items-center text-sm text-slate-500">Loading editor…</div>,
 });
 
 const MONACO_LANG: Record<string, string> = { python: "python", javascript: "javascript", java: "java", cpp: "cpp" };
@@ -171,7 +171,7 @@ export function CodingPanel({
                 {result.results.map((r, i) => (
                   <div key={i} className="rounded border border-slate-200 p-2 text-xs">
                     <p>
-                      Test {i + 1}: <Badge tone={r.verdict === "AC" ? "green" : "red"}>{VERDICT[r.verdict] ?? r.verdict}</Badge> {r.timeMs != null && <span className="text-slate-400">{r.timeMs} ms</span>}
+                      Test {i + 1}: <Badge tone={r.verdict === "AC" ? "green" : "red"}>{VERDICT[r.verdict] ?? r.verdict}</Badge> {r.timeMs != null && <span className="text-slate-500">{r.timeMs} ms</span>}
                     </p>
                     {r.expected !== undefined && r.verdict !== "AC" && (
                       <div className="mt-1 grid grid-cols-2 gap-2">

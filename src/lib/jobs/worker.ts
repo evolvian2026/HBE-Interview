@@ -2,6 +2,7 @@ import { sql } from "drizzle-orm";
 import { db } from "../db";
 import { handlers } from "./handlers";
 import { periodicMaintenance } from "../services/maintenance";
+import { workerHeartbeat } from "../services/ops";
 
 interface JobRow {
   id: number;
@@ -65,6 +66,9 @@ export function startWorker(concurrency = Number(process.env.WORKER_CONCURRENCY 
   if (globalThis.__hbeWorkerStarted) return;
   globalThis.__hbeWorkerStarted = true;
   console.log(`[worker] starting with concurrency ${concurrency}`);
+  const beat = () => workerHeartbeat({ concurrency }).catch((e) => console.error("[worker] heartbeat failed", e));
+  void beat();
+  setInterval(beat, 30_000).unref?.();
   for (let i = 0; i < concurrency; i++) {
     (async function loop() {
       for (;;) {

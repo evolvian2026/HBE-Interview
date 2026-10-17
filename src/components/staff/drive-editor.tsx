@@ -174,7 +174,7 @@ export function DriveEditor({ driveId, initial, published }: { driveId: string; 
               <div key={r.type} className={cx("rounded-xl border p-4", r.enabled ? "border-slate-200" : "border-dashed border-slate-300 opacity-70")}>
                 <div className="flex flex-wrap items-center gap-3">
                   <label className="flex items-center gap-2 font-medium">
-                    <input type="checkbox" checked={r.enabled} onChange={(e) => updateRound(r.type, { enabled: e.target.checked })} />
+                    <input type="checkbox" aria-label={`Include the ${ROUND_LABEL[r.type]}`} checked={r.enabled} onChange={(e) => updateRound(r.type, { enabled: e.target.checked })} />
                     {ROUND_LABEL[r.type]}
                   </label>
                   {r.type === "managerial" && <Badge>Recommended for Senior and above</Badge>}
@@ -182,9 +182,9 @@ export function DriveEditor({ driveId, initial, published }: { driveId: string; 
                   {r.type === "technical" && !r.enabled && <Badge tone="amber">Technical round disabled</Badge>}
                   <div className="ml-auto flex items-center gap-2 text-sm">
                     <span className="text-slate-500">Interviewer name</span>
-                    <Input className="w-28" value={r.personaName} onChange={(e) => updateRound(r.type, { personaName: e.target.value })} />
+                    <Input className="w-28" aria-label={`${ROUND_LABEL[r.type]} interviewer name`} value={r.personaName} onChange={(e) => updateRound(r.type, { personaName: e.target.value })} />
                     <span className="text-slate-500">Duration</span>
-                    <Input className="w-20" type="number" min={10} max={120} value={r.durationMin} onChange={(e) => updateRound(r.type, { durationMin: Number(e.target.value) })} />
+                    <Input className="w-20" type="number" min={10} max={120} aria-label={`${ROUND_LABEL[r.type]} duration in minutes`} value={r.durationMin} onChange={(e) => updateRound(r.type, { durationMin: Number(e.target.value) })} />
                     <span className="text-slate-500">min</span>
                   </div>
                 </div>
@@ -208,13 +208,14 @@ export function DriveEditor({ driveId, initial, published }: { driveId: string; 
                               <td className="py-1 pr-2">
                                 <input
                                   type="checkbox"
+                                  aria-label={`Include section ${s.title}`}
                                   checked={s.enabled}
                                   disabled={s.key === "intro" || s.key === "wrapup"}
                                   onChange={(e) => updateRound(r.type, { sections: r.sections.map((x, j) => (j === i ? { ...x, enabled: e.target.checked } : x)) })}
                                 />
                               </td>
                               <td className="py-1 pr-2">
-                                <Input value={s.title} onChange={(e) => updateRound(r.type, { sections: r.sections.map((x, j) => (j === i ? { ...x, title: e.target.value } : x)) })} />
+                                <Input aria-label={`Section ${i + 1} title`} value={s.title} onChange={(e) => updateRound(r.type, { sections: r.sections.map((x, j) => (j === i ? { ...x, title: e.target.value } : x)) })} />
                               </td>
                               {(["minutes", "minQ", "maxQ"] as const).map((k) => (
                                 <td key={k} className="py-1 pr-2">
@@ -222,6 +223,7 @@ export function DriveEditor({ driveId, initial, published }: { driveId: string; 
                                     className="w-20"
                                     type="number"
                                     min={k === "minQ" ? 0 : 1}
+                                    aria-label={`${s.title}: ${{ minutes: "minutes", minQ: "minimum questions", maxQ: "maximum questions" }[k]}`}
                                     value={s[k]}
                                     onChange={(e) => updateRound(r.type, { sections: r.sections.map((x, j) => (j === i ? { ...x, [k]: Number(e.target.value) } : x)) })}
                                   />
@@ -253,7 +255,7 @@ export function DriveEditor({ driveId, initial, published }: { driveId: string; 
                     {!isLastEnabled && (
                       <div className="mt-3 flex flex-wrap items-center gap-2 rounded-lg bg-slate-50 p-3 text-sm">
                         <span className="font-medium">Gate to next round:</span>
-                        <Select className="w-56" value={r.gate.mode} onChange={(e) => updateRound(r.type, { gate: { ...r.gate, mode: e.target.value as RoundConfig["gate"]["mode"] } })}>
+                        <Select className="w-56" aria-label={`Gate after the ${ROUND_LABEL[r.type]}`} value={r.gate.mode} onChange={(e) => updateRound(r.type, { gate: { ...r.gate, mode: e.target.value as RoundConfig["gate"]["mode"] } })}>
                           <option value="auto">Auto-advance at threshold</option>
                           <option value="manual">Recruiter decides</option>
                           <option value="always">Always advance</option>
@@ -261,7 +263,7 @@ export function DriveEditor({ driveId, initial, published }: { driveId: string; 
                         {r.gate.mode === "auto" && (
                           <>
                             <span>if recommendation ≥</span>
-                            <Select className="w-40" value={r.gate.threshold} onChange={(e) => updateRound(r.type, { gate: { ...r.gate, threshold: e.target.value as Recommendation } })}>
+                            <Select className="w-40" aria-label="Auto-advance threshold" value={r.gate.threshold} onChange={(e) => updateRound(r.type, { gate: { ...r.gate, threshold: e.target.value as Recommendation } })}>
                               {(["strong_hire", "hire", "lean_no"] as Recommendation[]).map((x) => (
                                 <option key={x} value={x}>
                                   {RECOMMENDATION_LABEL[x]}

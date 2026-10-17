@@ -12,6 +12,8 @@ import { ResumeStep } from "@/components/candidate/resume-step";
 import { ProfileStep } from "@/components/candidate/profile-step";
 import { ProjectsStep } from "@/components/candidate/projects-step";
 import { FeedbackSurvey } from "@/components/candidate/feedback-survey";
+import { YourData } from "@/components/candidate/your-data";
+import { pendingDeletion } from "@/lib/services/data-rights";
 import { pendingSurveyRound, type ReleasedFeedback } from "@/lib/services/feedback";
 
 export const dynamic = "force-dynamic";
@@ -38,6 +40,7 @@ export default async function CandidateHub({ params }: { params: Promise<{ token
   const rounds = await candidateRounds(candidacy, config);
   const needsProjects = needsProjectsStep(config);
   const surveyRound = await pendingSurveyRound(candidacy.id);
+  const deletion = await pendingDeletion(candidacy.id);
   const released = candidacy.feedbackReleasedAt ? (candidacy.feedbackSummary as ReleasedFeedback | null) : null;
 
   const steps = [
@@ -155,6 +158,7 @@ export default async function CandidateHub({ params }: { params: Promise<{ token
         ))}
       </ol>
       <Card>{body}</Card>
+      {candidacy.stage !== "invited" && <YourData token={token} companyName={settings.companyName} pendingDueAt={deletion?.dueAt.toISOString() ?? null} />}
     </Shell>
   );
 }

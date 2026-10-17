@@ -280,7 +280,7 @@ export function InterviewRoom(props: Props) {
                   </option>
                 ))}
               </select>
-              <span className="mt-1 block text-xs text-slate-500">The interviewer will speak and write in this language. Coding problems and technical terms stay in English.</span>
+              <span className="mt-1 block text-xs text-slate-600">The interviewer will speak and write in this language. Coding problems and technical terms stay in English.</span>
             </label>
           )}
           <fieldset className="mt-5">
@@ -290,7 +290,7 @@ export function InterviewRoom(props: Props) {
                 <label key={m} className={cx("cursor-pointer rounded-lg border p-3 text-sm", mode === m ? "border-brand-500 bg-brand-50" : "border-slate-200", m === "voice" && !support.stt && "cursor-not-allowed opacity-50")}>
                   <input type="radio" name="mode" className="mr-2" disabled={m === "voice" && !support.stt} checked={mode === m} onChange={() => setMode(m)} />
                   <b>{m === "text" ? "Text" : "Voice"}</b>
-                  <span className="mt-1 block text-xs text-slate-500">{m === "text" ? "Type your answers." : "The interviewer speaks; you answer by voice (you can edit the transcript before sending)."}</span>
+                  <span className="mt-1 block text-xs text-slate-600">{m === "text" ? "Type your answers." : "The interviewer speaks; you answer by voice (you can edit the transcript before sending)."}</span>
                 </label>
               ))}
             </div>
@@ -326,7 +326,7 @@ export function InterviewRoom(props: Props) {
         </div>
         <ol className="mx-auto hidden items-center gap-1 lg:flex">
           {state?.sections.map((s, i) => (
-            <li key={s.key} className={cx("rounded-full px-2.5 py-1 text-xs", s.status === "done" ? "bg-emerald-50 text-emerald-700" : i === state.current && !ended ? "bg-brand-600 text-white" : "bg-slate-100 text-slate-500")}>
+            <li key={s.key} className={cx("rounded-full px-2.5 py-1 text-xs", s.status === "done" ? "bg-emerald-50 text-emerald-700" : i === state.current && !ended ? "bg-brand-600 text-white" : "bg-slate-100 text-slate-600")}>
               {s.title}
             </li>
           ))}
@@ -434,7 +434,7 @@ export function InterviewRoom(props: Props) {
                         <input type="checkbox" checked={autoSpeak} onChange={(e) => setAutoSpeak(e.target.checked)} /> Read questions aloud
                       </label>
                     )}
-                    <span className="ml-auto text-xs text-slate-400">{input.length}/4000</span>
+                    <span className="ml-auto text-xs text-slate-500">{input.length}/4000</span>
                   </div>
                   {dictation.error && <p className="mt-1 text-xs text-red-600">{dictation.error}</p>}
                 </>

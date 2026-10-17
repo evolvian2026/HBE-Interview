@@ -17,6 +17,8 @@ export interface OrgSettings {
   retentionDays: number;
   consentText: string;
   consentVersion: number;
+  /** Staff must use two-factor sign-in (TOTP). */
+  require2fa: boolean;
 }
 
 /** Platform-wide settings, managed by platform admins (models are a cost/quality decision for the operator). */
@@ -45,6 +47,7 @@ export const DEFAULT_SETTINGS: OrgSettings = {
   retentionDays: 180,
   consentText: DEFAULT_CONSENT,
   consentVersion: 1,
+  require2fa: false,
 };
 
 export const DEFAULT_PLATFORM_SETTINGS: PlatformSettings = {

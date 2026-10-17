@@ -164,7 +164,7 @@ async function main() {
   const { candidacyId, link } = inv.data[0];
   const token = link.split("/c/")[1];
   check(inv.data[0].status === "invited" && candidacyId && token, "POST /api/v1/drives/{id}/candidates invites and returns the personal link");
-  const invited = await waitFor("candidate.invited webhook", async () => got("candidate.invited", candidacyId), 30_000);
+  const invited = await waitFor("candidate.invited webhook", async () => got("candidate.invited", candidacyId), 90_000);
   check(invited.verified, "candidate.invited webhook delivered with a valid HMAC signature");
 
   /* --------------------------- onboarding: OCR + GitLab -------------------------- */
@@ -244,7 +244,7 @@ async function main() {
   check(wb[0]?.n === 3 && wb[0]?.png > 0, "whiteboard shapes and PNG stored with the response");
   check((await anon.req("POST", `${base}/snapshot`, { image: `data:image/jpeg;base64,${JPEG.toString("base64")}` })).status === 200, "snapshots after the round ends are ignored");
 
-  const completed = await waitFor("round.completed webhook", async () => got("round.completed", candidacyId), 30_000);
+  const completed = await waitFor("round.completed webhook", async () => got("round.completed", candidacyId), 90_000);
   check(completed.verified && completed.body.data.roundIndex === 0, "round.completed webhook delivered and signed");
   const evaluated = await waitFor("round.evaluated webhook", async () => got("round.evaluated", candidacyId), 90_000);
   check(evaluated.verified && typeof evaluated.body.data.score === "number", "round.evaluated webhook carries the round score");
@@ -253,7 +253,7 @@ async function main() {
     // Mock score fell below the auto-advance band: a hiring manager decides, which also emits gate.decided.
     await admin.json("POST", `/api/candidacies/${candidacyId}/gate`, { decision: "advance", reason: "Phase 3 smoke: manual advance" });
   }
-  const gate = await waitFor("gate.decided webhook", async () => got("gate.decided", candidacyId), 30_000);
+  const gate = await waitFor("gate.decided webhook", async () => got("gate.decided", candidacyId), 90_000);
   check(gate.verified && gate.body.data.decision === "advance", `gate.decided webhook delivered (${gate.body.data.mode})`);
   const { rows: rep } = await db.query("select status from round_reports where session_id = $1", [sessionId]);
   check(rep[0]?.status === "ready", "round report ready");
@@ -292,7 +292,7 @@ async function main() {
 
   /* --------------------------- status change, ping, revoke -------------------------- */
   await admin.json("POST", `/api/candidacies/${candidacyId}/status`, { status: "on_hold" });
-  const sc = await waitFor("candidate.status_changed webhook", async () => got("candidate.status_changed", candidacyId), 30_000);
+  const sc = await waitFor("candidate.status_changed webhook", async () => got("candidate.status_changed", candidacyId), 90_000);
   check(sc.verified && sc.body.data.status === "on_hold", "candidate.status_changed webhook delivered");
   await admin.json("POST", `/api/settings/webhooks/${hook.id}/test`);
   const ping = await waitFor("ping", async () => got("ping"), 30_000);

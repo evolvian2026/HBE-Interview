@@ -68,7 +68,7 @@ export function PlatformOrgs({ orgs, activeOrgId, homeOrgId }: { orgs: OrgRow[];
                       <p className="font-medium">
                         {o.name} {o.id === activeOrgId && <Badge tone="blue">viewing</Badge>} {o.id === homeOrgId && <Badge>home</Badge>}
                       </p>
-                      <p className="font-mono text-xs text-slate-400">{o.slug}</p>
+                      <p className="font-mono text-xs text-slate-500">{o.slug}</p>
                     </td>
                     <td>
                       <Badge tone={o.status === "active" ? "green" : "red"}>{o.status}</Badge>
@@ -80,7 +80,7 @@ export function PlatformOrgs({ orgs, activeOrgId, homeOrgId }: { orgs: OrgRow[];
                     <td className="text-right">{usd(o.cost30)}</td>
                     <td className="text-right">
                       <span className={over ? "font-semibold text-red-700" : ""}>{usd(o.costMonth)}</span>
-                      <span className="text-slate-400"> / </span>
+                      <span className="text-slate-500"> / </span>
                       <button
                         className="text-brand-700 underline decoration-dotted"
                         title="Set monthly AI budget alert"
@@ -137,13 +137,13 @@ export function PlatformOrgs({ orgs, activeOrgId, homeOrgId }: { orgs: OrgRow[];
           <Field label="First admin — email">
             <Input type="email" value={f.adminEmail} onChange={(e) => setF({ ...f, adminEmail: e.target.value })} />
           </Field>
-          <Field label="First admin — temporary password (8+)">
+          <Field label="First admin — temporary password (10+)">
             <Input type="password" value={f.adminPassword} onChange={(e) => setF({ ...f, adminPassword: e.target.value })} />
           </Field>
         </div>
         <div className="mt-4 flex items-center gap-3">
           <Button
-            disabled={busy || !f.name.trim() || !f.adminEmail.trim() || f.adminPassword.length < 8 || !f.adminName.trim()}
+            disabled={busy || !f.name.trim() || !f.adminEmail.trim() || f.adminPassword.length < 10 || !f.adminName.trim()}
             onClick={() =>
               run(
                 () => api("/api/platform/orgs", { body: { name: f.name, slug: f.slug || undefined, admin: { name: f.adminName, email: f.adminEmail, password: f.adminPassword } } }),

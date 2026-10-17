@@ -171,7 +171,7 @@ export default async function DrivePage({ params, searchParams }: { params: Prom
                             {r?.status === "ready" ? (
                               <span title={RECOMMENDATION_LABEL[r.recommendation as Recommendation]}>{r.roundScore?.toFixed(0)}</span>
                             ) : r ? (
-                              <span className="text-xs text-slate-400">{r.status === "failed" ? "failed" : "…"}</span>
+                              <span className="text-xs text-slate-500">{r.status === "failed" ? "failed" : "…"}</span>
                             ) : (
                               <span className="text-slate-300">—</span>
                             )}

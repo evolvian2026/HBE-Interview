@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { requireStaff } from "@/lib/auth/staff";
+import { HttpError, requireStaff } from "@/lib/auth/staff";
 import { handle, json } from "@/lib/http";
 import { saveSettings } from "@/lib/settings";
 import { audit } from "@/lib/audit";
@@ -10,6 +10,7 @@ const Body = z.object({
   supportEmail: z.string().max(200).optional(),
   values: z.array(z.object({ name: z.string().trim().min(1).max(80), description: z.string().max(500), behaviors: z.array(z.string().max(200)).max(6) })).min(1).max(8).optional(),
   askCompensation: z.boolean().optional(),
+  require2fa: z.boolean().optional(),
   retentionDays: z.number().int().min(30).max(730).optional(),
   consentText: z.string().min(50).max(8000).optional(),
 });
@@ -17,6 +18,7 @@ const Body = z.object({
 export const PUT = handle(async (req: Request) => {
   const user = await requireStaff("admin");
   const patch = Body.parse(await req.json());
+  if (patch.require2fa && !user.has2fa) throw new HttpError(400, "Turn on two-factor sign-in for your own account first (Security), so you don't lock yourself out.");
   const s = await saveSettings(user.orgId, patch);
   await audit({ type: "staff", id: user.id, orgId: user.orgId }, "settings.update", "settings", "org", Object.keys(patch));
   return json(s);

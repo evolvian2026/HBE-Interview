@@ -6,7 +6,7 @@ import { createOrg } from "@/lib/services/platform";
 const Body = z.object({
   name: z.string().trim().min(2).max(120),
   slug: z.string().trim().max(40).optional(),
-  admin: z.object({ name: z.string().trim().min(1).max(120), email: z.string().trim().email(), password: z.string().min(8).max(200) }),
+  admin: z.object({ name: z.string().trim().min(1).max(120), email: z.string().trim().email(), password: z.string().min(1).max(200) }),
 });
 
 /** Create an organisation with its first admin (platform admins only). */

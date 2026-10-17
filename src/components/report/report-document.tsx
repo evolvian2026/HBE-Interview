@@ -55,7 +55,7 @@ export async function ReportDocument({ candidacyId, masked, includeTranscript = 
         <div className="text-right">
           {combined?.status === "ready" ? (
             <>
-              <p className="text-3xl font-semibold tabular-nums">{combined.finalScore?.toFixed(0)}<span className="text-base text-slate-400">/100</span></p>
+              <p className="text-3xl font-semibold tabular-nums">{combined.finalScore?.toFixed(0)}<span className="text-base text-slate-500">/100</span></p>
               <p className="font-medium">{RECOMMENDATION_LABEL[combined.recommendation as Recommendation]}{combined.partial ? " (partial)" : ""}</p>
               <p className="text-xs text-slate-500">confidence {combined.confidence}</p>
             </>

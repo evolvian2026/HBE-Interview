@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Document status** | v1.5 — approved; Phases 1–4 built (as-built notes: ARCHITECTURE §0; integration reference: [API.md](API.md)) |
+| **Document status** | v1.6 — approved; Phases 1–5 built (as-built notes: ARCHITECTURE §0; integration reference: [API.md](API.md)) |
 | **Date** | 2026-10-16 |
 | **Related** | [PRD.md](PRD.md) (product requirements) · [ARCHITECTURE.md](ARCHITECTURE.md) (technical architecture) |
 
@@ -31,6 +31,7 @@ This document specifies **how each feature behaves**: user stories, flows, scree
 17. [Phase 2 features (v1.3)](#17-phase-2-features-v13)
 18. [Phase 3 features (v1.4)](#18-phase-3-features-v14)
 19. [Phase 4 features (v1.5)](#19-phase-4-features-v15)
+20. [Phase 5 features (v1.6)](#20-phase-5-features-v16)
 
 ---
 
@@ -990,4 +991,52 @@ Candidates can request extra time (+25% or +50%) through a link on the consent s
 | Demographic bias audits | No protected data is collected (§18.7) |
 | Postgres row-level security | Isolation is enforced in the application and verified route by route; RLS is a later defence-in-depth option |
 | Per-organisation custom domains / branding beyond company name | Not requested yet |
+
+---
+
+## 20. Phase 5 features (v1.6)
+
+### 20.1 Sign-in security
+
+- **Throttling & lockout:** at most 10 sign-in attempts per account and 100 per network address per 15 minutes (counters shared by all app instances). Five wrong passwords lock the account for 15 minutes; locks and failures are audited. Messages never reveal whether an account exists.
+- **Password policy** (new users, resets, password changes, first admins): at least 10 characters; not a common password; not containing the person's email name or name; mix letters with numbers/symbols, or use a 16+ character passphrase.
+- **Session revocation:** changing a password, a role change, deactivation or a 2FA reset signs the user out everywhere (the current session survives your own password change). **Security → Sign out everywhere** ends all sessions including the current one.
+- **Cross-site protection:** session cookies are SameSite=Lax and every staff API rejects requests whose Origin isn't the app's own.
+- **Headers:** Content-Security-Policy (self + the code-editor CDN; no plugins, no framing), X-Frame-Options DENY, nosniff, a strict referrer policy (candidate links never leak to other sites), Permissions-Policy (camera/microphone for this site only), HSTS in production.
+
+### 20.2 Two-factor sign-in
+
+- **Security page** (click your name): scan a QR code with any authenticator app (or type the key), confirm a 6-digit code, save 10 one-time recovery codes. Codes allow ±30 s of clock drift and can't be replayed.
+- **Signing in:** password, then a code (or a recovery code; you're warned when ≤ 2 remain). New recovery codes and turning 2FA off need your password.
+- **Organisation enforcement:** *Settings → Compliance & privacy → Require two-factor sign-in* (the admin must have it on first). Staff without it are taken to the Security page and can't use anything else until they enrol; it can't be turned off while required.
+- **Lost phone:** an admin clicks **Reset 2FA** on the user (Settings → Users); the user is signed out and enrols again.
+- Secrets are encrypted at rest (AES-256-GCM).
+
+### 20.3 Audit log
+
+- **Audit** (admins): every sign-in, failed sign-in and lock, user/role change, drive change, invite, consent, report view/export, override, gate decision, share link, API key, webhook, organisation switch, data request and job action — filter by category, staff member, period and free text; links to the candidate or drive; paginated.
+- **Export CSV** with the same filters (cells that look like spreadsheet formulas are neutralised). Exports are themselves audited.
+
+### 20.4 Candidate data rights
+
+- **Your data** on the candidate's page (after consent): **Download my data** — a JSON file with their profile, resume text and parsed profile, consent record, repositories, transcripts, written answers, whiteboard, code they ran/submitted, practical details, survey answers and any released feedback. Internal evaluations (scores, recruiter notes) aren't included; the organisation provides them on request.
+- **Delete my data…** (with an optional reason) creates a request due in **30 days**; the candidate sees its status. Admins see a banner and a notice on the candidate page; **Data requests** lists them: **Delete now** or **Decline…** with a reason (e.g. legal hold), which is emailed to the candidate. Requests still pending at the due date are fulfilled automatically.
+- Deletion removes the candidacy (resume, transcripts, code, reports, snapshots…); the candidate's email, dates and outcome are kept as proof the request was handled.
+
+### 20.5 Operations (platform admins)
+
+- **Platform → Operations:** job worker status (heartbeat), jobs due, oldest waiting job, running, retrying, failed in 24 h; counts by job type; failed jobs with error and payload, **Retry** or **Discard**.
+- **/api/health** now reports the worker heartbeat and queue lag for uptime monitors (alert if the worker hasn't been seen for 2 minutes or a job has waited over 5 minutes). Completed jobs are kept 7 days, failed jobs 30 days.
+
+### 20.6 Accessibility
+
+- Automated WCAG 2.1 A/AA checks (axe-core) over 19 staff and candidate screens including the interview lobby and live room (`e2e/a11y-check.ts`): form controls are labelled, charts expose their values to screen readers, text meets 4.5:1 contrast, links in running text are underlined, alerts are announced.
+
+### 20.7 Not built yet
+
+| Item | Note |
+|---|---|
+| Single sign-on (SAML / OIDC with Google Workspace or Microsoft Entra) | Most-requested enterprise item; needs an identity provider to test against |
+| Postgres row-level security | Isolation stays application-enforced and tested route by route |
+| Per-organisation branding / custom domains | Company name only today |
 

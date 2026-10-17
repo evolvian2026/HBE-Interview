@@ -16,6 +16,7 @@ import { OverrideForm } from "@/components/staff/override-form";
 import { NotesForm } from "@/components/staff/notes-form";
 import { SharePanel } from "@/components/staff/share-panel";
 import { CandidateFeedbackPanel } from "@/components/staff/candidate-feedback-panel";
+import { pendingDeletion } from "@/lib/services/data-rights";
 import { CodeReplay } from "@/components/staff/code-replay";
 import { ReevaluateButton } from "@/components/staff/reevaluate-button";
 import { audit } from "@/lib/audit";
@@ -78,6 +79,7 @@ export default async function CandidatePage({ params }: { params: Promise<{ id: 
         .where(inArray(schema.proctorSnapshots.sessionId, sessionIds))
         .orderBy(asc(schema.proctorSnapshots.createdAt))
     : [];
+  const deletionRequest = await pendingDeletion(id);
   const surveys = await db.select().from(schema.candidateFeedback).where(eq(schema.candidateFeedback.candidacyId, id)).orderBy(asc(schema.candidateFeedback.roundIndex));
   const shareLinks = await db.select().from(schema.shareLinks).where(eq(schema.shareLinks.candidacyId, id)).orderBy(desc(schema.shareLinks.createdAt));
   const profile = resume?.parsed as ParsedResume | null;
@@ -121,6 +123,14 @@ export default async function CandidatePage({ params }: { params: Promise<{ id: 
       </div>
 
       {/* ------------------------ Combined report ------------------------ */}
+      {deletionRequest && (
+        <div role="alert" className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-900">
+          The candidate asked for their data to be deleted on {deletionRequest.createdAt.toLocaleDateString()}. It will be deleted automatically on {deletionRequest.dueAt.toLocaleDateString()} unless an admin declines with a reason.{" "}
+          <Link href="/app/data-requests" className="underline">
+            Data requests
+          </Link>
+        </div>
+      )}
       <Card title="Combined report">
         {!combined ? (
           <p className="text-sm text-slate-500">Generated automatically after the last round is evaluated. You can also generate a partial report from the actions above.</p>
@@ -129,7 +139,7 @@ export default async function CandidatePage({ params }: { params: Promise<{ id: 
         ) : (
           <div className="grid gap-6 lg:grid-cols-3">
             <div>
-              <p className="text-4xl font-semibold tabular-nums">{combined.finalScore?.toFixed(0) ?? "—"}<span className="text-base text-slate-400">/100</span></p>
+              <p className="text-4xl font-semibold tabular-nums">{combined.finalScore?.toFixed(0) ?? "—"}<span className="text-base text-slate-500">/100</span></p>
               <div className="mt-2 flex flex-wrap gap-2">
                 <Badge tone={REC_TONE[combined.recommendation as Recommendation]}>{RECOMMENDATION_LABEL[combined.recommendation as Recommendation]}</Badge>
                 <Badge>confidence: {combined.confidence}</Badge>
@@ -142,7 +152,7 @@ export default async function CandidatePage({ params }: { params: Promise<{ id: 
                     <a key={r.type} href={`#round-${i}`} className="flex items-center justify-between rounded px-2 py-1 hover:bg-slate-50">
                       <span>{ROUND_LABEL[r.type]}</span>
                       <span className="tabular-nums">
-                        {rep?.status === "ready" ? `${rep.roundScore?.toFixed(0)} · ${RECOMMENDATION_LABEL[rep.recommendation as Recommendation]}` : "—"} <span className="text-xs text-slate-400">(w {config.roundWeights[r.type]}%)</span>
+                        {rep?.status === "ready" ? `${rep.roundScore?.toFixed(0)} · ${RECOMMENDATION_LABEL[rep.recommendation as Recommendation]}` : "—"} <span className="text-xs text-slate-500">(w {config.roundWeights[r.type]}%)</span>
                       </span>
                     </a>
                   );
@@ -241,7 +251,7 @@ export default async function CandidatePage({ params }: { params: Promise<{ id: 
                                   <ul className="mt-2 space-y-1">
                                     {(ps?.evidence ?? []).map((e, k) => (
                                       <li key={k} className="text-xs text-slate-600">
-                                        <a href={e.type === "transcript" ? `#${session?.id}-${e.ref}` : undefined} className="mr-1 rounded bg-slate-100 px-1 font-mono text-[10px] text-slate-500">
+                                        <a href={e.type === "transcript" ? `#${session?.id}-${e.ref}` : undefined} className="mr-1 rounded bg-slate-100 px-1 font-mono text-[10px] text-slate-700">
                                           {e.ref}
                                         </a>
                                         “{e.quote}”
@@ -397,13 +407,13 @@ export default async function CandidatePage({ params }: { params: Promise<{ id: 
                           <ul className="mt-2 space-y-1 text-xs text-slate-600">
                             {rs.integrity.generated.map((g) => (
                               <li key={g.ref}>
-                                <a href={`#${session?.id}-${g.ref}`} className="mr-1 rounded bg-slate-100 px-1 font-mono text-[10px] text-slate-500">{g.ref}</a>
+                                <a href={`#${session?.id}-${g.ref}`} className="mr-1 rounded bg-slate-100 px-1 font-mono text-[10px] text-slate-700">{g.ref}</a>
                                 possibly AI-generated / scripted ({g.likelihood}) — {g.reason}
                               </li>
                             ))}
                           </ul>
                         )}
-                        <p className="mt-1 text-xs text-slate-400">Context only — not used in scoring.</p>
+                        <p className="mt-1 text-xs text-slate-500">Context only — not used in scoring.</p>
                         {snapshots.some((x) => x.sessionId === session?.id) && (
                           <details className="mt-2" open={snapshots.some((x) => x.sessionId === session?.id && x.flagged)}>
                             <summary className="cursor-pointer text-xs text-brand-700">
@@ -438,7 +448,7 @@ export default async function CandidatePage({ params }: { params: Promise<{ id: 
                   <ol className="mt-3 space-y-2 text-sm">
                     {transcript.map((m) => (
                       <li key={m.id} id={`${session?.id}-M${m.seq}`} className={cx("rounded-lg p-2", m.role === "candidate" ? "bg-brand-50/50" : m.role === "system" ? "bg-amber-50" : "bg-slate-50")}>
-                        <span className="mr-2 font-mono text-[10px] text-slate-400">M{m.seq}</span>
+                        <span className="mr-2 font-mono text-[10px] text-slate-500">M{m.seq}</span>
                         <span className="mr-2 text-xs font-medium text-slate-500">{m.role === "ai" ? r.personaName + " (AI)" : m.role === "candidate" ? "Candidate" : "Note"} · {m.sectionKey}</span>
                         {(m.meta as { inputMode?: string } | null)?.inputMode === "voice" && <Badge>voice</Badge>}
                         <p className="mt-1 whitespace-pre-wrap">{m.content}</p>
@@ -553,7 +563,7 @@ export default async function CandidatePage({ params }: { params: Promise<{ id: 
             {notes.map(({ n, u }) => (
               <li key={n.id} className="rounded-lg bg-slate-50 p-2">
                 <p className="whitespace-pre-wrap">{n.text}</p>
-                <p className="mt-1 text-xs text-slate-400">
+                <p className="mt-1 text-xs text-slate-500">
                   {u?.name ?? "—"} · {n.createdAt.toLocaleString()}
                 </p>
               </li>
@@ -585,7 +595,7 @@ function List({ title, items, highlight }: { title?: string; items?: string[] | 
   if (!items?.length) return null;
   return (
     <div className={cx(highlight && "rounded-lg bg-brand-50/60 p-3")}>
-      {title && <p className="mb-1 text-xs font-medium uppercase tracking-wide text-slate-500">{title}</p>}
+      {title && <p className="mb-1 text-xs font-medium uppercase tracking-wide text-slate-600">{title}</p>}
       <ul className="list-disc space-y-1 pl-5 text-sm">
         {items.map((x, i) => (
           <li key={i}>{x}</li>
@@ -598,14 +608,14 @@ function List({ title, items, highlight }: { title?: string; items?: string[] | 
 function Panel({ title, children }: { title: React.ReactNode; children: React.ReactNode }) {
   return (
     <div className="rounded-lg border border-slate-200 p-3">
-      <p className="mb-2 text-xs font-medium uppercase tracking-wide text-slate-500">{title}</p>
+      <p className="mb-2 text-xs font-medium uppercase tracking-wide text-slate-600">{title}</p>
       {children}
     </div>
   );
 }
 
 function ScoreDots({ score }: { score: number | null }) {
-  if (score == null) return <span className="text-xs text-slate-400">n/a</span>;
+  if (score == null) return <span className="text-xs text-slate-500">n/a</span>;
   return (
     <span className="inline-flex items-center gap-1" aria-label={`${score} out of 5`}>
       {[1, 2, 3, 4, 5].map((i) => (
@@ -619,8 +629,8 @@ function ScoreDots({ score }: { score: number | null }) {
 function PracticalFit({ compat, data }: { compat: Compatibility; data: Record<string, unknown> }) {
   return (
     <div className="mt-6 rounded-lg border border-slate-200 p-3">
-      <p className="mb-2 flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-slate-500">
-        Practical fit <Badge tone={FIT_TONE[compat.overall]}>{compat.overall}</Badge> <span className="normal-case text-slate-400">(not scored)</span>
+      <p className="mb-2 flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-slate-600">
+        Practical fit <Badge tone={FIT_TONE[compat.overall]}>{compat.overall}</Badge> <span className="normal-case text-slate-500">(not scored)</span>
       </p>
       <div className="grid gap-2 text-sm sm:grid-cols-2">
         {compat.fields.map((f) => (

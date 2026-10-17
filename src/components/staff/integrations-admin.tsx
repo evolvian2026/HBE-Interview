@@ -95,7 +95,7 @@ export function IntegrationsAdmin({ keys, hooks, deliveries }: { keys: KeyRow[];
           <tbody className="divide-y divide-slate-100">
             {activeKeys.length === 0 && (
               <tr>
-                <td colSpan={6} className="py-3 text-xs text-slate-400">
+                <td colSpan={6} className="py-3 text-xs text-slate-500">
                   No active API keys.
                 </td>
               </tr>
@@ -173,7 +173,7 @@ export function IntegrationsAdmin({ keys, hooks, deliveries }: { keys: KeyRow[];
           <tbody className="divide-y divide-slate-100">
             {hooks.length === 0 && (
               <tr>
-                <td colSpan={4} className="py-3 text-xs text-slate-400">
+                <td colSpan={4} className="py-3 text-xs text-slate-500">
                   No webhooks yet.
                 </td>
               </tr>

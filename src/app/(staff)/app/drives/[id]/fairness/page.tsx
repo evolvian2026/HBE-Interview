@@ -79,7 +79,7 @@ export default async function FairnessPage({ params }: { params: Promise<{ id: s
                           <span className="w-10 text-right">{pct(s.passRate)}</span>
                         </div>
                       </td>
-                      <td className="text-right">{s.small ? <span className="text-xs text-slate-400">n&lt;{MIN_COHORT}</span> : s.impactRatio == null ? "—" : s.impactRatio.toFixed(2)}</td>
+                      <td className="text-right">{s.small ? <span className="text-xs text-slate-500">n&lt;{MIN_COHORT}</span> : s.impactRatio == null ? "—" : s.impactRatio.toFixed(2)}</td>
                       <td className="text-right">{s.meanScore == null ? "—" : s.meanScore.toFixed(0)}</td>
                     </tr>
                   ))}
@@ -136,7 +136,7 @@ export default async function FairnessPage({ params }: { params: Promise<{ id: s
             {f.survey.comments.map((c, i) => (
               <li key={i} className="rounded-lg bg-slate-50 p-2">
                 <p className="whitespace-pre-wrap">“{c.comment}”</p>
-                <p className="mt-1 text-xs text-slate-400">
+                <p className="mt-1 text-xs text-slate-500">
                   rated {c.overall}/5 · {c.at.toLocaleDateString()}
                 </p>
               </li>

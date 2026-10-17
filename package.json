@@ -22,7 +22,10 @@
     "ui-check:phase3": "tsx e2e/ui-phase3.ts",
     "smoke:phase4": "tsx scripts/smoke-phase4.ts",
     "ui-check:phase4": "tsx e2e/ui-phase4.ts",
-    "check:aws-executor": "tsx scripts/check-aws-executor.ts"
+    "check:aws-executor": "tsx scripts/check-aws-executor.ts",
+    "smoke:phase5": "tsx scripts/smoke-phase5.ts",
+    "ui-check:phase5": "tsx e2e/ui-phase5.ts",
+    "a11y": "tsx e2e/a11y-check.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.135.0",
@@ -34,6 +37,7 @@
     "nanoid": "^6.0.2",
     "next": "^16.4.2",
     "pg": "^8.23.1",
+    "qrcode": "^1.5.4",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
     "tsx": "^4.23.15",
@@ -41,11 +45,13 @@
     "zod": "^4.6.7"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.10.2",
     "@playwright/test": "^1.64.1",
     "@tailwindcss/postcss": "^4.3.3",
     "@types/bcryptjs": "^2.4.6",
     "@types/node": "^26.6.5",
     "@types/pg": "^8.23.1",
+    "@types/qrcode": "^1.5.5",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "drizzle-kit": "^0.31.11",

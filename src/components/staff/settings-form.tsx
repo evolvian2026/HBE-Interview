@@ -53,6 +53,12 @@ export function SettingsForm({ initial }: { initial: OrgSettings }) {
               HR round asks for <b>expected</b> compensation (off by default). Current or past salary is never asked.
             </span>
           </label>
+          <label className="flex items-start gap-2 text-sm">
+            <input type="checkbox" className="mt-1" checked={s.require2fa} onChange={(e) => set("require2fa", e.target.checked)} />
+            <span>
+              Require <b>two-factor sign-in</b> for everyone in this organisation. Staff without it are asked to set it up at their next sign-in (Security page).
+            </span>
+          </label>
           <Field label="Data retention (days after the candidacy closes)" hint="Resumes, transcripts, code and reports are deleted automatically after this period.">
             <Input type="number" min={30} max={730} className="max-w-40" value={s.retentionDays} onChange={(e) => set("retentionDays", Number(e.target.value))} />
           </Field>
@@ -68,7 +74,7 @@ export function SettingsForm({ initial }: { initial: OrgSettings }) {
             try {
               const r = await api<OrgSettings>("/api/settings", {
                 method: "PUT",
-                body: { companyName: s.companyName, companyBlurb: s.companyBlurb, supportEmail: s.supportEmail, values: s.values.filter((v) => v.name.trim()), askCompensation: s.askCompensation, retentionDays: s.retentionDays, consentText: s.consentText },
+                body: { companyName: s.companyName, companyBlurb: s.companyBlurb, supportEmail: s.supportEmail, values: s.values.filter((v) => v.name.trim()), askCompensation: s.askCompensation, require2fa: s.require2fa, retentionDays: s.retentionDays, consentText: s.consentText },
               });
               setS(r);
               setMsg("Saved.");

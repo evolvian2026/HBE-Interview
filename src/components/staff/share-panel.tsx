@@ -40,7 +40,7 @@ export function SharePanel({ candidacyId, links, canShare }: { candidacyId: stri
           <div className="rounded-lg bg-slate-50 p-3">
             <p className="mb-2 font-medium">Share a read-only link</p>
             <div className="flex flex-wrap items-center gap-2">
-              <Select className="w-36" value={days} onChange={(e) => setDays(Number(e.target.value))}>
+              <Select className="w-36" aria-label="Link expiry" value={days} onChange={(e) => setDays(Number(e.target.value))}>
                 {[1, 3, 7, 14, 30].map((d) => (
                   <option key={d} value={d}>
                     Expires in {d}d
