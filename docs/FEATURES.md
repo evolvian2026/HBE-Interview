@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Document status** | v1.6 — approved; Phases 1–5 built (as-built notes: ARCHITECTURE §0; integration reference: [API.md](API.md)) |
+| **Document status** | v1.7 — approved; Phases 1–6 built (as-built notes: ARCHITECTURE §0; integration reference: [API.md](API.md)) |
 | **Date** | 2026-10-16 |
 | **Related** | [PRD.md](PRD.md) (product requirements) · [ARCHITECTURE.md](ARCHITECTURE.md) (technical architecture) |
 
@@ -32,6 +32,7 @@ This document specifies **how each feature behaves**: user stories, flows, scree
 18. [Phase 3 features (v1.4)](#18-phase-3-features-v14)
 19. [Phase 4 features (v1.5)](#19-phase-4-features-v15)
 20. [Phase 5 features (v1.6)](#20-phase-5-features-v16)
+21. [Phase 6 features (v1.7)](#21-phase-6-features-v17)
 
 ---
 
@@ -1036,7 +1037,43 @@ Candidates can request extra time (+25% or +50%) through a link on the consent s
 
 | Item | Note |
 |---|---|
-| Single sign-on (SAML / OIDC with Google Workspace or Microsoft Entra) | Most-requested enterprise item; needs an identity provider to test against |
+| Single sign-on (SAML / OIDC with Google Workspace or Microsoft Entra) | OIDC built in Phase 6 (§21); SAML still out |
 | Postgres row-level security | Isolation stays application-enforced and tested route by route |
-| Per-organisation branding / custom domains | Company name only today |
+| Per-organisation branding / custom domains | Branding built in Phase 6 (§21); custom domains still out |
 
+---
+
+## 21. Phase 6 features (v1.7)
+
+### 21.1 Email domains
+
+- **Settings → Single sign-on → Email domains** (admins): add the company's domain (e.g. `acme.com`). Public mail providers (gmail.com, outlook.com, yahoo.com, …) are refused, and a domain can belong to only one organisation.
+- **Verify** by publishing a DNS TXT record `hbe-verification=<token>` on the domain, then clicking **Verify**. A platform admin can also confirm a domain when DNS access is slow; the audit log records which way it was verified.
+- Only verified domains route people to their organisation's identity provider. Removing a domain stops that routing immediately.
+
+### 21.2 Single sign-on (OpenID Connect)
+
+- **Setup:** the admin registers HBE Interview as a web application in their identity provider (Google Workspace, Microsoft Entra ID, Okta, Auth0, Keycloak or any OIDC provider) with the redirect URI shown on the card (`<APP_BASE_URL>/api/auth/sso/callback`), then enters the **issuer URL**, **client ID** and **client secret**. The secret is encrypted at rest and never shown again (leave blank to keep it). Microsoft Entra needs the tenant-specific issuer (`https://login.microsoftonline.com/<tenant-id>/v2.0`).
+- **Saving** fetches the provider's discovery document; a wrong issuer, an unreachable provider or an internal network address is refused with a clear message. SSO can be switched on only once at least one domain is verified.
+- **Test sign-in** runs the whole flow against the admin's own account and returns to Settings with the result, without changing the current session. A successful test is required before SSO can be made mandatory.
+- **Signing in:** on the sign-in page, **Sign in with single sign-on** → work email → the organisation's identity provider → back into HBE Interview. Entering a password for an SSO-required account switches to the SSO step.
+- **Who gets in:** the identity provider must vouch for the email address (verified email claim; Entra by tenant). An existing active account in the same organisation signs in; accounts in another organisation, deactivated accounts and suspended organisations are refused.
+- **Just-in-time accounts** (off by default): pick a role (recruiter, hiring manager or viewer) and anyone from a verified domain who passes the identity provider gets an account with that role on first sign-in. Admins are never created this way.
+- **Require SSO:** password sign-in is blocked for the organisation's staff. Platform admins keep password sign-in as a break-glass in case the provider is down or misconfigured.
+- **Two-factor:** an SSO session satisfies the organisation's *Require two-factor sign-in* setting, because the identity provider applies its own MFA policy. Password sign-ins still need the TOTP code.
+- **Security:** authorisation code flow with PKCE (S256), state and nonce held in a signed, single-use, 10-minute cookie; ID-token signature (provider's published keys), issuer, audience, expiry and nonce checked. Sign-ins, test sign-ins, refusals and configuration changes are audited; the start endpoint is rate-limited.
+
+### 21.3 Branding
+
+- **Settings → Branding** (admins): upload a logo (PNG or JPEG, up to 200 KB; SVG is refused because it can carry scripts) and pick a brand colour. Colours that don't reach 4.5:1 contrast with white text are refused with a suggested darker shade, and a live preview shows the result.
+- The logo and colour appear on everything candidates see: the candidate hub (`/c/…`), open registration pages (`/i/…`) and the interview room. Buttons, links and highlights use the brand colour; a small "Interview powered by HBE Interview" line stays at the foot of the page. Staff pages keep the HBE Interview look.
+- Organisations without branding look exactly as before; one organisation's branding never shows on another's pages.
+
+### 21.4 Not built yet
+
+| Item | Note |
+|---|---|
+| SAML 2.0 | OIDC covers Google, Entra, Okta and most providers; SAML only on request (needs XML signature handling) |
+| SCIM user provisioning / deprovisioning | Just-in-time creation only; leavers are deactivated in Settings → Users or blocked at the provider |
+| Custom domains for candidate links | Candidate links stay on the app's own domain |
+| Branded emails | Invitation and reminder emails carry the organisation name, not the logo |

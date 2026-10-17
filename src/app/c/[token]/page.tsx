@@ -3,10 +3,11 @@ import Link from "next/link";
 import { db, schema } from "@/lib/db";
 import { candidacyByToken } from "@/lib/auth/candidate";
 import { getSettings } from "@/lib/settings";
+import { getBranding, type Branding } from "@/lib/branding";
 import { candidateRounds, needsProjectsStep } from "@/lib/services/candidacy";
 import type { DriveConfig } from "@/lib/core/types";
 import type { ParsedResume } from "@/lib/ai/analyzers";
-import { Badge, Card, Logo, cx } from "@/components/ui";
+import { Badge, BrandMark, Card, PoweredBy, cx } from "@/components/ui";
 import { ConsentStep } from "@/components/candidate/consent-step";
 import { ResumeStep } from "@/components/candidate/resume-step";
 import { ProfileStep } from "@/components/candidate/profile-step";
@@ -36,6 +37,7 @@ export default async function CandidateHub({ params }: { params: Promise<{ token
   const [version] = await db.select().from(schema.driveVersions).where(eq(schema.driveVersions.id, candidacy.driveVersionId));
   const config = version.config as DriveConfig;
   const settings = await getSettings(candidacy.orgId);
+  const brand = await getBranding(candidacy.orgId);
   const [resume] = await db.select().from(schema.resumes).where(eq(schema.resumes.candidacyId, candidacy.id));
   const rounds = await candidateRounds(candidacy, config);
   const needsProjects = needsProjectsStep(config);
@@ -144,7 +146,7 @@ export default async function CandidateHub({ params }: { params: Promise<{ token
   }
 
   return (
-    <Shell>
+    <Shell brand={brand}>
       <div className="mb-6">
         <p className="text-xs font-medium uppercase tracking-wide text-brand-600">{settings.companyName}</p>
         <h1 className="text-xl font-semibold">{drive.title}</h1>
@@ -163,13 +165,14 @@ export default async function CandidateHub({ params }: { params: Promise<{ token
   );
 }
 
-function Shell({ children }: { children: React.ReactNode }) {
+function Shell({ children, brand }: { children: React.ReactNode; brand?: Branding }) {
   return (
-    <main className="mx-auto max-w-3xl px-4 py-10">
+    <main className="mx-auto max-w-3xl px-4 py-10" style={brand?.style as React.CSSProperties | undefined}>
       <div className="mb-8">
-        <Logo />
+        <BrandMark brand={brand} />
       </div>
       {children}
+      {brand?.logoUrl && <PoweredBy />}
     </main>
   );
 }

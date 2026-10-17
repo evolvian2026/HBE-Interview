@@ -25,6 +25,8 @@ export interface StaffUser {
   mustEnroll2fa: boolean;
   has2fa: boolean;
   sessionVersion: number;
+  /** Signed in through the organisation's identity provider (which is responsible for MFA). */
+  viaSso: boolean;
 }
 
 const COOKIE = "hbe_staff";
@@ -47,8 +49,8 @@ export async function verifyPassword(pw: string, hash: string) {
  * Issue the session cookie. `activeOrgId` is honoured only for platform admins (org switching). The token carries the
  * user's session version, so bumping `users.session_version` revokes every outstanding session at once.
  */
-export async function createStaffSession(user: { id: string; role: StaffRole; sessionVersion: number }, activeOrgId?: string) {
-  const token = await new SignJWT({ role: user.role, sv: user.sessionVersion, ...(activeOrgId ? { org: activeOrgId } : {}) })
+export async function createStaffSession(user: { id: string; role: StaffRole; sessionVersion: number }, activeOrgId?: string, opts: { sso?: boolean } = {}) {
+  const token = await new SignJWT({ role: user.role, sv: user.sessionVersion, ...(activeOrgId ? { org: activeOrgId } : {}), ...(opts.sso ? { amr: "sso" } : {}) })
     .setProtectedHeader({ alg: "HS256" })
     .setSubject(user.id)
     .setIssuedAt()
@@ -111,8 +113,10 @@ export async function getStaff(): Promise<StaffUser | null> {
     // A platform admin acting inside another organisation acts as that organisation's admin.
     const role = orgId !== u.orgId ? "admin" : u.role;
     const has2fa = !!u.totpEnabledAt;
-    const mustEnroll2fa = !has2fa && !!(await getSettings(u.orgId)).require2fa;
-    return { id: u.id, email: u.email, name: u.name, role, driveIds: u.driveIds ?? [], orgId, homeOrgId: u.orgId, platformAdmin: u.platformAdmin, mustEnroll2fa, has2fa, sessionVersion: u.sessionVersion };
+    const viaSso = payload.amr === "sso";
+    // SSO sign-ins satisfy the organisation's 2FA requirement: multi-factor is enforced by the identity provider.
+    const mustEnroll2fa = !has2fa && !viaSso && !!(await getSettings(u.orgId)).require2fa;
+    return { id: u.id, email: u.email, name: u.name, role, driveIds: u.driveIds ?? [], orgId, homeOrgId: u.orgId, platformAdmin: u.platformAdmin, mustEnroll2fa, has2fa, sessionVersion: u.sessionVersion, viaSso };
   } catch {
     return null;
   }

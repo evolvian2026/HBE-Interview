@@ -1,21 +1,33 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button, Card, Field, Input, Logo } from "@/components/ui";
-import { api } from "@/components/api";
+import { api, ApiError } from "@/components/api";
 
 export default function LoginPage() {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [code, setCode] = useState("");
-  const [step, setStep] = useState<"password" | "code">("password");
+  const [step, setStep] = useState<"password" | "code" | "sso">("password");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
 
+  useEffect(() => {
+    const err = new URLSearchParams(window.location.search).get("sso_error");
+    if (err) {
+      setError(err);
+      setStep("sso");
+    }
+  }, []);
+
   async function submit(e: React.FormEvent) {
     e.preventDefault();
+    if (step === "sso") {
+      window.location.assign(`/api/auth/sso/start?email=${encodeURIComponent(email)}`);
+      return;
+    }
     setBusy(true);
     setError("");
     try {
@@ -34,6 +46,10 @@ export default function LoginPage() {
     } catch (err) {
       setError((err as Error).message);
       if (step === "code" && /expired/i.test((err as Error).message)) setStep("password");
+      if (err instanceof ApiError && err.status === 409) {
+        setStep("sso");
+        setPassword("");
+      }
     } finally {
       setBusy(false);
     }
@@ -47,8 +63,12 @@ export default function LoginPage() {
         </div>
         <Card>
           <form onSubmit={submit} className="space-y-4">
-            <h1 className="text-lg font-semibold">{step === "password" ? "Sign in" : "Two-factor sign-in"}</h1>
-            {step === "password" ? (
+            <h1 className="text-lg font-semibold">{step === "password" ? "Sign in" : step === "sso" ? "Sign in with single sign-on" : "Two-factor sign-in"}</h1>
+            {step === "sso" ? (
+              <Field label="Work email" hint="You'll continue at your organisation's sign-in page.">
+                <Input type="email" autoComplete="email" required value={email} onChange={(e) => setEmail(e.target.value)} />
+              </Field>
+            ) : step === "password" ? (
               <>
                 <Field label="Email">
                   <Input type="email" autoComplete="email" required value={email} onChange={(e) => setEmail(e.target.value)} />
@@ -68,8 +88,18 @@ export default function LoginPage() {
               </p>
             )}
             <Button type="submit" disabled={busy} className="w-full">
-              {busy ? "Signing in…" : step === "password" ? "Sign in" : "Verify"}
+              {busy ? "Signing in…" : step === "password" ? "Sign in" : step === "sso" ? "Continue" : "Verify"}
             </Button>
+            {step === "password" && (
+              <button type="button" className="w-full text-center text-sm text-brand-700 underline" onClick={() => (setStep("sso"), setError(""))}>
+                Sign in with single sign-on
+              </button>
+            )}
+            {step === "sso" && (
+              <button type="button" className="w-full text-center text-xs text-slate-600 underline" onClick={() => (setStep("password"), setError(""))}>
+                Use a password instead
+              </button>
+            )}
             {step === "code" && (
               <button type="button" className="w-full text-center text-xs text-slate-500 underline" onClick={() => (setStep("password"), setCode(""), setError(""))}>
                 Back

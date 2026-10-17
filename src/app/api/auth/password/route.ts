@@ -23,7 +23,7 @@ export const POST = handle(async (req: Request) => {
     .set({ passwordHash: await hashPassword(next), passwordChangedAt: new Date(), sessionVersion: sql`${schema.users.sessionVersion} + 1` })
     .where(eq(schema.users.id, u.id))
     .returning();
-  await createStaffSession(updated, user.orgId !== user.homeOrgId ? user.orgId : undefined);
+  await createStaffSession(updated, user.orgId !== user.homeOrgId ? user.orgId : undefined, { sso: user.viaSso });
   await audit({ type: "staff", id: u.id, orgId: u.orgId }, "auth.password_changed", "user", u.id);
   return json({ ok: true });
 });

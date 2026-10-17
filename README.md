@@ -22,6 +22,7 @@ An AI-powered, multi-round interview platform. Candidates upload a resume, link 
 | Phase 3 | Interviews in 12 languages (incl. Hindi, Tamil, Arabic; voice locales), OCR for scanned/photo resumes, GitLab & Bitbucket repos, system-design whiteboard seen by the AI, opt-in webcam presence checks (no face recognition), REST API with scoped keys and HMAC-signed webhooks, post-round candidate survey, recruiter-released candidate feedback, fairness monitor on process cohorts (four-fifths rule) |
 | Phase 4 | **Multiple organisations** with full data isolation (per-org settings, values, consent, KB, users, API keys, webhooks, retention, usage); **platform console** to create, enter and suspend organisations, set AI budget alerts and platform-wide models; **AWS Lambda code executor** (isolated VPC, CloudFormation template); **HR knowledge-base search** for large policy sets; whiteboard in PDF export |
 | Phase 5 | Production readiness: sign-in throttling and lockout, session revocation, password policy, security headers and CSRF guard; **two-factor sign-in** (org-enforceable); **audit log** with CSV export; **candidate data rights** (download, deletion within 30 days); **operations** dashboard and health monitoring; WCAG 2.1 AA accessibility checks |
+| Phase 6 | **Single sign-on** (OpenID Connect: Google Workspace, Microsoft Entra ID, Okta, …) with verified email domains, test sign-in, optional just-in-time accounts and organisation-enforced SSO; **branding** (logo and brand colour) on candidate pages and the interview room |
 | Recruiter app | Drives list, drive editor, candidate table with round/final scores, practical fit and integrity, decisions queue, full candidate report with transcripts, code and repo analysis, notes, settings (company values, HR knowledge base, consent, retention, users & roles) |
 
 ## Tech stack
@@ -47,7 +48,7 @@ npm run dev                   # http://localhost:3000 → sign in with the admin
 | Variable | Purpose |
 |---|---|
 | `DATABASE_URL` | Neon connection string. Use the **direct** endpoint (host without `-pooler`) with `sslmode=require` — the interview engine uses session-level advisory locks |
-| `APP_BASE_URL` | Public URL, used in candidate links and emails |
+| `APP_BASE_URL` | Public URL, used in candidate links and emails; SSO redirect URI is `${APP_BASE_URL}/api/auth/sso/callback` (register it with the identity provider) |
 | `SESSION_SECRET` | ≥ 32 random characters for signing staff sessions |
 | `ADMIN_EMAIL`, `ADMIN_PASSWORD` | First admin — a **platform admin** of the default organisation — created on first boot / `db:seed` if no users exist |
 | `ANTHROPIC_API_KEY` | Claude API key. Optional overrides: `AI_MODEL_INTERVIEWER`, `AI_MODEL_ANALYZER`, `AI_MODEL_EVALUATOR`, `AI_MODEL_UTILITY`, `AI_INTERVIEWER_EFFORT`, `AI_FALLBACKS` |
@@ -80,6 +81,9 @@ npm run ui-check:phase4  # platform console, acting-in-organisation banner, KB s
 npm run check:aws-executor   # AWS Lambda executor through the app's client (needs the AWS_* variables)
 npm run smoke:phase5 # headers, CSRF, lockout, session revocation, 2FA, data rights, audit CSV, operations
 npm run ui-check:phase5  # security/2FA, audit log, data requests, candidate data section, operations
+npm run smoke:phase6 # SSO against a local mock identity provider (forged tokens, replay, takeover, enforcement), branding
+npm run ui-check:phase6  # SSO and branding settings, SSO sign-in step, branded candidate pages
+npm run mock-oidc    # standalone mock OIDC provider on :4610 for trying SSO locally
 npm run a11y         # axe-core WCAG 2.1 AA checks on staff and candidate screens
 ```
 

@@ -87,6 +87,23 @@ export function Empty({ children }: { children: ReactNode }) {
   return <div className="rounded-lg border border-dashed border-slate-300 p-8 text-center text-sm text-slate-500">{children}</div>;
 }
 
+/** Candidate-facing header mark: the hiring organisation's logo and name when it has one, otherwise HBE Interview. */
+export function BrandMark({ brand, className }: { brand?: { name: string; logoUrl: string | null } | null; className?: string }) {
+  if (!brand?.logoUrl) return <Logo className={className} />;
+  return (
+    <span className={cx("inline-flex items-center gap-2 font-semibold text-slate-900", className)}>
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src={brand.logoUrl} alt={`${brand.name} logo`} className="h-8 w-auto max-w-[10rem] object-contain" />
+      <span>{brand.name}</span>
+    </span>
+  );
+}
+
+/** Small attribution shown on branded candidate pages. */
+export function PoweredBy() {
+  return <p className="mt-10 text-center text-xs text-slate-600">Interview powered by HBE Interview</p>;
+}
+
 export function Logo({ className }: { className?: string }) {
   return (
     <span className={cx("inline-flex items-center gap-2 font-semibold text-slate-900", className)}>

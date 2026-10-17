@@ -25,6 +25,9 @@
     "check:aws-executor": "tsx scripts/check-aws-executor.ts",
     "smoke:phase5": "tsx scripts/smoke-phase5.ts",
     "ui-check:phase5": "tsx e2e/ui-phase5.ts",
+    "smoke:phase6": "tsx scripts/smoke-phase6.ts",
+    "ui-check:phase6": "tsx e2e/ui-phase6.ts",
+    "mock-oidc": "tsx scripts/mock-oidc.ts",
     "a11y": "tsx e2e/a11y-check.ts"
   },
   "dependencies": {

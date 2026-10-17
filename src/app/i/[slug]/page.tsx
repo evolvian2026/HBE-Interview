@@ -2,7 +2,8 @@ import { DEFAULT_ORG_ID } from "@/lib/tenancy";
 import { eq } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
 import { getSettings } from "@/lib/settings";
-import { Card, Logo } from "@/components/ui";
+import { BrandMark, Card, PoweredBy } from "@/components/ui";
+import { getBranding } from "@/lib/branding";
 import { RegisterForm } from "@/components/candidate/register-form";
 import { enabledRounds } from "@/lib/core/rounds";
 import { ROUND_LABEL, type DriveConfig } from "@/lib/core/types";
@@ -13,6 +14,7 @@ export default async function OpenInvitePage({ params }: { params: Promise<{ slu
   const { slug } = await params;
   const [drive] = await db.select().from(schema.drives).where(eq(schema.drives.openSlug, slug));
   const settings = await getSettings(drive?.orgId ?? DEFAULT_ORG_ID);
+  const brand = drive ? await getBranding(drive.orgId) : null;
   const active = drive && drive.status === "active" && drive.currentVersionId;
   let rounds: string[] = [];
   if (active) {
@@ -20,9 +22,9 @@ export default async function OpenInvitePage({ params }: { params: Promise<{ slu
     rounds = enabledRounds(v.config as DriveConfig).map((r) => `${ROUND_LABEL[r.type]} · ~${r.durationMin} min`);
   }
   return (
-    <main className="mx-auto max-w-lg px-4 py-12">
+    <main className="mx-auto max-w-lg px-4 py-12" style={brand?.style as React.CSSProperties | undefined}>
       <div className="mb-8 flex justify-center">
-        <Logo />
+        <BrandMark brand={brand} />
       </div>
       {!active ? (
         <Card>
@@ -44,6 +46,7 @@ export default async function OpenInvitePage({ params }: { params: Promise<{ slu
           <RegisterForm slug={slug} />
         </Card>
       )}
+      {brand?.logoUrl && <PoweredBy />}
     </main>
   );
 }

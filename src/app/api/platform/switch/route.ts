@@ -13,7 +13,7 @@ export const POST = handle(async (req: Request) => {
   const { orgId } = Body.parse(await req.json());
   const org = isUuid(orgId) ? await getOrg(orgId) : null;
   if (!org) throw new HttpError(404, "Organisation not found");
-  await createStaffSession(user, org.id === user.homeOrgId ? undefined : org.id);
+  await createStaffSession(user, org.id === user.homeOrgId ? undefined : org.id, { sso: user.viaSso });
   await audit({ type: "staff", id: user.id, orgId: org.id }, "org.switch", "organization", org.id);
   return json({ ok: true });
 });

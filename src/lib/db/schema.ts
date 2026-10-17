@@ -34,6 +34,10 @@ export const organizations = pgTable("organizations", {
   status: text("status").notNull().default("active").$type<"active" | "suspended">(),
   /** Optional monthly AI spend alert threshold in USD (estimate). */
   aiBudgetUsd: real("ai_budget_usd"),
+  /** Branding on candidate pages (v1.7): logo image and primary colour (#rrggbb, contrast-checked against white). */
+  logo: bytea("logo"),
+  logoMime: text("logo_mime"),
+  brandColor: text("brand_color"),
   createdAt: createdAt(),
 });
 
@@ -543,4 +547,34 @@ export const dataRequests = pgTable(
   },
   (t) => [index("data_requests_org_status").on(t.orgId, t.status)],
 );
+
+/* ------------------------------- Phase 6 ---------------------------------- */
+
+/** Email domains an organisation has proven it controls (DNS TXT record, or confirmed by a platform admin). */
+export const orgDomains = pgTable("org_domains", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  orgId: orgRef(),
+  domain: text("domain").notNull().unique(),
+  verificationToken: text("verification_token").notNull(),
+  verifiedAt: ts("verified_at"),
+  verifiedBy: text("verified_by").$type<"dns" | "platform">(),
+  createdAt: createdAt(),
+});
+
+/** OpenID Connect single sign-on, one identity provider per organisation. */
+export const ssoConfigs = pgTable("sso_configs", {
+  orgId: uuid("org_id").primaryKey().references(() => organizations.id, { onDelete: "cascade" }),
+  issuer: text("issuer").notNull(),
+  clientId: text("client_id").notNull(),
+  /** AES-256-GCM sealed. */
+  clientSecret: text("client_secret").notNull(),
+  enabled: boolean("enabled").notNull().default(false),
+  /** Password sign-in refused for this organisation's users (platform admins keep it as break-glass). */
+  required: boolean("required").notNull().default(false),
+  /** Role given to people from a verified domain on first SSO sign-in; null = only existing users may sign in. */
+  jitRole: text("jit_role").$type<"recruiter" | "hiring_manager" | "viewer">(),
+  lastTestedAt: ts("last_tested_at"),
+  createdAt: createdAt(),
+  updatedAt: updatedAt(),
+});
 

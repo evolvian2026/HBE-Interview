@@ -5,6 +5,7 @@ import { createMfaChallenge, createStaffSession, ensureBootstrapAdmin, HttpError
 import { handle, json } from "@/lib/http";
 import { audit } from "@/lib/audit";
 import { clientIp, limit, resetLimit } from "@/lib/security/rate-limit";
+import { passwordBlockedBySso } from "@/lib/services/sso";
 
 const Body = z.object({ email: z.string().email(), password: z.string().min(1).max(200) });
 
@@ -32,6 +33,7 @@ export const POST = handle(async (req: Request) => {
     }
     throw new HttpError(401, GENERIC);
   }
+  if (await passwordBlockedBySso(u)) return json({ error: { message: "Your organisation signs in with single sign-on." }, sso: true }, 409);
   const [org] = await db.select({ status: schema.organizations.status }).from(schema.organizations).where(eq(schema.organizations.id, u.orgId));
   if (org?.status !== "active" && !u.platformAdmin) throw new HttpError(403, "Your organisation's account is suspended. Please contact support.");
   await db.update(schema.users).set({ failedLogins: 0, lockedUntil: null }).where(eq(schema.users.id, u.id));

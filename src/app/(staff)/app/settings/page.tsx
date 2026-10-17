@@ -8,11 +8,21 @@ import { KnowledgeBase } from "@/components/staff/knowledge-base";
 import { UsersAdmin } from "@/components/staff/users-admin";
 import { IntegrationsAdmin } from "@/components/staff/integrations-admin";
 import { recentDeliveries } from "@/lib/services/integrations";
+import { getSsoConfig, listDomains } from "@/lib/services/sso";
+import { verificationRecord } from "@/lib/core/domain";
+import { redirectUri } from "@/lib/sso/flow";
+import { SsoSettings } from "@/components/staff/sso-settings";
+import { BrandingSettings } from "@/components/staff/branding-settings";
+import { getBranding } from "@/lib/branding";
 
 export const dynamic = "force-dynamic";
 
-export default async function SettingsPage() {
+export default async function SettingsPage({ searchParams }: { searchParams: Promise<{ sso_error?: string; sso_test?: string }> }) {
   const me = await requireStaffPage("admin");
+  const sp = await searchParams;
+  const ssoDomains = await listDomains(me.orgId);
+  const ssoCfg = await getSsoConfig(me.orgId);
+  const branding = await getBranding(me.orgId);
   const settings = await getSettings(me.orgId);
   const kb = await db.select({ id: schema.kbDocuments.id, title: schema.kbDocuments.title, content: schema.kbDocuments.content }).from(schema.kbDocuments).where(eq(schema.kbDocuments.orgId, me.orgId)).orderBy(asc(schema.kbDocuments.title));
   const users = await db.select({ id: schema.users.id, name: schema.users.name, email: schema.users.email, role: schema.users.role, active: schema.users.active, driveIds: schema.users.driveIds, platformAdmin: schema.users.platformAdmin, totpEnabledAt: schema.users.totpEnabledAt }).from(schema.users).where(eq(schema.users.orgId, me.orgId)).orderBy(asc(schema.users.name));
@@ -31,6 +41,14 @@ export default async function SettingsPage() {
       <SettingsForm initial={settings} />
       <KnowledgeBase docs={kb.map((d) => ({ id: d.id, title: d.title, size: d.content.length, preview: d.content.slice(0, 200) }))} />
       <UsersAdmin users={users.map((u) => ({ ...u, has2fa: !!u.totpEnabledAt, totpEnabledAt: undefined }))} drives={drives} meId={me.id} />
+      <BrandingSettings name={settings.companyName} logoUrl={branding.logoUrl} brandColor={branding.brandColor} />
+      <SsoSettings
+        domains={ssoDomains.map((d) => ({ id: d.id, domain: d.domain, txt: verificationRecord(d.verificationToken), verified: !!d.verifiedAt, verifiedBy: d.verifiedBy }))}
+        config={ssoCfg ? { issuer: ssoCfg.issuer, clientId: ssoCfg.clientId, enabled: ssoCfg.enabled, required: ssoCfg.required, jitRole: ssoCfg.jitRole, lastTestedAt: ssoCfg.lastTestedAt?.toISOString() ?? null, hasSecret: !!ssoCfg.clientSecret } : null}
+        redirectUri={redirectUri()}
+        testedEmail={sp.sso_test}
+        error={sp.sso_error}
+      />
       <IntegrationsAdmin
         keys={keys.map((k) => ({ ...k, lastUsedAt: iso(k.lastUsedAt), revokedAt: iso(k.revokedAt), createdAt: k.createdAt.toISOString() }))}
         hooks={hooks}

@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Product** | HBE Interview: an AI-powered, multi-round interview platform |
-| **Document status** | v1.6 — approved; Phases 1–5 built |
+| **Document status** | v1.7 — approved; Phases 1–6 built |
 | **Date** | 2026-10-16 |
 | **Owner** | Product Architect / Product Owner |
 | **Companion documents** | [FEATURES.md](FEATURES.md) (detailed feature specification) · [ARCHITECTURE.md](ARCHITECTURE.md) (detailed technical architecture) |
@@ -12,6 +12,7 @@
 
 | Version | Date | Change |
 |---|---|---|
+| 1.7 | 2026-10-17 | Phase 6 built — enterprise identity and branding: **single sign-on** over OpenID Connect (Google Workspace, Microsoft Entra ID, Okta, any OIDC provider) with verified email domains (DNS TXT or platform confirmation), test sign-in, optional just-in-time accounts, and organisation-enforced SSO with a platform-admin break-glass; **per-organisation branding** (logo and accessible brand colour) on candidate pages and the interview room |
 | 1.6 | 2026-10-17 | Phase 5 built — production readiness: login throttling and account lockout (shared across instances), session revocation, password policy, security headers (CSP, HSTS, frame-ancestors), cross-site request guard; **two-factor sign-in** (TOTP + recovery codes, organisation-enforceable, admin reset); **audit log** viewer and CSV export; **candidate data rights** (self-service download, deletion requests fulfilled within 30 days, automatic at the due date); **operations** dashboard (job queue, failed-job retry, worker heartbeat in /api/health); WCAG 2.1 AA accessibility pass |
 | 1.5 | 2026-10-16 | Phase 4 built — the deferred decisions §11-3 and §11-8: **multiple organisations** (tenant isolation on every page, API, webhook and job; per-org settings, values, consent, KB, users, API keys, webhooks, retention and usage; platform console to create/suspend organisations, switch into them and set AI budget alerts; platform-wide model settings), **AWS Lambda code executor** (SigV4 Invoke, container image, isolated-VPC CloudFormation template; Judge0 remains the default), **HR knowledge-base search** for large policy sets (Postgres full-text passages per question), whiteboard in the PDF export |
 | 1.4 | 2026-10-16 | Phase 3 built: multilingual interviews (12 languages), OCR for scanned/image resumes, GitLab and Bitbucket repositories, system-design whiteboard, opt-in webcam presence proctoring, REST API with scoped API keys, HMAC-signed webhooks, candidate experience survey, recruiter-released candidate feedback, fairness monitor on process cohorts. Identity verification / face matching deliberately not built (biometric data); demographic bias audits require consented external data |
@@ -453,7 +454,8 @@ Diagrams, component design, the interview state machine, data model, API specifi
 | **Phase 2 — built (v1.3)** | P1 items: bulk CSV invites and reminders (B-2), code replay (F-6), inline snippet editor (F-8), prioritisation exercise (G-8), PDF export and share links (I-8), comparison (J-6), analytics (J-7), template library (A-9), custom coding problems (A-8), AI-generated answer flags (K-3), cross-round contradictions in the combined report (K-5), usage metering (L-3), model admin (L-4), hiring-manager drive assignment. Voice moved to Phase 1. Private repositories (D-3) deferred per decision §11-4 |
 | **Phase 3 — built (v1.4)** | P2 items: multilingual interviews, OCR, whiteboard, GitLab/Bitbucket, opt-in webcam presence proctoring, REST API + signed webhooks for ATS/HRMS, candidate survey and released feedback, fairness monitor (process cohorts, four-fifths rule). Not built by design: face matching / identity verification (biometric data under DPDP/GDPR), demographic bias audits (no protected data is collected). Still deferred: private repositories (§11-4), multiple organisations (§11-8) — see FEATURES §18.8 |
 | **Phase 4 — built (v1.5)** | Deferred decisions delivered: multiple organisations with a platform console (§11-8), AWS Lambda code execution (§11-3), HR knowledge-base search for large policy sets, whiteboard in PDF export. Still out of scope: private repositories (§11-4), identity verification, demographic bias audits |
-| **Phase 5 — built (v1.6)** | Production readiness: security hardening, two-factor sign-in, audit log, candidate data rights (access and erasure), operations dashboard and health monitoring, accessibility (WCAG 2.1 AA automated checks). Not built: SSO/SAML (next candidate), Postgres row-level security, per-org branding |
+| **Phase 5 — built (v1.6)** | Production readiness: security hardening, two-factor sign-in, audit log, candidate data rights (access and erasure), operations dashboard and health monitoring, accessibility (WCAG 2.1 AA automated checks) |
+| **Phase 6 — built (v1.7)** | Enterprise identity and branding: OIDC single sign-on with verified domains, test sign-in, just-in-time accounts and SSO enforcement; organisation logo and brand colour on candidate-facing pages. Not built: SAML 2.0, SCIM provisioning, custom domains, Postgres row-level security |
 
 ### 10.1 Phase 1 build milestones
 

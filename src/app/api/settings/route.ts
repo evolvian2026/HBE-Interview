@@ -18,7 +18,7 @@ const Body = z.object({
 export const PUT = handle(async (req: Request) => {
   const user = await requireStaff("admin");
   const patch = Body.parse(await req.json());
-  if (patch.require2fa && !user.has2fa) throw new HttpError(400, "Turn on two-factor sign-in for your own account first (Security), so you don't lock yourself out.");
+  if (patch.require2fa && !user.has2fa && !user.viaSso) throw new HttpError(400, "Turn on two-factor sign-in for your own account first (Security), so you don't lock yourself out.");
   const s = await saveSettings(user.orgId, patch);
   await audit({ type: "staff", id: user.id, orgId: user.orgId }, "settings.update", "settings", "org", Object.keys(patch));
   return json(s);

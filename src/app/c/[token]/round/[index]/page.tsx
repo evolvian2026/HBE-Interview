@@ -5,6 +5,7 @@ import { candidacyByToken } from "@/lib/auth/candidate";
 import { enabledRounds } from "@/lib/core/rounds";
 import { ROUND_LABEL, type DriveConfig } from "@/lib/core/types";
 import { getSettings } from "@/lib/settings";
+import { getBranding } from "@/lib/branding";
 import { InterviewRoom } from "@/components/room/room";
 
 export const dynamic = "force-dynamic";
@@ -24,9 +25,12 @@ export default async function RoundPage({ params }: { params: Promise<{ token: s
   const available = i === row.candidacy.currentRoundIndex && ["ready", "round_available"].includes(row.candidacy.stage);
   if (!session && !available) redirect(`/c/${token}`);
   const settings = await getSettings(row.candidacy.orgId);
+  const brand = await getBranding(row.candidacy.orgId);
   const sections = round.sections.filter((s) => s.enabled);
   return (
+    <div style={brand.style as React.CSSProperties}>
     <InterviewRoom
+      brand={{ name: brand.name, logoUrl: brand.logoUrl }}
       token={token}
       roundIndex={i}
       roundLabel={ROUND_LABEL[round.type]}
@@ -40,5 +44,6 @@ export default async function RoundPage({ params }: { params: Promise<{ token: s
       languages={(version.config as DriveConfig).languages ?? ["en"]}
       webcam={(version.config as DriveConfig).proctoring?.webcam && (row.candidacy.consent as { webcam?: boolean } | null)?.webcam ? { intervalSec: (version.config as DriveConfig).proctoring!.intervalSec } : null}
     />
+    </div>
   );
 }
