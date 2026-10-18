@@ -26,6 +26,7 @@ An AI-powered, multi-round interview platform. Candidates upload a resume, link 
 | Phase 7 | **Blind calibration reviews** of the AI's scoring with an agreement dashboard and drift alerts; **candidate accommodations** (extra time, extra breaks) applied to the interview clock |
 | Phase 8 | **Panel interviews** (candidate self-scheduling, calendar files), **interview kits** from the AI reports, **independent scorecards**, split-panel debrief and the **final decision** (offer / reject / hold) with candidate notification |
 | Phase 9 | **Talent pool** with candidate consent, cross-drive search, tags and **re-invite with resume reuse**; candidacy sources; **hiring insights** (funnel, durations, sources, AI vs decisions, panelist agreement) with CSV |
+| Phase 10 | **Talent-pool matching** on each drive (explainable skill fit) with **bulk invites**; a **staff inbox** with a navigation count and an opt-in **daily digest** |
 | Recruiter app | Drives list, drive editor, candidate table with round/final scores, practical fit and integrity, decisions queue, full candidate report with transcripts, code and repo analysis, notes, settings (company values, HR knowledge base, consent, retention, users & roles) |
 
 ## Tech stack
@@ -92,6 +93,8 @@ npm run smoke:phase8 # panel scheduling, kits, independent scorecards, debrief, 
 npm run ui-check:phase8  # arranging a panel, candidate picks a time, kit + scorecard, debrief + decision, offer
 npm run smoke:phase9 # sources, talent pool consent/search/tags/re-invite, insights and CSV, isolation
 npm run ui-check:phase9  # pool opt-in, talent search and profile, hiring insights
+npm run smoke:phase10 # pool matching and bulk invites, inbox per role, nav count, digest
+npm run ui-check:phase10 # pool suggestions on a drive, the inbox
 npm run mock-oidc    # standalone mock OIDC provider on :4610 for trying SSO locally
 npm run a11y         # axe-core WCAG 2.1 AA checks on staff and candidate screens
 ```

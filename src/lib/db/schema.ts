@@ -69,6 +69,9 @@ export const users = pgTable("users", {
   passwordChangedAt: ts("password_changed_at"),
   /** Drives a hiring manager is assigned to (hiring managers only see these). */
   driveIds: jsonb("drive_ids").$type<string[]>().notNull().default([]),
+  /** Daily inbox email (Phase 10), sent from 07:00 UTC when there's something to act on. */
+  digestOptIn: boolean("digest_opt_in").notNull().default(false),
+  digestSentAt: ts("digest_sent_at"),
   createdAt: createdAt(),
 });
 

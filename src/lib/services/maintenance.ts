@@ -5,6 +5,7 @@ import { endSession } from "../interview/orchestrator";
 import { audit } from "../audit";
 import { sendReminderEmail } from "./notify";
 import { sendScorecardReminders } from "./panel";
+import { sendDigests } from "./inbox";
 
 let lastPurge = 0;
 
@@ -52,7 +53,9 @@ export async function periodicMaintenance() {
   }
   // 5) Panel scorecards still open a day after the interview.
   await sendScorecardReminders(now).catch((e) => console.error("scorecard reminders failed", e));
-  // 6) Retention purge (daily).
+  // 6) Daily inbox digest for staff who asked for it.
+  await sendDigests(now).catch((e) => console.error("digest failed", e));
+  // 7) Retention purge (daily).
   if (now.getTime() - lastPurge > 24 * 3600_000) {
     lastPurge = now.getTime();
     // Each organisation has its own retention period.

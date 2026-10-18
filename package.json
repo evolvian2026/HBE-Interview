@@ -29,10 +29,12 @@
     "smoke:phase7": "tsx scripts/smoke-phase7.ts",
     "smoke:phase8": "tsx scripts/smoke-phase8.ts",
     "smoke:phase9": "tsx scripts/smoke-phase9.ts",
+    "smoke:phase10": "tsx scripts/smoke-phase10.ts",
     "ui-check:phase6": "tsx e2e/ui-phase6.ts",
     "ui-check:phase7": "tsx e2e/ui-phase7.ts",
     "ui-check:phase8": "tsx e2e/ui-phase8.ts",
     "ui-check:phase9": "tsx e2e/ui-phase9.ts",
+    "ui-check:phase10": "tsx e2e/ui-phase10.ts",
     "mock-oidc": "tsx scripts/mock-oidc.ts",
     "a11y": "tsx e2e/a11y-check.ts"
   },

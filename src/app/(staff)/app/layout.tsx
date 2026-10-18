@@ -8,11 +8,13 @@ import { Logo } from "@/components/ui";
 import { LogoutButton } from "@/components/staff/logout-button";
 import { ReturnHomeButton } from "@/components/staff/return-home-button";
 import { AdminMenu } from "@/components/staff/admin-menu";
+import { actionCount, inbox } from "@/lib/services/inbox";
 
 export default async function StaffLayout({ children }: { children: React.ReactNode }) {
   const user = await requireStaffPage("viewer", { allowEnrollment: true });
   const org = await getOrg(user.orgId);
   const away = user.orgId !== user.homeOrgId;
+  const waiting = user.mustEnroll2fa ? 0 : actionCount(await inbox(user, { light: true }));
   const budget = user.role === "admin" ? await orgBudget(user.orgId) : null;
   const [dr] =
     user.role === "admin"
@@ -49,6 +51,9 @@ export default async function StaffLayout({ children }: { children: React.ReactN
           </Link>
           <nav aria-label="Main" className="flex items-center gap-0.5 text-sm">
             <Link href="/app" className="whitespace-nowrap rounded-md px-2.5 py-1.5 text-slate-700 hover:bg-slate-100">Hiring drives</Link>
+            <Link href="/app/inbox" className="whitespace-nowrap rounded-md px-2.5 py-1.5 text-slate-700 hover:bg-slate-100" aria-label={waiting ? `Inbox, ${waiting} waiting` : "Inbox"}>
+              Inbox{waiting > 0 && <span className="ml-1 rounded-full bg-amber-100 px-1.5 py-0.5 text-xs font-semibold text-amber-900">{waiting}</span>}
+            </Link>
             <Link href="/app/gate-queue" className="whitespace-nowrap rounded-md px-2.5 py-1.5 text-slate-700 hover:bg-slate-100">Decisions</Link>
             {user.role !== "viewer" && <Link href="/app/panel" className="whitespace-nowrap rounded-md px-2.5 py-1.5 text-slate-700 hover:bg-slate-100">My interviews</Link>}
             {(user.role === "recruiter" || user.role === "admin") && <Link href="/app/talent" className="whitespace-nowrap rounded-md px-2.5 py-1.5 text-slate-700 hover:bg-slate-100">Talent</Link>}

@@ -10,6 +10,8 @@ import { Badge, Card, Empty, LinkButton, PageHeader } from "@/components/ui";
 import { FIT_TONE, REC_TONE, STAGE_LABEL, STAGE_TONE } from "@/components/labels";
 import { DriveActions } from "@/components/staff/drive-actions";
 import { InviteForm } from "@/components/staff/invite-form";
+import { PoolSuggestions } from "@/components/staff/pool-suggestions";
+import { poolSuggestions, MATCH_THRESHOLD } from "@/lib/services/matching";
 import { CopyButton } from "@/components/staff/copy-button";
 
 export const dynamic = "force-dynamic";
@@ -35,6 +37,7 @@ export default async function DrivePage({ params, searchParams }: { params: Prom
   const ids = rows.map((r) => r.c.id);
   const reports = ids.length ? await db.select().from(schema.roundReports).where(inArray(schema.roundReports.candidacyId, ids)) : [];
   const combined = ids.length ? await db.select().from(schema.combinedReports).where(inArray(schema.combinedReports.candidacyId, ids)) : [];
+  const suggestions = d.status === "active" && hasRole(user, "recruiter") ? await poolSuggestions(user, d.id, { limit: 10, minScore: 40 }) : [];
   const fits = ids.length ? await db.select().from(schema.practicalFit).where(inArray(schema.practicalFit.candidacyId, ids)) : [];
 
   const byStage: Record<string, number> = {};
@@ -95,6 +98,14 @@ export default async function DrivePage({ params, searchParams }: { params: Prom
           {d.status === "active" && hasRole(user, "recruiter") ? <InviteForm driveId={d.id} /> : <p className="text-sm text-slate-500">Available when the drive is active.</p>}
         </Card>
       </div>
+      {suggestions.length > 0 && (
+        <Card title={`Suggested from your talent pool — ${suggestions.filter((x) => x.score >= MATCH_THRESHOLD).length} strong match${suggestions.filter((x) => x.score >= MATCH_THRESHOLD).length === 1 ? "" : "es"}`} className="mb-6">
+          <PoolSuggestions
+            driveId={d.id}
+            items={suggestions.map((x) => ({ candidateId: x.candidateId, name: x.name, score: x.score, matchedMust: x.matchedMust, missingMust: x.missingMust, matchedNice: x.matchedNice, yearsOk: x.yearsOk, lastDrive: x.lastDrive, lastAi: x.lastAi ? RECOMMENDATION_LABEL[x.lastAi] : null, tags: x.tags }))}
+          />
+        </Card>
+      )}
 
       <div className="mb-3 flex flex-wrap items-center gap-2 text-sm">
         {STAGES.filter((s) => s === "all" || byStage[s]).map((s) => (

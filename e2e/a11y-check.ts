@@ -70,6 +70,7 @@ async function main() {
     ["talent pool", "/app/talent"],
     ["talent profile", `/app/talent/${c.candidate_id}`],
     ["insights", "/app/insights"],
+    ["inbox", "/app/inbox"],
     ...(panel ? ([["interview kit", `/app/panel/${panel.id}`]] as [string, string][]) : []),
   ];
   for (const [label, path] of staffPages) {

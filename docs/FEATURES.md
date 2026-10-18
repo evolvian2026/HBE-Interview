@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Document status** | v2.0 — approved; Phases 1–9 built (as-built notes: ARCHITECTURE §0; integration reference: [API.md](API.md)) |
+| **Document status** | v2.1 — approved; Phases 1–10 built (as-built notes: ARCHITECTURE §0; integration reference: [API.md](API.md)) |
 | **Date** | 2026-10-16 |
 | **Related** | [PRD.md](PRD.md) (product requirements) · [ARCHITECTURE.md](ARCHITECTURE.md) (technical architecture) |
 
@@ -36,6 +36,7 @@ This document specifies **how each feature behaves**: user stories, flows, scree
 22. [Phase 7 features (v1.8)](#22-phase-7-features-v18)
 23. [Phase 8 features (v1.9)](#23-phase-8-features-v19)
 24. [Phase 9 features (v2.0)](#24-phase-9-features-v20)
+25. [Phase 10 features (v2.1)](#25-phase-10-features-v21)
 
 ---
 
@@ -1222,3 +1223,40 @@ Candidates can request extra time (+25% or +50%) through a link on the consent s
 | Automatic matching of pooled candidates to new drives | Search by skill and re-invite manually |
 | Outreach campaigns / bulk re-invites | One drive at a time per candidate |
 | Cost per source, requisitions and headcount | Not tracked |
+
+---
+
+## 25. Phase 10 features (v2.1)
+
+### 25.1 Suggested from your talent pool
+
+- **Where:** every active drive shows recruiters and admins up to 10 people from the talent pool who aren't in the drive yet, ranked by **fit to the role**. The title counts the **strong matches** (60%+).
+- **Fit (0–100):** must-have skills 70, nice-to-haves 20, years of experience for the level 10 (neutral when unknown), from the person's latest parsed resume.
+  - Skills are compared after normalising case, punctuation and common aliases: Node.js/NodeJS, Postgres/PostgreSQL, K8s/Kubernetes, Golang/Go, JS/TS and others.
+  - A more specific skill satisfies a general one (*AWS Lambda* counts as *AWS*), but Java never matches JavaScript and Go never matches Google Cloud.
+  - Years are computed from experience dates, counting overlapping jobs once.
+- **Explanation:** each suggestion says what the person has, which must-haves are missing, any bonus skills, an experience gap, and their last application with its AI result. People below 40% aren't listed.
+- **Bulk invite:** tick people and *Invite selected* (up to 25 at once). Each gets the same re-invite as in Phase 9: a copied resume re-matched to the role, recorded as a talent-pool source. People who aren't in the pool are reported and not invited. Hiring managers and viewers don't see suggestions.
+- Matching is deterministic and runs no AI, so it's free, instant and explainable. It complements, not replaces, the AI interview.
+
+### 25.2 Inbox
+
+- **Inbox** (all staff) lists what is waiting on *you*, with a count of actionable items in the navigation:
+
+  | Who | Sections |
+  |---|---|
+  | Panelists (hiring managers and above) | Scorecards to submit; panel interviews this week |
+  | Decision makers (hiring managers and above, their drives) | Round decisions waiting; panels with every scorecard in, ready for the final decision; blind calibration reviews |
+  | Recruiters and admins | Interview adjustment requests; panel interviews to reschedule; AI scoring drift alerts |
+  | Admins | Candidate data deletion requests |
+
+- Each section shows up to 8 items (oldest first), with times in the viewer's time zone and a link to the full list. Informational sections (upcoming interviews, calibration, drift) don't add to the count.
+- **Daily summary email:** *Email me a daily summary* on the Inbox page. It is sent once a day from 07:00 UTC, and only when there's something to act on, listing each section with links.
+
+### 25.3 Not built yet
+
+| Item | Note |
+|---|---|
+| AI / semantic matching (beyond skills) | Skill fit is deterministic; the AI interview does the judging |
+| Outreach campaigns | Invitations use the standard invite email |
+| Slack / Microsoft Teams notifications | Email digest and in-app inbox only |

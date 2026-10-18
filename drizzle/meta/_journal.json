@@ -71,6 +71,13 @@
       "when": 1792290565209,
       "tag": "0009_phase9_talent",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1792291557740,
+      "tag": "0010_phase10_inbox",
+      "breakpoints": true
     }
   ]
 }
