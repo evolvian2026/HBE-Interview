@@ -100,6 +100,8 @@ Register an HTTPS endpoint and choose events. The signing secret (`whsec_…`) i
 | `gate.decided` | An auto or manual gate decision is recorded | `candidacyId`, `fromRoundIndex`, `decision`, `mode` |
 | `candidate.completed` | The combined report is ready | `candidacyId`, `finalScore`, `recommendation`, `partial` |
 | `candidate.status_changed` | A recruiter shortlists / rejects / holds / completes | `candidacyId`, `status` |
+| `panel.scheduled` | A panel interview is booked (one time offered, the candidate chose a time, or a single new time was offered) | `candidacyId`, `interviewId`, `scheduledAt`, `durationMin` |
+| `candidate.decided` | The final decision is recorded (offer / reject / hold) | `candidacyId`, `decision`, `aiRecommendation`, `panelConsensus` |
 | `ping` | "Send test" in Settings | `message` |
 
 ### Request
