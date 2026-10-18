@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Product** | HBE Interview: an AI-powered, multi-round interview platform |
-| **Document status** | v1.9 — approved; Phases 1–8 built |
+| **Document status** | v2.0 — approved; Phases 1–9 built |
 | **Date** | 2026-10-16 |
 | **Owner** | Product Architect / Product Owner |
 | **Companion documents** | [FEATURES.md](FEATURES.md) (detailed feature specification) · [ARCHITECTURE.md](ARCHITECTURE.md) (detailed technical architecture) |
@@ -12,6 +12,7 @@
 
 | Version | Date | Change |
 |---|---|---|
+| 2.0 | 2026-10-18 | Phase 9 built — talent pool and hiring insights: **candidate-consented talent pool** (6/12/24 months, kept out of the retention purge until it ends, leave any time), **cross-drive candidate search** (name, email, resume text, drive, stage, AI result, tags), recruiter **tags**, **re-invite to another drive** reusing and re-matching the latest resume; **candidacy sources** (invite, CSV, open link, API, talent pool); **hiring insights** (funnel with conversion, median durations, sources, people's decisions vs the AI, agreement between panelists, per-drive table, anonymised CSV); compact staff navigation (Admin menu) |
 | 1.9 | 2026-10-18 | Phase 8 built — from AI screening to a hiring decision: **panel interviews** with people (recruiter offers times, candidate self-schedules or asks for others, calendar files, reschedule/cancel, reminders), **interview kits** built from the AI reports, **independent scorecards** (hidden from fellow panelists until each submits), a **debrief** that flags split panels, and the **final decision** (offer / reject / hold) with recorded reasoning, the AI and panel basis, an optional candidate notification and a `candidate.decided` webhook |
 | 1.8 | 2026-10-17 | Phase 7 built — human oversight of the AI and fair access: **blind calibration reviews** (a sample of AI-evaluated rounds, every low-confidence evaluation, or any round on request, scored by a person who can't see the AI's scores or the candidate's name), a **calibration dashboard** (agreement per parameter, bias, weighted kappa, recommendation confusion matrix, by evaluator version, drift alerts, CSV export) and disagreement flags on reports and Decisions; **candidate accommodations** (extra time and extra breaks requested by the candidate, decided by recruiters, applied to the interview clock, private from decision makers and the AI) |
 | 1.7 | 2026-10-17 | Phase 6 built — enterprise identity and branding: **single sign-on** over OpenID Connect (Google Workspace, Microsoft Entra ID, Okta, any OIDC provider) with verified email domains (DNS TXT or platform confirmation), test sign-in, optional just-in-time accounts, and organisation-enforced SSO with a platform-admin break-glass; **per-organisation branding** (logo and accessible brand colour) on candidate pages and the interview room |
@@ -460,6 +461,7 @@ Diagrams, component design, the interview state machine, data model, API specifi
 | **Phase 6 — built (v1.7)** | Enterprise identity and branding: OIDC single sign-on with verified domains, test sign-in, just-in-time accounts and SSO enforcement; organisation logo and brand colour on candidate-facing pages. Not built: SAML 2.0, SCIM provisioning, custom domains, Postgres row-level security |
 | **Phase 7 — built (v1.8)** | Human oversight and fair access: blind calibration reviews, AI–human agreement dashboard with drift alerts, disagreement flags; candidate accommodations (extra time, extra breaks) applied to the interview clock. Not built: holding auto-advance until a sampled round is reviewed, inter-rater agreement between people, automatic recalibration of the evaluator |
 | **Phase 8 — built (v1.9)** | Human panel and final decision: self-scheduled panel interviews with .ics files, interview kits from the AI reports, independent scorecards, split-panel debrief, offer/reject/hold with reasoning and candidate notification. Not built: calendar sync (Google/Microsoft free-busy), video-meeting creation, offer letters and e-signature, interviewer training/shadowing |
+| **Phase 9 — built (v2.0)** | Talent pool with candidate consent, search, tags and re-invite with resume reuse; candidacy sources; hiring insights (funnel, durations, sources, AI vs decisions, panelist agreement) with CSV. Not built: automatic matching of pooled candidates to new drives, outreach campaigns, source cost tracking |
 
 ### 10.1 Phase 1 build milestones
 

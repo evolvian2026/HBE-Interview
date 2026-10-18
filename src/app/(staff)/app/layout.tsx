@@ -7,6 +7,7 @@ import { db, schema } from "@/lib/db";
 import { Logo } from "@/components/ui";
 import { LogoutButton } from "@/components/staff/logout-button";
 import { ReturnHomeButton } from "@/components/staff/return-home-button";
+import { AdminMenu } from "@/components/staff/admin-menu";
 
 export default async function StaffLayout({ children }: { children: React.ReactNode }) {
   const user = await requireStaffPage("viewer", { allowEnrollment: true });
@@ -41,23 +42,35 @@ export default async function StaffLayout({ children }: { children: React.ReactN
         </div>
       )}
       <header className="sticky top-0 z-20 border-b border-slate-200 bg-white/90 backdrop-blur">
-        <div className="mx-auto flex h-14 max-w-7xl items-center gap-6 px-4">
+        <div className="mx-auto flex h-14 max-w-7xl items-center gap-4 px-4">
           <Link href="/app" className="flex items-center gap-2">
             <Logo />
             {org && <span className="hidden rounded-md bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600 md:inline">{org.name}</span>}
           </Link>
-          <nav className="flex gap-1 text-sm">
-            <Link href="/app" className="rounded-md px-3 py-1.5 text-slate-700 hover:bg-slate-100">Hiring drives</Link>
-            <Link href="/app/gate-queue" className="rounded-md px-3 py-1.5 text-slate-700 hover:bg-slate-100">Decisions</Link>
-            {user.role !== "viewer" && <Link href="/app/panel" className="rounded-md px-3 py-1.5 text-slate-700 hover:bg-slate-100">My interviews</Link>}
-            {user.role !== "viewer" && <Link href="/app/calibration" className="rounded-md px-3 py-1.5 text-slate-700 hover:bg-slate-100">Calibration</Link>}
-            {user.role === "admin" && <Link href="/app/usage" className="rounded-md px-3 py-1.5 text-slate-700 hover:bg-slate-100">AI usage</Link>}
-            {user.role === "admin" && <Link href="/app/audit" className="rounded-md px-3 py-1.5 text-slate-700 hover:bg-slate-100">Audit</Link>}
-            {user.role === "admin" && <Link href="/app/settings" className="rounded-md px-3 py-1.5 text-slate-700 hover:bg-slate-100">Settings</Link>}
-            {user.platformAdmin && <Link href="/app/platform" className="rounded-md px-3 py-1.5 text-slate-700 hover:bg-slate-100">Platform</Link>}
+          <nav aria-label="Main" className="flex items-center gap-0.5 text-sm">
+            <Link href="/app" className="whitespace-nowrap rounded-md px-2.5 py-1.5 text-slate-700 hover:bg-slate-100">Hiring drives</Link>
+            <Link href="/app/gate-queue" className="whitespace-nowrap rounded-md px-2.5 py-1.5 text-slate-700 hover:bg-slate-100">Decisions</Link>
+            {user.role !== "viewer" && <Link href="/app/panel" className="whitespace-nowrap rounded-md px-2.5 py-1.5 text-slate-700 hover:bg-slate-100">My interviews</Link>}
+            {(user.role === "recruiter" || user.role === "admin") && <Link href="/app/talent" className="whitespace-nowrap rounded-md px-2.5 py-1.5 text-slate-700 hover:bg-slate-100">Talent</Link>}
+            {(user.role === "recruiter" || user.role === "admin") && <Link href="/app/insights" className="whitespace-nowrap rounded-md px-2.5 py-1.5 text-slate-700 hover:bg-slate-100">Insights</Link>}
+            {user.role !== "viewer" && <Link href="/app/calibration" className="whitespace-nowrap rounded-md px-2.5 py-1.5 text-slate-700 hover:bg-slate-100">Calibration</Link>}
+            {(user.role === "admin" || user.platformAdmin) && (
+              <AdminMenu
+                items={[
+                  ...(user.role === "admin"
+                    ? [
+                        { href: "/app/settings", label: "Settings" },
+                        { href: "/app/usage", label: "AI usage" },
+                        { href: "/app/audit", label: "Audit log" },
+                      ]
+                    : []),
+                  ...(user.platformAdmin ? [{ href: "/app/platform", label: "Platform" }] : []),
+                ]}
+              />
+            )}
           </nav>
           <div className="ml-auto flex items-center gap-3 text-sm text-slate-600">
-            <Link href="/app/security" className="hidden hover:text-slate-900 sm:inline" title="Security settings">
+            <Link href="/app/security" className="hidden whitespace-nowrap hover:text-slate-900 lg:inline" title="Security settings">
               {user.name} · {user.role.replace("_", " ")}
             </Link>
             <LogoutButton />

@@ -28,7 +28,7 @@ async function main() {
   await db.connect();
   const [c] = (
     await db.query(
-      "select c.id, c.access_token, c.drive_id from candidacies c join combined_reports r on r.candidacy_id = c.id join users u on u.org_id = c.org_id where r.status = 'ready' and u.email = $1 order by c.created_at desc limit 1",
+      "select c.id, c.access_token, c.drive_id, c.candidate_id from candidacies c join combined_reports r on r.candidacy_id = c.id join users u on u.org_id = c.org_id where r.status = 'ready' and u.email = $1 order by c.created_at desc limit 1",
       [process.env.ADMIN_EMAIL!.toLowerCase()],
     )
   ).rows;
@@ -67,6 +67,9 @@ async function main() {
     ["calibration", "/app/calibration"],
     ...(queued ? ([["blind review", `/app/calibration/${queued.id}`]] as [string, string][]) : []),
     ["my interviews", "/app/panel"],
+    ["talent pool", "/app/talent"],
+    ["talent profile", `/app/talent/${c.candidate_id}`],
+    ["insights", "/app/insights"],
     ...(panel ? ([["interview kit", `/app/panel/${panel.id}`]] as [string, string][]) : []),
   ];
   for (const [label, path] of staffPages) {

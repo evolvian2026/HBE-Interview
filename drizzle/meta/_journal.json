@@ -64,6 +64,13 @@
       "when": 1792288998180,
       "tag": "0008_phase8_panel",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1792290565209,
+      "tag": "0009_phase9_talent",
+      "breakpoints": true
     }
   ]
 }

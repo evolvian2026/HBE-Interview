@@ -63,7 +63,13 @@ export async function periodicMaintenance() {
         .select({ id: schema.candidacies.id })
         .from(schema.candidacies)
         .where(
-          and(eq(schema.candidacies.orgId, org.id), lt(schema.candidacies.updatedAt, cutoff), sql`${schema.candidacies.stage} in ('completed','rejected','expired','declined','shortlisted','offer')`),
+          and(
+            eq(schema.candidacies.orgId, org.id),
+            lt(schema.candidacies.updatedAt, cutoff),
+            sql`${schema.candidacies.stage} in ('completed','rejected','expired','declined','shortlisted','offer')`,
+            // Candidates in the talent pool are kept until their consent runs out.
+            sql`not exists (select 1 from candidates x where x.id = ${schema.candidacies.candidateId} and x.pool_expires_at > now())`,
+          ),
         );
       for (const c of old) await purgeCandidacy(c.id, "retention");
     }

@@ -123,6 +123,11 @@ export const candidates = pgTable(
     email: text("email").notNull(),
     name: text("name").notNull(),
     githubUsername: text("github_username"),
+    /** Talent pool: the candidate agreed to be kept on file and contacted about future roles (until the expiry). */
+    poolConsentAt: ts("pool_consent_at"),
+    poolExpiresAt: ts("pool_expires_at"),
+    /** Recruiter tags, e.g. "silver medalist", "frontend". */
+    tags: jsonb("tags").notNull().default([]).$type<string[]>(),
     createdAt: createdAt(),
   },
   (t) => [uniqueIndex("candidate_org_email").on(t.orgId, t.email)],
@@ -149,6 +154,8 @@ export const candidacies = pgTable(
     feedbackSummary: jsonb("feedback_summary"),
     feedbackReleasedAt: ts("feedback_released_at"),
     finalStatus: text("final_status"),
+    /** How the candidacy started: staff invite, CSV, open link, API, or a talent-pool re-invite. */
+    source: text("source").$type<"invite" | "csv" | "open" | "api" | "reinvite">(),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },

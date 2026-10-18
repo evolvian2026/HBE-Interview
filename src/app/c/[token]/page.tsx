@@ -18,6 +18,7 @@ import { AccommodationCard } from "@/components/candidate/accommodation-card";
 import { getAccommodation } from "@/lib/services/accommodations";
 import { candidateInterviews, candidateOutcome } from "@/lib/services/panel";
 import { PanelCard } from "@/components/candidate/panel-card";
+import { TalentPoolCard } from "@/components/candidate/talent-pool-card";
 import { pendingDeletion } from "@/lib/services/data-rights";
 import { pendingSurveyRound, type ReleasedFeedback } from "@/lib/services/feedback";
 
@@ -209,6 +210,9 @@ export default async function CandidateHub({ params }: { params: Promise<{ token
           }
           canChange={canAskAdjustments}
         />
+      )}
+      {!["invited", "declined"].includes(candidacy.stage) && (
+        <TalentPoolCard token={token} companyName={settings.companyName} expiresAt={candidate.poolExpiresAt && candidate.poolExpiresAt > new Date() ? candidate.poolExpiresAt.toISOString() : null} />
       )}
       {candidacy.stage !== "invited" && <YourData token={token} companyName={settings.companyName} pendingDueAt={deletion?.dueAt.toISOString() ?? null} />}
     </Shell>

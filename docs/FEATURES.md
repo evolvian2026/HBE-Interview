@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Document status** | v1.9 — approved; Phases 1–8 built (as-built notes: ARCHITECTURE §0; integration reference: [API.md](API.md)) |
+| **Document status** | v2.0 — approved; Phases 1–9 built (as-built notes: ARCHITECTURE §0; integration reference: [API.md](API.md)) |
 | **Date** | 2026-10-16 |
 | **Related** | [PRD.md](PRD.md) (product requirements) · [ARCHITECTURE.md](ARCHITECTURE.md) (technical architecture) |
 
@@ -35,6 +35,7 @@ This document specifies **how each feature behaves**: user stories, flows, scree
 21. [Phase 6 features (v1.7)](#21-phase-6-features-v17)
 22. [Phase 7 features (v1.8)](#22-phase-7-features-v18)
 23. [Phase 8 features (v1.9)](#23-phase-8-features-v19)
+24. [Phase 9 features (v2.0)](#24-phase-9-features-v20)
 
 ---
 
@@ -1169,3 +1170,55 @@ Candidates can request extra time (+25% or +50%) through a link on the consent s
 | Calendar sync (free/busy from Google or Microsoft 365) | Recruiters pick times; candidates choose. Needs calendar OAuth credentials |
 | Creating the video meeting automatically | Paste any meeting link |
 | Offer letters, approvals and e-signature | Decision is recorded here; the offer itself is handled in your HR system (webhook) |
+
+---
+
+## 24. Phase 9 features (v2.0)
+
+### 24.1 Talent pool (candidate consent)
+
+- **Opting in:** after consenting to the interview, the candidate's page offers *Future roles at {company}*. If they choose to be kept on file for **6, 12 or 24 months**, their profile and interview record are kept for that period instead of being deleted after the process, and the recruiting team may invite them to other roles.
+- **Leaving:** the candidate can leave at any time from the same page, even after the process has closed. Joining and leaving are audited, and the membership appears in the candidate's data download.
+- **Retention:** candidates in the pool are skipped by the retention purge until their consent runs out. After that the normal retention period applies. A deletion request still deletes everything immediately.
+
+### 24.2 Search, profiles and tags
+
+- **Talent** (recruiters and admins) searches everyone who has applied to the organisation, across drives. Search terms cover name, email and resume text (e.g. a skill such as *Kafka*). Filters cover drive, stage, AI recommendation, tag and *Talent pool only*. There is one row per person: their latest application, how many applications they have, the AI result, tags and pool status.
+- **Profile:**
+  - every application with its source, stage, AI result and final decision, linking to the reports the viewer may open;
+  - the latest parsed resume (summary, experience, skills);
+  - pool status and recruiter **tags** (normalised: lower-case, de-duplicated, up to 12).
+- Hiring managers and viewers don't see the talent pool. Other organisations' candidates never appear.
+
+### 24.3 Re-inviting from the pool
+
+- From a pooled candidate's profile, *Invite to this drive* (any active drive they haven't applied to) creates the application with source *Talent pool* and emails their personal link.
+- Their latest resume is copied and **re-analysed against the new role**, so after consenting they go straight to *Review your profile* instead of uploading again.
+- People who didn't opt in, or whose consent expired or was withdrawn, can't be re-invited. Neither can someone already in that drive.
+
+### 24.4 Sources
+
+- Every new application records how it started: **Invited**, **CSV import**, **Open link**, **API / ATS** or **Talent pool**. Applications from before Phase 9 show as *Before tracking*.
+
+### 24.5 Hiring insights
+
+- **Insights** (recruiters and admins) covers candidates who started in the last 30/90/180/365 days, optionally for one drive. It shows:
+  - **Median durations:** invite → consent, invite → AI rounds done, AI rounds → final decision, and invite → decision.
+  - **Funnel:** invited → consented → finished AI rounds → panel → offer, each with the share of the previous step (and of everyone, on hover). It has a table view.
+  - **Sources:** candidates, AI-round completion and offers per source.
+  - **People's decisions vs the AI:** how often the final offer/reject matched the AI's combined recommendation, how many times the AI said hire and people rejected (and the reverse), and the latest overrides with their reasoning. Holds are excluded.
+  - **Agreement between panelists:** across interviews with 2+ scorecards, every pair of panelists compared — ratings within one point, same side of the hire line, and average spread per competency.
+  - **By hiring drive:** candidates, AI completion, offers and median time to decision (the 20 busiest drives; all of them in the CSV).
+- **Export CSV:** one row per application with milestones, AI result, panel and decision. It contains no names or emails. Exports are audited.
+
+### 24.6 Navigation
+
+- The staff header now shows Hiring drives, Decisions, My interviews, Talent, Insights and Calibration, depending on role. Settings, AI usage, Audit log and Platform sit under an **Admin** menu.
+
+### 24.7 Not built yet
+
+| Item | Note |
+|---|---|
+| Automatic matching of pooled candidates to new drives | Search by skill and re-invite manually |
+| Outreach campaigns / bulk re-invites | One drive at a time per candidate |
+| Cost per source, requisitions and headcount | Not tracked |

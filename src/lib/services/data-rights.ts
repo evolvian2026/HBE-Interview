@@ -38,6 +38,7 @@ export async function exportCandidateData(candidacyId: string) {
   const code = sids.length ? await db.select({ sessionId: schema.codeRuns.sessionId, kind: schema.codeRuns.kind, language: schema.codeRuns.language, code: schema.codeRuns.code, createdAt: schema.codeRuns.createdAt }).from(schema.codeRuns).where(and(inArray(schema.codeRuns.sessionId, sids), inArray(schema.codeRuns.kind, ["run", "submit"]))).orderBy(asc(schema.codeRuns.createdAt)) : [];
   const [fit] = await db.select({ data: schema.practicalFit.data }).from(schema.practicalFit).where(eq(schema.practicalFit.candidacyId, candidacyId));
   const survey = await db.select({ roundIndex: schema.candidateFeedback.roundIndex, overall: schema.candidateFeedback.overall, fairness: schema.candidateFeedback.fairness, clarity: schema.candidateFeedback.clarity, technical: schema.candidateFeedback.technical, comment: schema.candidateFeedback.comment }).from(schema.candidateFeedback).where(eq(schema.candidateFeedback.candidacyId, candidacyId));
+  const panels = await db.select().from(schema.panelInterviews).where(eq(schema.panelInterviews.candidacyId, candidacyId));
   const [adj] = await db
     .select({ requested: { extraTimePct: schema.accommodations.extraTimePct, extraBreaks: schema.accommodations.extraBreaks, details: schema.accommodations.details }, status: schema.accommodations.status, approvedExtraTimePct: schema.accommodations.approvedExtraTimePct, approvedExtraBreaks: schema.accommodations.approvedExtraBreaks, note: schema.accommodations.decisionNote })
     .from(schema.accommodations)
@@ -46,7 +47,7 @@ export async function exportCandidateData(candidacyId: string) {
     exportedAt: new Date().toISOString(),
     organisation: row.org,
     role: row.drive,
-    you: { name: row.cand.name, email: row.cand.email, githubUsername: row.cand.githubUsername },
+    you: { name: row.cand.name, email: row.cand.email, githubUsername: row.cand.githubUsername, talentPool: row.cand.poolExpiresAt ? { joinedAt: row.cand.poolConsentAt, until: row.cand.poolExpiresAt } : null },
     application: { stage: row.c.stage, invitedAt: row.c.createdAt, consent: row.c.consent },
     resume: resume ?? null,
     repositories: repos,
@@ -63,6 +64,7 @@ export async function exportCandidateData(candidacyId: string) {
     })),
     practicalDetails: fit?.data ?? null,
     adjustmentRequest: adj ?? null,
+    panelInterviews: panels.map((p) => ({ title: p.title, scheduledAt: p.scheduledAt, durationMin: p.durationMin, location: p.location, status: p.status })),
     surveyAnswers: survey,
     feedbackReleasedToYou: row.c.feedbackReleasedAt ? row.c.feedbackSummary : null,
     note: "This file contains the personal data you provided and your interview record. Internal evaluations (scores and recruiter notes) are available from the hiring organisation on request.",

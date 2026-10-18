@@ -17,6 +17,7 @@ interface Result {
 export function InviteForm({ driveId }: { driveId: string }) {
   const router = useRouter();
   const [text, setText] = useState("");
+  const [fromCsv, setFromCsv] = useState(false);
   const [busy, setBusy] = useState(false);
   const [results, setResults] = useState<Result[]>([]);
   const [error, setError] = useState("");
@@ -32,6 +33,7 @@ export function InviteForm({ driveId }: { driveId: string }) {
             onChange={async (e) => {
               const f = e.target.files?.[0];
               if (!f) return;
+              setFromCsv(true);
               setText(csvToInvitees(await f.text()).map((p) => `${p.name}, ${p.email}`).join("\n"));
               e.target.value = "";
             }}
@@ -51,9 +53,10 @@ export function InviteForm({ driveId }: { driveId: string }) {
             .filter((p) => p.length >= 2)
             .map(([name, email]) => ({ name, email }));
           try {
-            const r = await api<{ results: Result[] }>(`/api/drives/${driveId}/invites`, { body: { candidates } });
+            const r = await api<{ results: Result[] }>(`/api/drives/${driveId}/invites`, { body: { candidates, source: fromCsv ? "csv" : "invite" } });
             setResults(r.results);
             setText("");
+            setFromCsv(false);
             router.refresh();
           } catch (e) {
             setError((e as Error).message);
