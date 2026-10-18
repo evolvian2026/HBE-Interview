@@ -14,6 +14,12 @@ import { redirectUri } from "@/lib/sso/flow";
 import { SsoSettings } from "@/components/staff/sso-settings";
 import { BrandingSettings } from "@/components/staff/branding-settings";
 import { getBranding } from "@/lib/branding";
+import { Card } from "@/components/ui";
+import { EmailTemplates } from "@/components/staff/email-templates";
+import { PLACEHOLDERS, TEMPLATE_KEYS, TEMPLATES, type TemplateDef } from "@/lib/core/templates";
+import { NotificationChannels } from "@/components/staff/notification-channels";
+import { listChannels } from "@/lib/services/channels";
+import { CHANNEL_EVENTS, CHANNEL_EVENT_KEYS } from "@/lib/core/notifications";
 
 export const dynamic = "force-dynamic";
 
@@ -34,6 +40,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
     .orderBy(desc(schema.apiKeys.createdAt));
   const hooks = await db.select({ id: schema.webhooks.id, url: schema.webhooks.url, events: schema.webhooks.events, active: schema.webhooks.active }).from(schema.webhooks).where(eq(schema.webhooks.orgId, me.orgId)).orderBy(desc(schema.webhooks.createdAt));
   const deliveries = await recentDeliveries(me.orgId, 15);
+  const channels = await listChannels(me.orgId);
   const iso = (d: Date | null) => (d ? d.toISOString() : null);
   return (
     <div className="space-y-6">
@@ -42,6 +49,36 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
       <KnowledgeBase docs={kb.map((d) => ({ id: d.id, title: d.title, size: d.content.length, preview: d.content.slice(0, 200) }))} />
       <UsersAdmin users={users.map((u) => ({ ...u, has2fa: !!u.totpEnabledAt, totpEnabledAt: undefined }))} drives={drives} meId={me.id} />
       <BrandingSettings name={settings.companyName} logoUrl={branding.logoUrl} brandColor={branding.brandColor} />
+      <section id="emails">
+        <Card title="Candidate emails">
+          <EmailTemplates
+            rows={TEMPLATE_KEYS.map((key) => {
+              const def: TemplateDef = TEMPLATES[key];
+              const custom = settings.emailTemplates?.[key];
+              return {
+                key,
+                label: def.label,
+                when: def.when,
+                placeholders: def.placeholders.map((name) => ({ name, description: PLACEHOLDERS[name] })),
+                required: def.required,
+                subject: custom?.subject ?? def.subject,
+                body: custom?.body ?? def.body,
+                defaultSubject: def.subject,
+                defaultBody: def.body,
+                custom: !!custom,
+              };
+            })}
+          />
+        </Card>
+      </section>
+      <section id="notifications">
+        <Card title="Team notifications (Slack / Teams)">
+          <NotificationChannels
+            channels={channels.map((c) => ({ id: c.id, kind: c.kind, name: c.name, host: c.host, events: c.events, includeNames: c.includeNames, active: c.active, lastDeliveredAt: c.lastDeliveredAt?.toISOString() ?? null, lastError: c.lastError }))}
+            events={CHANNEL_EVENT_KEYS.map((key) => ({ key, label: CHANNEL_EVENTS[key] }))}
+          />
+        </Card>
+      </section>
       <SsoSettings
         domains={ssoDomains.map((d) => ({ id: d.id, domain: d.domain, txt: verificationRecord(d.verificationToken), verified: !!d.verifiedAt, verifiedBy: d.verifiedBy }))}
         config={ssoCfg ? { issuer: ssoCfg.issuer, clientId: ssoCfg.clientId, enabled: ssoCfg.enabled, required: ssoCfg.required, jitRole: ssoCfg.jitRole, lastTestedAt: ssoCfg.lastTestedAt?.toISOString() ?? null, hasSecret: !!ssoCfg.clientSecret } : null}

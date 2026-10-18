@@ -2,8 +2,9 @@ import { and, asc, desc, eq, inArray, isNull, lt, ne, sql } from "drizzle-orm";
 import { db, schema } from "../db";
 import { HttpError, canSeeDrive, hasRole, isUuid, type StaffRole, type StaffUser } from "../auth/staff";
 import { audit } from "../audit";
-import { getSettings } from "../settings";
-import { candidateLink, sendEmail } from "./notify";
+import { sendEmail } from "./notify";
+import { sendCandidateEmail } from "./emails";
+import { notifyAboutCandidacy } from "./channels";
 import { emitEvent } from "./integrations";
 import { env } from "../env";
 import { buildIcs } from "../core/ics";
@@ -137,17 +138,8 @@ async function onScheduled(iv: PanelInterview) {
 }
 
 async function notifyCandidate(iv: PanelInterview, kind: "choose" | "scheduled" | "cancelled") {
-  const row = await candidacyRow(iv.candidacyId);
-  if (!row) return;
-  const s = await getSettings(row.c.orgId);
-  const link = candidateLink(row.c.accessToken);
-  const body =
-    kind === "choose"
-      ? `<p>The hiring team at ${esc(s.companyName)} would like to meet you for a ${iv.durationMin}-minute <b>${esc(iv.title)}</b>. Please <a href="${link}">choose a time that suits you</a>.</p>`
-      : kind === "scheduled"
-        ? `<p>Your <b>${esc(iv.title)}</b> with ${esc(s.companyName)} is confirmed for <b>${fmtUtc(iv.scheduledAt!)}</b> (${iv.durationMin} minutes) at ${esc(iv.location)}. <a href="${link}">Your interview page</a> shows the time in your time zone and has a calendar file.</p>`
-        : `<p>Your <b>${esc(iv.title)}</b> with ${esc(s.companyName)} has been cancelled. The hiring team will be in touch.</p>`;
-  await sendEmail(row.cand.email, `${iv.title} — ${row.d.title}`, `<p>Hi ${esc(row.cand.name)},</p>${body}`).catch((e) => console.error("panel email failed", e));
+  const key = kind === "choose" ? "panel_choose" : kind === "scheduled" ? "panel_confirmed" : "panel_cancelled";
+  await sendCandidateEmail(iv.candidacyId, key, { interview_title: iv.title, duration: String(iv.durationMin), interview_time: iv.scheduledAt ? fmtUtc(iv.scheduledAt) : "", location: iv.location }).catch((e) => console.error("panel email failed", e));
 }
 
 /** The candidate picks one of the offered times. */
@@ -181,6 +173,7 @@ export async function requestOtherTimes(candidacy: { id: string }, interviewId: 
     .set({ status: "reschedule_requested", candidateMessage: message.trim() || null, scheduledAt: null, sequence: iv.sequence + (iv.scheduledAt ? 1 : 0), updatedAt: new Date() })
     .where(eq(schema.panelInterviews.id, iv.id));
   await audit({ type: "candidate", id: candidacy.id }, "panel.reschedule_request", "candidacy", candidacy.id, { interviewId: iv.id });
+  await notifyAboutCandidacy(candidacy.id, "panel.reschedule_requested", "Reschedule request", (who, drive) => `${who} (${drive}) asked for other times for the ${iv.title}.`);
 }
 
 async function staffInterview(user: StaffUser, interviewId: string) {
@@ -253,6 +246,10 @@ export async function submitScorecard(user: StaffUser, interviewId: string, inpu
     .set({ ratings, recommendation: input.recommendation, strengths: input.strengths?.trim() || null, concerns: input.concerns?.trim() || null, submittedAt: card.submittedAt ?? new Date(), updatedAt: new Date() })
     .where(eq(schema.panelScorecards.id, card.id));
   await audit({ type: "staff", id: user.id, orgId: user.orgId }, card.submittedAt ? "panel.scorecard_update" : "panel.scorecard", "candidacy", iv.candidacyId, { interviewId: iv.id, recommendation: input.recommendation });
+  if (!card.submittedAt) {
+    const open = await db.select({ id: schema.panelScorecards.id }).from(schema.panelScorecards).where(and(eq(schema.panelScorecards.interviewId, iv.id), isNull(schema.panelScorecards.submittedAt)));
+    if (!open.length) await notifyAboutCandidacy(iv.candidacyId, "panel.feedback_complete", "Panel feedback complete", (who, drive) => `Every scorecard for ${who}'s ${iv.title} (${drive}) is in — ready for the debrief and final decision.`);
+  }
 }
 
 /* --------------------------- Views (visibility) --------------------------- */
@@ -378,15 +375,9 @@ export async function recordDecision(user: StaffUser, candidacyId: string, input
     .returning();
   await db.update(schema.candidacies).set({ stage, finalStatus: stage, updatedAt: new Date() }).where(eq(schema.candidacies.id, candidacyId));
   await audit({ type: "staff", id: user.id, orgId: user.orgId }, `decision.${input.decision}`, "candidacy", candidacyId, { notified: notify, panelSplit: panels.some((p) => p.summary.split), ai: basis.ai?.recommendation ?? null });
+  await notifyAboutCandidacy(candidacyId, "candidate.decided", "Final decision", (who, drive) => `${user.name} recorded ${input.decision === "offer" ? "an offer" : input.decision === "reject" ? "a rejection" : "a hold"} for ${who} (${drive}).`);
   await emitEvent(user.orgId, "candidate.decided", { candidacyId, decision: input.decision, aiRecommendation: basis.ai?.recommendation ?? null, panelConsensus: panels[0]?.summary.consensus ?? null });
-  if (notify) {
-    const s = await getSettings(user.orgId);
-    const body =
-      input.decision === "offer"
-        ? `<p>Thank you for interviewing for <b>${esc(row.d.title)}</b>. We're delighted to tell you that ${esc(s.companyName)} would like to make you an offer. A member of the team will contact you shortly with the details.</p>`
-        : `<p>Thank you for the time and effort you put into interviewing for <b>${esc(row.d.title)}</b> at ${esc(s.companyName)}. After careful consideration, we won't be moving forward with your application this time. We appreciate your interest and wish you every success.</p>`;
-    await sendEmail(row.cand.email, `Your application for ${row.d.title}`, `<p>Hi ${esc(row.cand.name)},</p>${body}`).catch((e) => console.error("decision email failed", e));
-  }
+  if (notify) await sendCandidateEmail(candidacyId, input.decision === "offer" ? "offer" : "reject").catch((e) => console.error("decision email failed", e));
   return d;
 }
 

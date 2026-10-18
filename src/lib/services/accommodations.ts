@@ -2,8 +2,8 @@ import { and, eq, inArray } from "drizzle-orm";
 import { db, schema } from "../db";
 import { HttpError, type StaffUser } from "../auth/staff";
 import { audit } from "../audit";
-import { getSettings } from "../settings";
-import { candidateLink, sendEmail } from "./notify";
+import { sendCandidateEmail } from "./emails";
+import { notifyAboutCandidacy } from "./channels";
 import { LIMITS, type Adjustment } from "../core/interview";
 import { pauseAllowance } from "../core/calibration";
 
@@ -43,6 +43,7 @@ export async function requestAccommodation(candidacy: { id: string; orgId: strin
     .insert(schema.accommodations)
     .values({ candidacyId: candidacy.id, orgId: candidacy.orgId, ...values })
     .onConflictDoUpdate({ target: schema.accommodations.candidacyId, set: values });
+  await notifyAboutCandidacy(candidacy.id, "accommodation.requested", "Adjustment request", (who, drive) => `${who} (${drive}) asked for interview adjustments. Details are on the candidate report for recruiters.`, `/app/candidates/${candidacy.id}#adjustments`);
   // The audit entry records that a request was made, not its (possibly health-related) content.
   await audit({ type: "candidate", id: candidacy.id }, "accommodation.request", "candidacy", candidacy.id, { extraTimePct: req.extraTimePct, extraBreaks: req.extraBreaks });
 }
@@ -72,21 +73,7 @@ export async function decideAccommodation(user: StaffUser, candidacyId: string, 
     })
     .where(eq(schema.accommodations.candidacyId, candidacyId));
   await audit({ type: "staff", id: user.id, orgId: user.orgId }, d.approve ? "accommodation.approve" : "accommodation.decline", "candidacy", candidacyId, d.approve ? { extraTimePct: d.extraTimePct ?? a.extraTimePct, extraBreaks: d.extraBreaks ?? a.extraBreaks } : undefined);
-  const [row] = await db
-    .select({ email: schema.candidates.email, name: schema.candidates.name, token: schema.candidacies.accessToken, drive: schema.drives.title })
-    .from(schema.candidacies)
-    .innerJoin(schema.candidates, eq(schema.candidacies.candidateId, schema.candidates.id))
-    .innerJoin(schema.drives, eq(schema.candidacies.driveId, schema.drives.id))
-    .where(eq(schema.candidacies.id, candidacyId));
-  if (row) {
-    const s = await getSettings(user.orgId);
-    const esc = (x: string) => x.replace(/[&<>"]/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[ch]!);
-    await sendEmail(
-      row.email,
-      `Your interview adjustment request — ${row.drive}`,
-      `<p>Hi ${esc(row.name)},</p><p>${d.approve ? `Your adjustment request for <b>${esc(row.drive)}</b> at ${esc(s.companyName)} has been approved and will apply to the rounds you haven't started yet.` : `${esc(s.companyName)} couldn't approve your adjustment request for <b>${esc(row.drive)}</b>.`}</p>${d.note?.trim() ? `<p>${esc(d.note.trim())}</p>` : ""}<p><a href="${candidateLink(row.token)}">Open your interview page</a></p>`,
-    ).catch((e) => console.error("accommodation email failed", e));
-  }
+  await sendCandidateEmail(candidacyId, d.approve ? "adjustment_approved" : "adjustment_declined", { note: d.note?.trim() ?? "" }).catch((e) => console.error("accommodation email failed", e));
 }
 
 /** The approved adjustment for a candidacy as it applies to a new round session, or undefined. */

@@ -6,6 +6,7 @@ import { getSettings } from "../settings";
 import { enabledRounds } from "../core/rounds";
 import { PARAMETERS, paramLabel } from "../core/rubrics";
 import { roundKnockouts, roundRecommendation, roundScore, type KnockoutResult } from "../core/scoring";
+import { notifyAboutCandidacy } from "./channels";
 import { agreement, agreementAlerts, compareReview, recommendationAgreement, sampleReason, type AgreementStat } from "../core/calibration";
 import type { DriveConfig, ParamScore, Recommendation, RoundType } from "../core/types";
 
@@ -181,6 +182,8 @@ export async function submitReview(user: StaffUser, reportId: string, input: Rev
     .returning();
   if (!created) throw new HttpError(409, "You've already reviewed this round");
   await audit({ type: "staff", id: user.id, orgId: user.orgId }, "calibration.review", "round_report", reportId, { disagrees: cmp.disagrees, maxGap: cmp.maxGap, blind: created.blind });
+  if (cmp.disagrees)
+    await notifyAboutCandidacy(c.id, "calibration.disagreement", "Blind review disagreed with the AI", (who, drive) => `${user.name}'s blind review of ${who}'s ${round.type} round (${drive}) recommends ${input.recommendation.replace("_", " ")}; the AI said ${ai.recommendation.replace("_", " ")}.`);
   return { review: created, comparison: cmp, ai };
 }
 

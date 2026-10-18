@@ -31,6 +31,8 @@ import { defaultCompetencies } from "@/lib/core/panel";
 import { PanelInterviewView } from "@/components/staff/panel-view";
 import { PanelAdmin, PanelScheduler } from "@/components/staff/panel-scheduler";
 import { DecisionPanel } from "@/components/staff/decision-panel";
+import { emailsFor } from "@/lib/services/emails";
+import { TEMPLATES, type TemplateKey } from "@/lib/core/templates";
 
 export const dynamic = "force-dynamic";
 
@@ -97,6 +99,7 @@ export default async function CandidatePage({ params }: { params: Promise<{ id: 
   const calibration = canDecide ? await reviewsForCandidacy(id) : [];
   // Adjustment requests can hold health information: recruiters and admins only.
   const accommodation = hasRole(user, "recruiter") ? await getAccommodation(id) : null;
+  const emails = hasRole(user, "recruiter") ? await emailsFor(id) : [];
   const panels = canDecide ? await panelForCandidacy(user, id) : [];
   const decisions = canDecide ? await decisionsFor(id) : [];
   const canSchedule = hasRole(user, "recruiter") && ["completed", "shortlisted", "on_hold", "panel"].includes(row.c.stage);
@@ -222,6 +225,25 @@ export default async function CandidatePage({ params }: { params: Promise<{ id: 
               </div>
             )}
           </div>
+        </Card>
+      )}
+
+      {emails.length > 0 && (
+        <Card title={`Emails to the candidate (${emails.length})`}>
+          <ul className="divide-y divide-slate-100 text-sm">
+            {emails.map((e) => (
+              <li key={e.id} className="flex flex-wrap items-center justify-between gap-2 py-1.5">
+                <span>
+                  <span className="font-medium">{TEMPLATES[e.template as TemplateKey]?.label ?? e.template}</span>
+                  <span className="text-slate-600">{` · ${e.subject}`}</span>
+                </span>
+                <span className="flex items-center gap-2 text-xs text-slate-500">
+                  <Badge tone={e.status === "sent" ? "green" : e.status === "failed" ? "red" : "slate"}>{e.status === "not_configured" ? "email not configured" : e.status}</Badge>
+                  {e.createdAt.toLocaleString()}
+                </span>
+              </li>
+            ))}
+          </ul>
         </Card>
       )}
 

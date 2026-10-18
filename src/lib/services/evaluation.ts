@@ -34,6 +34,7 @@ import { audit } from "../audit";
 import { notifyCandidateNextRound } from "./notify";
 import { emitEvent } from "./integrations";
 import { maybeSampleForCalibration } from "./calibration";
+import { notifyAboutCandidacy } from "./channels";
 
 /* ----------------------------- Evidence bundle ---------------------------- */
 
@@ -381,6 +382,7 @@ async function afterRoundEvaluated(candidacyId: string, roundIndex: number, reco
     await advanceCandidacy(candidacyId, roundIndex, { mode: "auto", reason: `Auto-advanced: ${RECOMMENDATION_LABEL[recommendation]}` });
   } else {
     await db.update(schema.candidacies).set({ stage: "gate_pending", updatedAt: new Date() }).where(eq(schema.candidacies.id, candidacyId));
+    await notifyAboutCandidacy(candidacyId, "decision.needed", "Decision needed", (who, drive) => `${who} finished round ${roundIndex + 1} for ${drive} (AI: ${RECOMMENDATION_LABEL[recommendation]}). The next round unlocks after a decision.`);
   }
 }
 
@@ -501,6 +503,7 @@ export async function combinedReportJob(payload: { candidacyId: string }) {
     .onConflictDoUpdate({ target: schema.combinedReports.candidacyId, set: values });
   const orgId = await orgOfCandidacy(payload.candidacyId);
   if (orgId) await emitEvent(orgId, "candidate.completed", { candidacyId: payload.candidacyId, finalScore: result.finalScore, recommendation: result.recommendation, partial: result.partial });
+  await notifyAboutCandidacy(payload.candidacyId, "candidate.completed", "AI interviews complete", (who, drive) => `${who} completed the AI interviews for ${drive}: ${result.finalScore?.toFixed(0) ?? "—"}/100, ${RECOMMENDATION_LABEL[result.recommendation as Recommendation] ?? result.recommendation}${result.partial ? " (partial)" : ""}.`);
 }
 
 export async function combinedReportFailed(payload: { candidacyId: string; error?: string }) {

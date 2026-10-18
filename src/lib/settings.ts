@@ -1,6 +1,7 @@
 import { eq } from "drizzle-orm";
 import { db, schema } from "./db";
 import { DEFAULT_CALIBRATION, type CalibrationSettings } from "./core/calibration";
+import type { TemplateKey, TemplateText } from "./core/templates";
 
 export interface OrgValue {
   name: string;
@@ -22,6 +23,8 @@ export interface OrgSettings {
   require2fa: boolean;
   /** Blind human reviews of AI-evaluated rounds (human oversight of the AI's scoring). */
   calibration: CalibrationSettings;
+  /** Customised candidate emails; a missing key uses the built-in default. */
+  emailTemplates: Partial<Record<TemplateKey, TemplateText>>;
 }
 
 /** Platform-wide settings, managed by platform admins (models are a cost/quality decision for the operator). */
@@ -52,6 +55,7 @@ export const DEFAULT_SETTINGS: OrgSettings = {
   consentVersion: 1,
   require2fa: false,
   calibration: DEFAULT_CALIBRATION,
+  emailTemplates: {},
 };
 
 export const DEFAULT_PLATFORM_SETTINGS: PlatformSettings = {

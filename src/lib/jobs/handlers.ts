@@ -3,6 +3,7 @@ import { analyzeRepoJob, analyzeRepoFailed } from "../services/repos";
 import { evaluateRoundJob, evaluateRoundFailed, combinedReportJob, combinedReportFailed } from "../services/evaluation";
 import { proctorCheckJob } from "../services/proctor";
 import { deliverWebhookFailed, deliverWebhookJob } from "../services/integrations";
+import { deliverChannelJob } from "../services/channels";
 
 type Handler = (payload: Record<string, unknown>) => Promise<void>;
 
@@ -19,4 +20,5 @@ export const handlers: Record<string, Handler> = {
   "proctor-check": (p) => proctorCheckJob(p as { snapshotId: string }),
   "deliver-webhook": (p) => deliverWebhookJob(p as { deliveryId: string }),
   "deliver-webhook:failed": (p) => deliverWebhookFailed(p as { deliveryId: string }),
+  "notify-channel": (p) => deliverChannelJob(p as unknown as Parameters<typeof deliverChannelJob>[0]),
 };

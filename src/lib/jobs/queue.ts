@@ -8,7 +8,8 @@ export type JobType =
   | "combined-report"
   | "send-email"
   | "proctor-check"
-  | "deliver-webhook";
+  | "deliver-webhook"
+  | "notify-channel";
 
 /**
  * Enqueue a durable job. With a singleton key, a job that is already queued/running is not duplicated,

@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Document status** | v2.1 — approved; Phases 1–10 built (as-built notes: ARCHITECTURE §0; integration reference: [API.md](API.md)) |
+| **Document status** | v2.2 — approved; Phases 1–11 built (as-built notes: ARCHITECTURE §0; integration reference: [API.md](API.md)) |
 | **Date** | 2026-10-16 |
 | **Related** | [PRD.md](PRD.md) (product requirements) · [ARCHITECTURE.md](ARCHITECTURE.md) (technical architecture) |
 
@@ -37,6 +37,7 @@ This document specifies **how each feature behaves**: user stories, flows, scree
 23. [Phase 8 features (v1.9)](#23-phase-8-features-v19)
 24. [Phase 9 features (v2.0)](#24-phase-9-features-v20)
 25. [Phase 10 features (v2.1)](#25-phase-10-features-v21)
+26. [Phase 11 features (v2.2)](#26-phase-11-features-v22)
 
 ---
 
@@ -1260,3 +1261,40 @@ Candidates can request extra time (+25% or +50%) through a link on the consent s
 | AI / semantic matching (beyond skills) | Skill fit is deterministic; the AI interview does the judging |
 | Outreach campaigns | Invitations use the standard invite email |
 | Slack / Microsoft Teams notifications | Email digest and in-app inbox only |
+
+---
+
+## 26. Phase 11 features (v2.2)
+
+### 26.1 Candidate emails
+
+- **Settings → Candidate emails** (admins) edits the subject and message of the 10 emails candidates receive: invitation, reminder, next round available, panel interview (choose a time / confirmed / cancelled), adjustments approved / declined, and the offer and rejection decisions.
+- **Placeholders** such as `{{first_name}}`, `{{role}}`, `{{company}}`, `{{link}}`, `{{deadline}}`, `{{interview_time}}` and `{{note}}` are offered per email as click-to-insert chips. Unknown placeholders and unfinished `{{…` are refused. Some emails must contain a placeholder (an invitation must include `{{link}}`; a confirmed interview must include `{{interview_time}}`).
+- **Format:** plain text. A blank line starts a paragraph, and a paragraph that is just `{{link}}` becomes a button in the brand colour. A paragraph that ends up empty (e.g. no note) is dropped.
+- **Live preview** with example values in the organisation's branded layout (logo or name, brand colour, "Sent by HBE Interview on behalf of …"). There is also *Send me a test* (to the admin's own address) and *Reset to default*. Customisations are per organisation and audited.
+- **Safety:** template text and every value are HTML-escaped and only http(s) links are used. Before this phase, the invitation, reminder and next-round emails inserted candidate names into HTML unescaped, which mattered because open-link candidates type their own name. Every email also has a plain-text part.
+- **Email log:** each candidate email is recorded (email, subject, *sent* / *failed* / *email not configured*, time) and listed on the candidate report for recruiters and admins. The log is deleted with the candidacy.
+- Staff emails (panel invitations, scorecard reminders, the daily digest) and data-rights notices keep fixed wording.
+
+### 26.2 Team notifications (Slack / Microsoft Teams)
+
+- **Settings → Team notifications** (admins) adds up to 10 channels by pasting the app's incoming webhook URL: Slack incoming webhooks, or Teams incoming webhooks / Workflows. Each channel picks its events:
+  - a round is finished and needs a decision;
+  - a candidate finished all AI rounds;
+  - every panel scorecard is in;
+  - a final decision was recorded;
+  - a candidate asked for adjustments;
+  - a candidate asked to reschedule a panel interview;
+  - a blind review disagreed with the AI.
+- **Messages:** Slack gets a formatted block with an *Open in HBE Interview* button; Teams gets a message card. Each says what happened, for which drive, and links to the right page.
+- **Privacy:** candidate names are **off by default** ("A candidate…"). Turn them on only for private hiring-team channels. Adjustment request details never leave the app.
+- **Security:** the URL is a credential, so it is encrypted at rest and never shown again (only its host). In production the URL must be HTTPS on the provider's host and must not resolve to an internal address, which is re-checked at send time.
+- **Operations:** *Send test*, *Pause/Resume* and *Remove* per channel. Deliveries are queued and retried up to 4 times, and the channel shows the last delivery time or error.
+
+### 26.3 Not built yet
+
+| Item | Note |
+|---|---|
+| Email templates per interview language | One template per email per organisation |
+| SMS / WhatsApp | Email only (needs a messaging provider account) |
+| Acting from Slack/Teams (e.g. approve a gate) | Notifications link back to the app |

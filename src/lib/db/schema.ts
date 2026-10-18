@@ -706,3 +706,42 @@ export const hiringDecisions = pgTable("hiring_decisions", {
   candidateNotifiedAt: ts("candidate_notified_at"),
   createdAt: createdAt(),
 });
+
+/* ------------------------------- Phase 11 --------------------------------- */
+
+/** Every email sent (or attempted) to a candidate, for the candidate report. Deleted with the candidacy. */
+export const emailLog = pgTable(
+  "email_log",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    orgId: orgRef(),
+    candidacyId: uuid("candidacy_id").references(() => candidacies.id, { onDelete: "cascade" }),
+    to: text("to").notNull(),
+    template: text("template").notNull(),
+    subject: text("subject").notNull(),
+    status: text("status").notNull().$type<"sent" | "failed" | "not_configured">(),
+    error: text("error"),
+    createdAt: createdAt(),
+  },
+  (t) => [index("email_log_candidacy").on(t.candidacyId)],
+);
+
+/** Slack / Microsoft Teams incoming webhooks that receive team notifications. */
+export const notificationChannels = pgTable("notification_channels", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  orgId: orgRef(),
+  kind: text("kind").notNull().$type<"slack" | "teams">(),
+  name: text("name").notNull(),
+  /** AES-256-GCM sealed: the URL is the channel's credential. */
+  url: text("url").notNull(),
+  /** Hostname shown in the UI (the full URL is never shown again). */
+  host: text("host").notNull(),
+  events: jsonb("events").notNull().$type<string[]>(),
+  /** Off by default: messages say "a candidate" rather than their name. */
+  includeNames: boolean("include_names").notNull().default(false),
+  active: boolean("active").notNull().default(true),
+  lastDeliveredAt: ts("last_delivered_at"),
+  lastError: text("last_error"),
+  createdBy: uuid("created_by").references(() => users.id, { onDelete: "set null" }),
+  createdAt: createdAt(),
+});
