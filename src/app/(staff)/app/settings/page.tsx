@@ -19,6 +19,8 @@ import { EmailTemplates } from "@/components/staff/email-templates";
 import { PLACEHOLDERS, TEMPLATE_KEYS, TEMPLATES, type TemplateDef } from "@/lib/core/templates";
 import { NotificationChannels } from "@/components/staff/notification-channels";
 import { listChannels } from "@/lib/services/channels";
+import { ScimSettings } from "@/components/staff/scim-settings";
+import { getScimConfig, provisioningStats, scimBase } from "@/lib/services/scim";
 import { CHANNEL_EVENTS, CHANNEL_EVENT_KEYS } from "@/lib/core/notifications";
 
 export const dynamic = "force-dynamic";
@@ -31,7 +33,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
   const branding = await getBranding(me.orgId);
   const settings = await getSettings(me.orgId);
   const kb = await db.select({ id: schema.kbDocuments.id, title: schema.kbDocuments.title, content: schema.kbDocuments.content }).from(schema.kbDocuments).where(eq(schema.kbDocuments.orgId, me.orgId)).orderBy(asc(schema.kbDocuments.title));
-  const users = await db.select({ id: schema.users.id, name: schema.users.name, email: schema.users.email, role: schema.users.role, active: schema.users.active, driveIds: schema.users.driveIds, platformAdmin: schema.users.platformAdmin, totpEnabledAt: schema.users.totpEnabledAt }).from(schema.users).where(eq(schema.users.orgId, me.orgId)).orderBy(asc(schema.users.name));
+  const users = await db.select({ id: schema.users.id, name: schema.users.name, email: schema.users.email, role: schema.users.role, active: schema.users.active, driveIds: schema.users.driveIds, platformAdmin: schema.users.platformAdmin, totpEnabledAt: schema.users.totpEnabledAt, provisionedBy: schema.users.provisionedBy, deprovisioned: schema.users.scimDeprovisionedAt }).from(schema.users).where(eq(schema.users.orgId, me.orgId)).orderBy(asc(schema.users.name));
   const drives = await db.select({ id: schema.drives.id, title: schema.drives.title }).from(schema.drives).where(eq(schema.drives.orgId, me.orgId)).orderBy(asc(schema.drives.title));
   const keys = await db
     .select({ id: schema.apiKeys.id, name: schema.apiKeys.name, prefix: schema.apiKeys.prefix, scopes: schema.apiKeys.scopes, lastUsedAt: schema.apiKeys.lastUsedAt, revokedAt: schema.apiKeys.revokedAt, createdAt: schema.apiKeys.createdAt })
@@ -41,13 +43,15 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
   const hooks = await db.select({ id: schema.webhooks.id, url: schema.webhooks.url, events: schema.webhooks.events, active: schema.webhooks.active }).from(schema.webhooks).where(eq(schema.webhooks.orgId, me.orgId)).orderBy(desc(schema.webhooks.createdAt));
   const deliveries = await recentDeliveries(me.orgId, 15);
   const channels = await listChannels(me.orgId);
+  const scimCfg = await getScimConfig(me.orgId);
+  const scimStats = await provisioningStats(me.orgId);
   const iso = (d: Date | null) => (d ? d.toISOString() : null);
   return (
     <div className="space-y-6">
       <PageHeader title="Settings" subtitle="Company profile, values, HR knowledge base, compliance, users and integrations." />
       <SettingsForm initial={settings} />
       <KnowledgeBase docs={kb.map((d) => ({ id: d.id, title: d.title, size: d.content.length, preview: d.content.slice(0, 200) }))} />
-      <UsersAdmin users={users.map((u) => ({ ...u, has2fa: !!u.totpEnabledAt, totpEnabledAt: undefined }))} drives={drives} meId={me.id} />
+      <UsersAdmin users={users.map((u) => ({ ...u, has2fa: !!u.totpEnabledAt, totpEnabledAt: undefined, scim: u.provisionedBy === "scim" ? (u.deprovisioned ? "deprovisioned" : "managed") : undefined, provisionedBy: undefined, deprovisioned: undefined }))} drives={drives} meId={me.id} />
       <BrandingSettings name={settings.companyName} logoUrl={branding.logoUrl} brandColor={branding.brandColor} />
       <section id="emails">
         <Card title="Candidate emails">
@@ -86,6 +90,14 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
         testedEmail={sp.sso_test}
         error={sp.sso_error}
       />
+      <section id="provisioning">
+        <Card title="User provisioning (SCIM 2.0)">
+          <ScimSettings
+            baseUrl={scimBase()}
+            s={{ configured: !!scimCfg, enabled: !!scimCfg?.enabled, defaultRole: scimCfg?.defaultRole ?? "viewer", tokenPrefix: scimCfg?.tokenPrefix ?? null, lastUsedAt: scimCfg?.lastUsedAt?.toISOString() ?? null, provisioned: scimStats.total, active: scimStats.active, verifiedDomains: ssoDomains.filter((d) => d.verifiedAt).length }}
+          />
+        </Card>
+      </section>
       <IntegrationsAdmin
         keys={keys.map((k) => ({ ...k, lastUsedAt: iso(k.lastUsedAt), revokedAt: iso(k.revokedAt), createdAt: k.createdAt.toISOString() }))}
         hooks={hooks}

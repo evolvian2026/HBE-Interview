@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Document status** | v2.2 — approved; Phases 1–11 built (as-built notes: ARCHITECTURE §0; integration reference: [API.md](API.md)) |
+| **Document status** | v2.3 — approved; Phases 1–12 built (as-built notes: ARCHITECTURE §0; integration reference: [API.md](API.md)) |
 | **Date** | 2026-10-16 |
 | **Related** | [PRD.md](PRD.md) (product requirements) · [ARCHITECTURE.md](ARCHITECTURE.md) (technical architecture) |
 
@@ -38,6 +38,7 @@ This document specifies **how each feature behaves**: user stories, flows, scree
 24. [Phase 9 features (v2.0)](#24-phase-9-features-v20)
 25. [Phase 10 features (v2.1)](#25-phase-10-features-v21)
 26. [Phase 11 features (v2.2)](#26-phase-11-features-v22)
+27. [Phase 12 features (v2.3)](#27-phase-12-features-v23)
 
 ---
 
@@ -1298,3 +1299,34 @@ Candidates can request extra time (+25% or +50%) through a link on the consent s
 | Email templates per interview language | One template per email per organisation |
 | SMS / WhatsApp | Email only (needs a messaging provider account) |
 | Acting from Slack/Teams (e.g. approve a gate) | Notifications link back to the app |
+
+---
+
+## 27. Phase 12 features (v2.3)
+
+### 27.1 User provisioning (SCIM 2.0)
+
+- **Turning it on:** *Settings → User provisioning (SCIM 2.0)* (admins) shows the **SCIM base URL** (`<APP_BASE_URL>/scim/v2`) and creates a **bearer token**, which is shown once and stored only as a hash. Both are pasted into the identity provider's app provisioning settings (Okta, Microsoft Entra ID, OneLogin, JumpCloud and others that speak SCIM 2.0). The token can be **rotated** (the old one stops working at once) or **paused**.
+- **What the identity provider can do:**
+  - create people assigned to the app;
+  - update names and email;
+  - deactivate and reactivate;
+  - deprovision (DELETE);
+  - find people by `userName`, email or `externalId` (case-insensitive), with paging.
+  Both Okta-style and Entra-style requests are understood, e.g. `"active": "False"` as a string, capitalised ops, and value-object PATCHes.
+- **Roles from groups:** the four fixed groups **HBE Admins**, **HBE Recruiters**, **HBE Hiring Managers** and **HBE Viewers** are exposed. Assigning someone to a group sets their role; removing them falls back to the organisation's default role for new people (recruiter, hiring manager or viewer, never admin). Groups can't be created or deleted. Hiring managers still get drives assigned in HBE Interview.
+- **Rules and safety:**
+  - only emails on the organisation's **verified domains** (Phase 6) can be provisioned or changed to, and an email used anywhere else is a `uniqueness` conflict;
+  - deactivation, email changes and role changes **sign the person out everywhere**;
+  - DELETE deactivates and hides the account from SCIM but keeps it for the audit trail, shown as *deprovisioned (SCIM)* in Settings → Users;
+  - **platform administrators are invisible to SCIM** and can't be changed through it, so the break-glass accounts survive a misconfigured provider;
+  - one organisation's token can't see or change another's users, and a suspended organisation can't be provisioned.
+- **Users and audit:** provisioned people show a *SCIM* badge and sign in with single sign-on; they have no usable password unless an admin sets one. Every create, update, role change and deprovision is audited (actor *scim*). Requests are rate-limited per organisation.
+
+### 27.2 Not built yet
+
+| Item | Note |
+|---|---|
+| SAML 2.0 single sign-on | OIDC covers the same providers |
+| SCIM Bulk operations | Providers fall back to one request per change |
+| Mapping custom attributes (e.g. drive assignment) | Drives are assigned in HBE Interview |

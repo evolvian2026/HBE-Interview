@@ -12,7 +12,7 @@ export function UsersAdmin({
   drives,
   meId,
 }: {
-  users: { id: string; name: string; email: string; role: Role; active: boolean; driveIds: string[]; platformAdmin?: boolean; has2fa?: boolean }[];
+  users: { id: string; name: string; email: string; role: Role; active: boolean; driveIds: string[]; platformAdmin?: boolean; has2fa?: boolean; scim?: "managed" | "deprovisioned" }[];
   drives: { id: string; title: string }[];
   meId: string;
 }) {
@@ -44,7 +44,7 @@ export function UsersAdmin({
           {users.map((u) => (
             <tr key={u.id}>
               <td className="py-2">
-                {u.name} {u.platformAdmin && <Badge tone="blue">platform admin</Badge>}
+                {u.name} {u.platformAdmin && <Badge tone="blue">platform admin</Badge>} {u.scim && <Badge tone={u.scim === "managed" ? "slate" : "amber"}>{u.scim === "managed" ? "SCIM" : "deprovisioned (SCIM)"}</Badge>}
               </td>
               <td>{u.email}</td>
               <td>

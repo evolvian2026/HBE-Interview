@@ -72,6 +72,10 @@ export const users = pgTable("users", {
   /** Daily inbox email (Phase 10), sent from 07:00 UTC when there's something to act on. */
   digestOptIn: boolean("digest_opt_in").notNull().default(false),
   digestSentAt: ts("digest_sent_at"),
+  /** SCIM provisioning (Phase 12): the identity provider's id, who manages the account, and when it was deprovisioned. */
+  scimExternalId: text("scim_external_id"),
+  provisionedBy: text("provisioned_by").$type<"scim">(),
+  scimDeprovisionedAt: ts("scim_deprovisioned_at"),
   createdAt: createdAt(),
 });
 
@@ -744,4 +748,19 @@ export const notificationChannels = pgTable("notification_channels", {
   lastError: text("last_error"),
   createdBy: uuid("created_by").references(() => users.id, { onDelete: "set null" }),
   createdAt: createdAt(),
+});
+
+/* ------------------------------- Phase 12 --------------------------------- */
+
+/** SCIM 2.0 provisioning: one bearer token per organisation (only its hash is stored). */
+export const scimConfigs = pgTable("scim_configs", {
+  orgId: uuid("org_id").primaryKey().references(() => organizations.id, { onDelete: "cascade" }),
+  tokenHash: text("token_hash").notNull().unique(),
+  tokenPrefix: text("token_prefix").notNull(),
+  /** Role for new users until a role group says otherwise. Never admin. */
+  defaultRole: text("default_role").notNull().default("viewer").$type<"recruiter" | "hiring_manager" | "viewer">(),
+  enabled: boolean("enabled").notNull().default(true),
+  lastUsedAt: ts("last_used_at"),
+  createdAt: createdAt(),
+  updatedAt: updatedAt(),
 });

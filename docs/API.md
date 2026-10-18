@@ -155,3 +155,17 @@ def verify_hbe_webhook(raw_body: bytes, headers, secret: str) -> bool:
 - Pausing a webhook stops new deliveries (queued ones are dropped); deleting it removes its history.
 - Settings shows the 15 most recent deliveries with status, attempts and response code.
 - In production, endpoints must be HTTPS and may not resolve to private, loopback, link-local or metadata addresses (checked when saved and again at send time).
+
+## 4. SCIM 2.0 user provisioning
+
+Base URL `<APP_BASE_URL>/scim/v2`, authenticated with the bearer token from *Settings → User provisioning* (one per organisation; rotate or pause there). Responses are `application/scim+json`; errors follow RFC 7644 (`status`, `detail`, `scimType`).
+
+| Endpoint | Supported |
+|---|---|
+| `GET /ServiceProviderConfig`, `/ResourceTypes`, `/Schemas` | Discovery (PATCH and filtering on; bulk, sort, ETags off) |
+| `GET /Users?filter=userName eq "…"&startIndex=&count=` | Filters: `userName`, `emails.value` (or `emails[type eq "work"].value`), `externalId`, `id`, `displayName` with `eq`. Page size ≤ 200; `count=0` returns only the total |
+| `POST /Users` | `userName` (email on a verified domain), `name`, `displayName`, `emails`, `active`, `externalId`. New users get the default role. `409 uniqueness` if the email exists |
+| `GET / PUT / PATCH / DELETE /Users/{id}` | PATCH `add` / `replace` / `remove` with or without a path (`active`, `userName`, `displayName`, `name.*`, `emails`, `externalId`); `"True"` / `"False"` strings are accepted. DELETE (204) deprovisions |
+| `GET /Groups`, `GET / PATCH / PUT /Groups/{id}` | Fixed groups `admin`, `recruiter`, `hiring_manager`, `viewer` (display names *HBE Admins*, …). Member add, remove (`members[value eq "…"]`) or replace sets roles. Creating or deleting groups returns `403 mutability` |
+
+Platform administrators never appear in SCIM. Deactivation, email changes and role changes end the person's sessions immediately.

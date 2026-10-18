@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Product** | HBE Interview: an AI-powered, multi-round interview platform |
-| **Document status** | v2.2 — approved; Phases 1–11 built |
+| **Document status** | v2.3 — approved; Phases 1–12 built |
 | **Date** | 2026-10-16 |
 | **Owner** | Product Architect / Product Owner |
 | **Companion documents** | [FEATURES.md](FEATURES.md) (detailed feature specification) · [ARCHITECTURE.md](ARCHITECTURE.md) (detailed technical architecture) |
@@ -12,6 +12,7 @@
 
 | Version | Date | Change |
 |---|---|---|
+| 2.3 | 2026-10-18 | Phase 12 built — **SCIM 2.0 user provisioning** for Okta, Microsoft Entra ID and other identity providers: create, update, deactivate and deprovision staff accounts; roles from four fixed groups (HBE Admins / Recruiters / Hiring Managers / Viewers); verified-domain rule; deactivation and role changes revoke sessions; platform administrators invisible to SCIM; hashed, rotatable, pausable bearer token per organisation; every change audited |
 | 2.2 | 2026-10-18 | Phase 11 built — communications: **editable, branded candidate emails** (10 templates with validated placeholders, live preview, test send, reset; organisation logo and colour; every value escaped — fixing names previously inserted into email HTML unescaped), an **email log** on each candidate report, and **Slack / Microsoft Teams team notifications** (7 events, encrypted webhook URLs, names off by default, test, pause, retries, failure status) |
 | 2.1 | 2026-10-18 | Phase 10 built — sourcing and day-to-day flow: **talent-pool matching** on every active drive (explainable skill-fit score with aliases, years of experience, strong-match count) and **bulk re-invites**; a **staff inbox** of everything waiting on each person by role (scorecards due, upcoming panels, round decisions, completed panels ready for the final call, calibration reviews, adjustment and reschedule requests, AI drift, deletion requests) with a count in the navigation and an opt-in **daily email digest** |
 | 2.0 | 2026-10-18 | Phase 9 built — talent pool and hiring insights: **candidate-consented talent pool** (6/12/24 months, kept out of the retention purge until it ends, leave any time), **cross-drive candidate search** (name, email, resume text, drive, stage, AI result, tags), recruiter **tags**, **re-invite to another drive** reusing and re-matching the latest resume; **candidacy sources** (invite, CSV, open link, API, talent pool); **hiring insights** (funnel with conversion, median durations, sources, people's decisions vs the AI, agreement between panelists, per-drive table, anonymised CSV); compact staff navigation (Admin menu) |
@@ -466,6 +467,7 @@ Diagrams, component design, the interview state machine, data model, API specifi
 | **Phase 9 — built (v2.0)** | Talent pool with candidate consent, search, tags and re-invite with resume reuse; candidacy sources; hiring insights (funnel, durations, sources, AI vs decisions, panelist agreement) with CSV. Not built: automatic matching of pooled candidates to new drives, outreach campaigns, source cost tracking |
 | **Phase 10 — built (v2.1)** | Talent-pool matching with explainable fit and bulk invites; staff inbox with navigation count and daily digest. Not built: AI (semantic) matching beyond skills, outreach email campaigns, Slack/Teams notifications |
 | **Phase 11 — built (v2.2)** | Branded, editable candidate emails with preview and log; Slack/Teams notifications. Not built: per-language email templates, SMS/WhatsApp, two-way chat-app actions (approve from Slack) |
+| **Phase 12 — built (v2.3)** | SCIM 2.0 provisioning (Users + role Groups) with session revocation and audit. Not built: SAML 2.0, SCIM Bulk, custom attribute mapping (e.g. drive assignment from the identity provider) |
 
 ### 10.1 Phase 1 build milestones
 
