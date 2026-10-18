@@ -37,6 +37,7 @@ async function main() {
   const [live] = (await db.query("select c.access_token, s.round_index from round_sessions s join candidacies c on c.id = s.candidacy_id where s.status = 'active' and c.org_id = (select org_id from users where email = $1) order by s.created_at desc limit 1", [process.env.ADMIN_EMAIL!.toLowerCase()])).rows;
   const [queued] = (await db.query("select r.id from round_reports r join candidacies c on c.id = r.candidacy_id where r.calibration_requested_at is not null and r.status = 'ready' and c.org_id = (select org_id from users where email = $1) order by r.calibration_requested_at desc limit 1", [process.env.ADMIN_EMAIL!.toLowerCase()])).rows;
   const [adjusted] = (await db.query("select c.access_token from accommodations a join candidacies c on c.id = a.candidacy_id where c.org_id = (select org_id from users where email = $1) order by a.updated_at desc limit 1", [process.env.ADMIN_EMAIL!.toLowerCase()])).rows;
+  const [panel] = (await db.query("select p.id, c.access_token from panel_interviews p join candidacies c on c.id = p.candidacy_id where c.org_id = (select org_id from users where email = $1) order by p.created_at desc limit 1", [process.env.ADMIN_EMAIL!.toLowerCase()])).rows;
   await db.end();
   const browser = await chromium.launch(process.env.CHROMIUM_PATH ? { executablePath: process.env.CHROMIUM_PATH } : {});
   const page = await (await browser.newContext({ viewport: { width: 1440, height: 900 } })).newPage();
@@ -65,6 +66,8 @@ async function main() {
     ["operations", "/app/platform/ops"],
     ["calibration", "/app/calibration"],
     ...(queued ? ([["blind review", `/app/calibration/${queued.id}`]] as [string, string][]) : []),
+    ["my interviews", "/app/panel"],
+    ...(panel ? ([["interview kit", `/app/panel/${panel.id}`]] as [string, string][]) : []),
   ];
   for (const [label, path] of staffPages) {
     await page.goto(BASE + path);
@@ -73,6 +76,10 @@ async function main() {
   const cand = await (await browser.newContext({ viewport: { width: 1440, height: 900 } })).newPage();
   await cand.goto(`${BASE}/c/${c.access_token}`);
   failures += await audit(cand, "candidate hub (completed)");
+  if (panel) {
+    await cand.goto(`${BASE}/c/${panel.access_token}`);
+    failures += await audit(cand, "candidate hub (panel / decision)");
+  }
   if (adjusted) {
     await cand.goto(`${BASE}/c/${adjusted.access_token}`);
     failures += await audit(cand, "candidate hub (adjustments)");

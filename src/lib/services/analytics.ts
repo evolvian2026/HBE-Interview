@@ -46,7 +46,8 @@ export async function driveAnalytics(driveId: string) {
     { label: "Gave consent", value: consented.length },
     { label: "Profile confirmed", value: resumes.filter((r) => r.status === "confirmed").length },
     ...rounds.map((r, i) => ({ label: `Finished ${ROUND_LABEL[r.type]}`, value: sessions.filter((s) => s.roundIndex === i && s.status === "ended").length })),
-    { label: "Shortlisted", value: cands.filter((c) => c.stage === "shortlisted").length },
+    { label: "Shortlisted or in panel", value: cands.filter((c) => ["shortlisted", "panel", "offer"].includes(c.stage)).length },
+    { label: "Offer", value: cands.filter((c) => c.stage === "offer").length },
   ];
 
   // Drop-off: incomplete sessions grouped by the section they ended in, plus candidates who never started.

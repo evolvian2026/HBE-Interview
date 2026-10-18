@@ -370,7 +370,7 @@ async function afterRoundEvaluated(candidacyId: string, roundIndex: number, reco
     }
     return;
   }
-  if (["rejected", "shortlisted", "on_hold"].includes(candidacy.stage) || candidacy.currentRoundIndex !== roundIndex) return;
+  if (["rejected", "shortlisted", "on_hold", "panel", "offer"].includes(candidacy.stage) || candidacy.currentRoundIndex !== roundIndex) return;
   if (isLast) {
     await db.update(schema.candidacies).set({ stage: "completed", updatedAt: new Date() }).where(eq(schema.candidacies.id, candidacyId));
     await enqueue("combined-report", { candidacyId }, { singletonKey: `combined:${candidacyId}` });

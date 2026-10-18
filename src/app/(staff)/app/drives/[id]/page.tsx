@@ -15,7 +15,7 @@ import { CopyButton } from "@/components/staff/copy-button";
 export const dynamic = "force-dynamic";
 
 const STATUS_TONE = { draft: "slate", active: "green", paused: "amber", closed: "slate" } as const;
-const STAGES = ["all", "invited", "onboarding", "in_round", "evaluating", "gate_pending", "round_available", "completed", "shortlisted", "rejected", "on_hold", "expired"];
+const STAGES = ["all", "invited", "onboarding", "in_round", "evaluating", "gate_pending", "round_available", "completed", "shortlisted", "panel", "offer", "rejected", "on_hold", "expired"];
 
 export default async function DrivePage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ stage?: string; sort?: string }> }) {
   const user = await requireStaffPage();

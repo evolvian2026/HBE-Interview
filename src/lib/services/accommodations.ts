@@ -10,7 +10,7 @@ import { pauseAllowance } from "../core/calibration";
 export type Accommodation = typeof schema.accommodations.$inferSelect;
 
 /** Stages in which there's no round left to adjust. */
-const CLOSED = ["declined", "expired", "rejected", "completed", "shortlisted", "withdrawn"];
+const CLOSED = ["declined", "expired", "rejected", "completed", "shortlisted", "panel", "offer"];
 
 export async function getAccommodation(candidacyId: string): Promise<Accommodation | null> {
   const [a] = await db.select().from(schema.accommodations).where(eq(schema.accommodations.candidacyId, candidacyId));

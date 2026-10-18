@@ -16,6 +16,8 @@ import { FeedbackSurvey } from "@/components/candidate/feedback-survey";
 import { YourData } from "@/components/candidate/your-data";
 import { AccommodationCard } from "@/components/candidate/accommodation-card";
 import { getAccommodation } from "@/lib/services/accommodations";
+import { candidateInterviews, candidateOutcome } from "@/lib/services/panel";
+import { PanelCard } from "@/components/candidate/panel-card";
 import { pendingDeletion } from "@/lib/services/data-rights";
 import { pendingSurveyRound, type ReleasedFeedback } from "@/lib/services/feedback";
 
@@ -46,8 +48,10 @@ export default async function CandidateHub({ params }: { params: Promise<{ token
   const surveyRound = await pendingSurveyRound(candidacy.id);
   const deletion = await pendingDeletion(candidacy.id);
   const accommodation = await getAccommodation(candidacy.id);
+  const panels = await candidateInterviews(candidacy.id);
+  const outcome = await candidateOutcome(candidacy.id);
   const timeFactor = accommodation?.status === "approved" ? 1 + (accommodation.approvedExtraTimePct ?? 0) / 100 : 1;
-  const canAskAdjustments = !["invited", "declined", "expired", "rejected", "completed", "shortlisted"].includes(candidacy.stage);
+  const canAskAdjustments = !["invited", "declined", "expired", "rejected", "completed", "shortlisted", "panel", "offer"].includes(candidacy.stage);
   const released = candidacy.feedbackReleasedAt ? (candidacy.feedbackSummary as ReleasedFeedback | null) : null;
 
   const steps = [
@@ -55,7 +59,7 @@ export default async function CandidateHub({ params }: { params: Promise<{ token
     { key: "resume", label: "Resume", done: !!resume && ["parsed", "confirmed"].includes(resume.status) },
     { key: "profile", label: "Profile", done: resume?.status === "confirmed" },
     ...(needsProjects ? [{ key: "projects", label: "Projects", done: !["invited", "onboarding"].includes(candidacy.stage) }] : []),
-    { key: "rounds", label: "Interview", done: ["completed", "shortlisted"].includes(candidacy.stage) },
+    { key: "rounds", label: "Interview", done: ["completed", "shortlisted", "panel", "offer"].includes(candidacy.stage) },
   ];
 
   let body: React.ReactNode;
@@ -74,13 +78,15 @@ export default async function CandidateHub({ params }: { params: Promise<{ token
     }
     body = <ProjectsStep token={token} projects={prof.projects.map((p) => p.name).filter(Boolean)} githubUsername={candidate.githubUsername ?? prof.githubUsername ?? ""} links={links} />;
   } else {
-    const done = ["completed", "shortlisted", "rejected"].includes(candidacy.stage);
+    const done = ["completed", "shortlisted", "rejected", "panel", "offer"].includes(candidacy.stage);
     body = (
       <div className="space-y-4">
         <div>
           <h2 className="text-lg font-semibold">Your interview rounds</h2>
           <p className="text-sm text-slate-600">
-            {done
+            {done && panels.length > 0 && !outcome
+              ? "You've completed the AI interview rounds — thank you! Next, the hiring team would like to meet you."
+              : done
               ? "You've completed your interview. Thank you! The hiring team will review it and get back to you."
               : config.schedulingMode === "single"
                 ? "All rounds run one after another. Take a short break between rounds if you need one."
@@ -116,6 +122,25 @@ export default async function CandidateHub({ params }: { params: Promise<{ token
             );
           })}
         </ol>
+        {outcome === "offer" && (
+          <div role="status" className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900">
+            <p className="font-semibold">Good news!</p>
+            <p className="mt-1">{`${settings.companyName} would like to make you an offer. A member of the team will contact you shortly with the details.`}</p>
+          </div>
+        )}
+        {outcome === "reject" && (
+          <div role="status" className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
+            {`Thank you for interviewing with ${settings.companyName}. After careful consideration, the team won't be moving forward with your application this time. We wish you every success.`}
+          </div>
+        )}
+        {!outcome && panels.length > 0 && (
+          <div className="space-y-3">
+            <h3 className="text-base font-semibold">Next step: meet the team</h3>
+            {panels.map((p) => (
+              <PanelCard key={p.id} token={token} iv={{ ...p, scheduledAt: p.scheduledAt?.toISOString() ?? null }} />
+            ))}
+          </div>
+        )}
         {surveyRound != null && <FeedbackSurvey token={token} roundIndex={surveyRound} roundLabel={rounds[surveyRound]?.label} />}
         {released && (
           <div className="rounded-xl border border-emerald-200 bg-emerald-50/50 p-4">

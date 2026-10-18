@@ -9,5 +9,7 @@ export const WEBHOOK_EVENTS = [
   "gate.decided",
   "candidate.completed",
   "candidate.status_changed",
+  "panel.scheduled",
+  "candidate.decided",
 ] as const;
 export type WebhookEvent = (typeof WEBHOOK_EVENTS)[number];

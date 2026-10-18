@@ -49,6 +49,7 @@ export default async function StaffLayout({ children }: { children: React.ReactN
           <nav className="flex gap-1 text-sm">
             <Link href="/app" className="rounded-md px-3 py-1.5 text-slate-700 hover:bg-slate-100">Hiring drives</Link>
             <Link href="/app/gate-queue" className="rounded-md px-3 py-1.5 text-slate-700 hover:bg-slate-100">Decisions</Link>
+            {user.role !== "viewer" && <Link href="/app/panel" className="rounded-md px-3 py-1.5 text-slate-700 hover:bg-slate-100">My interviews</Link>}
             {user.role !== "viewer" && <Link href="/app/calibration" className="rounded-md px-3 py-1.5 text-slate-700 hover:bg-slate-100">Calibration</Link>}
             {user.role === "admin" && <Link href="/app/usage" className="rounded-md px-3 py-1.5 text-slate-700 hover:bg-slate-100">AI usage</Link>}
             {user.role === "admin" && <Link href="/app/audit" className="rounded-md px-3 py-1.5 text-slate-700 hover:bg-slate-100">Audit</Link>}

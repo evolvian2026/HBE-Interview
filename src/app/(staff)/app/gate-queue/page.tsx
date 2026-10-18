@@ -4,6 +4,7 @@ import { db, schema } from "@/lib/db";
 import { canSeeDrive, hasRole, requireStaffPage } from "@/lib/auth/staff";
 import { disagreementsAmong } from "@/lib/services/calibration";
 import { pendingAccommodations } from "@/lib/services/accommodations";
+import { rescheduleRequests } from "@/lib/services/panel";
 import { ROUND_LABEL, RECOMMENDATION_LABEL, type Recommendation, type RoundType } from "@/lib/core/types";
 import { Badge, Card, Empty, PageHeader } from "@/components/ui";
 import { REC_TONE } from "@/components/labels";
@@ -24,6 +25,7 @@ export default async function GateQueuePage() {
   const reports = ids.length ? await db.select().from(schema.roundReports).where(inArray(schema.roundReports.candidacyId, ids)) : [];
   const disagreed = await disagreementsAmong(ids);
   const adjustments = hasRole(user, "recruiter") ? (await pendingAccommodations(user.orgId)).filter((x) => canSeeDrive(user, { id: x.driveId, orgId: user.orgId })) : [];
+  const reschedules = hasRole(user, "recruiter") ? await rescheduleRequests(user) : [];
   const auto = await db
     .select({ g: schema.gateDecisions, cand: schema.candidates, c: schema.candidacies })
     .from(schema.gateDecisions)
@@ -35,6 +37,20 @@ export default async function GateQueuePage() {
   return (
     <>
       <PageHeader title="Decisions" subtitle="Candidates whose last round needs a human decision before the next round unlocks." />
+      {reschedules.length > 0 && (
+        <Card title={`Panel interviews to reschedule (${reschedules.length})`} className="mb-6">
+          <ul className="space-y-1 text-sm">
+            {reschedules.map((x) => (
+              <li key={x.iv.id}>
+                <Link href={`/app/candidates/${x.iv.candidacyId}`} className="font-medium text-brand-700 hover:underline">
+                  {x.name}
+                </Link>
+                {` — ${x.d.title} · ${x.iv.title}${x.iv.candidateMessage ? ` · “${x.iv.candidateMessage}”` : ""}`}
+              </li>
+            ))}
+          </ul>
+        </Card>
+      )}
       {adjustments.length > 0 && (
         <Card title={`Adjustment requests (${adjustments.length})`} className="mb-6">
           <ul className="space-y-1 text-sm">

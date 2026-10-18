@@ -26,6 +26,11 @@ import { getAccommodation } from "@/lib/services/accommodations";
 import { AccommodationPanel } from "@/components/staff/accommodation-panel";
 import { RequestCalibrationButton } from "@/components/staff/request-calibration-button";
 import type { SessionState } from "@/lib/core/interview";
+import { decisionsFor, eligiblePanelists, panelForCandidacy } from "@/lib/services/panel";
+import { defaultCompetencies } from "@/lib/core/panel";
+import { PanelInterviewView } from "@/components/staff/panel-view";
+import { PanelAdmin, PanelScheduler } from "@/components/staff/panel-scheduler";
+import { DecisionPanel } from "@/components/staff/decision-panel";
 
 export const dynamic = "force-dynamic";
 
@@ -92,6 +97,11 @@ export default async function CandidatePage({ params }: { params: Promise<{ id: 
   const calibration = canDecide ? await reviewsForCandidacy(id) : [];
   // Adjustment requests can hold health information: recruiters and admins only.
   const accommodation = hasRole(user, "recruiter") ? await getAccommodation(id) : null;
+  const panels = canDecide ? await panelForCandidacy(user, id) : [];
+  const decisions = canDecide ? await decisionsFor(id) : [];
+  const canSchedule = hasRole(user, "recruiter") && ["completed", "shortlisted", "on_hold", "panel"].includes(row.c.stage);
+  const canFinalDecide = canDecide && ["completed", "shortlisted", "on_hold", "panel", "offer", "gate_pending"].includes(row.c.stage);
+  const pendingCards = panels.filter((p) => p.interview.status !== "cancelled").reduce((n, p) => n + p.panel.filter((m) => !m.submitted).length, 0);
   const [decider] = accommodation?.decidedBy ? await db.select({ name: schema.users.name }).from(schema.users).where(eq(schema.users.id, accommodation.decidedBy)) : [];
   const cd = combined?.data as { executiveSummary?: string; strengths?: string[]; risks?: string[]; focusAreas?: string[]; contradictions?: string[]; reasons?: string[] } | null;
 
@@ -181,6 +191,39 @@ export default async function CandidatePage({ params }: { params: Promise<{ id: 
         )}
         {fit?.compatibility != null && <PracticalFit compat={fit.compatibility as Compatibility} data={fit.data as Record<string, unknown>} />}
       </Card>
+
+      {canDecide && (panels.length > 0 || canSchedule || canFinalDecide || decisions.length > 0) && (
+        <Card title="Panel interviews & final decision">
+          <div className="space-y-4">
+            {panels.map((v) => (
+              <PanelInterviewView key={v.interview.id} v={v} showLink actions={hasRole(user, "recruiter") && !["cancelled", "completed"].includes(v.interview.status) ? <PanelAdmin interviewId={v.interview.id} cancellable /> : undefined} />
+            ))}
+            {canSchedule && <PanelScheduler candidacyId={id} panelists={await eligiblePanelists(user.orgId, row.d.id)} defaultCompetencies={defaultCompetencies(config)} />}
+            {decisions.length > 0 && (
+              <div className="text-sm">
+                <h3 className="mb-1 font-semibold">Decisions</h3>
+                <ul className="space-y-1">
+                  {decisions.map(({ d, by }) => (
+                    <li key={d.id}>
+                      <Badge tone={d.decision === "offer" ? "green" : d.decision === "reject" ? "red" : "amber"}>{d.decision}</Badge> {`${by ?? "former user"}, ${d.createdAt.toLocaleString()}: ${d.reason}`}
+                      {d.candidateNotifiedAt ? <span className="text-xs text-slate-500"> · candidate told</span> : null}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            {canFinalDecide && (
+              <div className="border-t border-slate-100 pt-4">
+                <p className="mb-2 text-sm text-slate-700">
+                  {`AI combined recommendation: ${combined?.status === "ready" ? RECOMMENDATION_LABEL[combined.recommendation as Recommendation] : "not available"}`}
+                  {panels.filter((p) => p.summary?.consensus).map((p) => ` · ${p.interview.title}: ${RECOMMENDATION_LABEL[p.summary!.consensus!]} (${p.summary!.hireVotes}/${p.summary!.submitted} for hire)`).join("")}
+                </p>
+                <DecisionPanel candidacyId={id} pendingScorecards={pendingCards} />
+              </div>
+            )}
+          </div>
+        </Card>
+      )}
 
       {accommodation && (
         <div id="adjustments">

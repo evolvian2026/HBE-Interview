@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Document status** | v1.8 — approved; Phases 1–7 built (as-built notes: ARCHITECTURE §0; integration reference: [API.md](API.md)) |
+| **Document status** | v1.9 — approved; Phases 1–8 built (as-built notes: ARCHITECTURE §0; integration reference: [API.md](API.md)) |
 | **Date** | 2026-10-16 |
 | **Related** | [PRD.md](PRD.md) (product requirements) · [ARCHITECTURE.md](ARCHITECTURE.md) (technical architecture) |
 
@@ -34,6 +34,7 @@ This document specifies **how each feature behaves**: user stories, flows, scree
 20. [Phase 5 features (v1.6)](#20-phase-5-features-v16)
 21. [Phase 6 features (v1.7)](#21-phase-6-features-v17)
 22. [Phase 7 features (v1.8)](#22-phase-7-features-v18)
+23. [Phase 8 features (v1.9)](#23-phase-8-features-v19)
 
 ---
 
@@ -1121,3 +1122,50 @@ Candidates can request extra time (+25% or +50%) through a link on the consent s
 | Hold auto-advance until a sampled round is reviewed | Today sampling is retrospective; set the drive's gate to manual for the same effect |
 | Agreement between people (two reviewers on the same round) | Several people can review a round, but only AI–human agreement is reported |
 | Automatic evaluator recalibration | Drift is surfaced to people; the rubric and prompts are changed deliberately |
+
+---
+
+## 23. Phase 8 features (v1.9)
+
+### 23.1 Arranging a panel interview
+
+- **Who and when:** recruiters and admins, once the AI rounds are finished (candidate *Completed*, *Shortlisted* or *On hold*). Use *Arrange a panel interview…* on the candidate report.
+- **Form fields:**
+  - title, length (15–240 minutes), and where (video link or address);
+  - **1–5 times** in the recruiter's own time zone, stored in UTC;
+  - the **panel**: active recruiters, admins, and hiring managers assigned to the drive (viewers and unassigned hiring managers are refused);
+  - **scorecard competencies**: up to 8, suggested from the role, for example *Technical depth, Problem solving, System design, Leadership, Communication, Collaboration, Motivation & role fit*.
+- **Booking:** offering one time books it straight away. Offering several emails the candidate to choose. The candidate moves to the **Panel interview** stage.
+- **Candidate side:** the interview page lists the offered times in the candidate's own time zone. The candidate confirms one, or says *None of these times work for me* with their availability. Once booked, the page shows the time, the place and an **Add to calendar (.ics)** link. *Can't make it? Ask for another time* releases the booking. The candidate never sees panel names.
+- **Rescheduling:** requests appear on *Decisions → Panel interviews to reschedule* with the candidate's message. *Offer new times* sends fresh options (or books a single time). *Cancel interview* records a reason in the audit log and tells the candidate.
+- **Calendar files:** every change bumps the event's sequence number, so calendar apps update the existing entry rather than adding a new one. A cancellation produces a cancelled event. Panelists get emails and a calendar file linking to their kit.
+
+### 23.2 Interview kit and scorecards
+
+- **My interviews** lists each panelist's upcoming and past interviews, with any scorecard that's due.
+- **The kit:** time, place, the panel and who has submitted, plus the AI's combined recommendation, summary, focus areas and risks to probe, and questions the candidate asked that need a person. A link opens the full report.
+- **Scorecard:** each competency rated 1–5 (or *Not assessed*), an overall recommendation, and strengths and concerns with evidence.
+  - It opens when the interview starts.
+  - It can be updated until the final decision, then it locks.
+  - Only panelists can submit.
+- **Independence:** a panelist can't see other panelists' scorecards, on the kit or the report, until they've submitted their own. They can see who has submitted. People not on the panel see everything they otherwise have access to.
+- **Reminders:** a panelist whose scorecard is still open 24 hours after the interview ends gets one reminder email.
+
+### 23.3 Debrief and final decision
+
+- **Report section:** *Panel interviews & final decision* shows each interview with ratings side by side per panelist, averages, and every recommendation. The consensus is the most common recommendation, with ties going to the more cautious one.
+- **Panel split:** flagged when recommendations fall on both sides of the hire line, or any competency's ratings differ by 2 or more.
+- **Decision** (hiring managers and above): *Make an offer*, *Reject* or *Hold*, with reasoning of at least 10 characters. A warning appears if scorecards are missing.
+  - The decision records its **basis**: the AI combined recommendation and score, and each panel's consensus, hire votes, completeness and split.
+  - Stage changes to **Offer**, **Rejected** or **On hold**.
+  - It is audited, and the webhook `candidate.decided` fires.
+- **Telling the candidate:** optional, ticked by default. An offer shows "Good news!" on the candidate's page and sends an email. A rejection sends a courteous, non-specific message. A hold is never sent. Untick it to tell them personally.
+- **Analytics:** the drive funnel now counts *Shortlisted or in panel* and *Offer*.
+
+### 23.4 Not built yet
+
+| Item | Note |
+|---|---|
+| Calendar sync (free/busy from Google or Microsoft 365) | Recruiters pick times; candidates choose. Needs calendar OAuth credentials |
+| Creating the video meeting automatically | Paste any meeting link |
+| Offer letters, approvals and e-signature | Decision is recorded here; the offer itself is handled in your HR system (webhook) |

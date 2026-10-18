@@ -4,6 +4,7 @@ import { getSettings } from "../settings";
 import { endSession } from "../interview/orchestrator";
 import { audit } from "../audit";
 import { sendReminderEmail } from "./notify";
+import { sendScorecardReminders } from "./panel";
 
 let lastPurge = 0;
 
@@ -49,7 +50,9 @@ export async function periodicMaintenance() {
     await db.update(schema.candidacies).set({ reminderSentAt: now }).where(eq(schema.candidacies.id, c.id));
     await sendReminderEmail(c.id).catch((e) => console.error("reminder failed", e));
   }
-  // 5) Retention purge (daily).
+  // 5) Panel scorecards still open a day after the interview.
+  await sendScorecardReminders(now).catch((e) => console.error("scorecard reminders failed", e));
+  // 6) Retention purge (daily).
   if (now.getTime() - lastPurge > 24 * 3600_000) {
     lastPurge = now.getTime();
     // Each organisation has its own retention period.
@@ -60,7 +63,7 @@ export async function periodicMaintenance() {
         .select({ id: schema.candidacies.id })
         .from(schema.candidacies)
         .where(
-          and(eq(schema.candidacies.orgId, org.id), lt(schema.candidacies.updatedAt, cutoff), sql`${schema.candidacies.stage} in ('completed','rejected','expired','declined','shortlisted')`),
+          and(eq(schema.candidacies.orgId, org.id), lt(schema.candidacies.updatedAt, cutoff), sql`${schema.candidacies.stage} in ('completed','rejected','expired','declined','shortlisted','offer')`),
         );
       for (const c of old) await purgeCandidacy(c.id, "retention");
     }

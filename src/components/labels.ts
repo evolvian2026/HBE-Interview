@@ -13,6 +13,8 @@ export const STAGE_LABEL: Record<string, string> = {
   on_hold: "On hold",
   completed: "Completed",
   shortlisted: "Shortlisted",
+  panel: "Panel interview",
+  offer: "Offer",
   rejected: "Rejected",
   expired: "Expired",
 };
@@ -21,6 +23,8 @@ export const STAGE_TONE: Record<string, Tone> = {
   gate_pending: "amber",
   completed: "blue",
   shortlisted: "green",
+  panel: "blue",
+  offer: "green",
   rejected: "red",
   expired: "slate",
   declined: "slate",

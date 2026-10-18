@@ -630,3 +630,69 @@ export const accommodations = pgTable("accommodations", {
   createdAt: createdAt(),
   updatedAt: updatedAt(),
 });
+
+/* ------------------------------- Phase 8 ---------------------------------- */
+
+/**
+ * A live interview with people (after the AI rounds). The recruiter offers one or more slots; the candidate picks one
+ * (or asks for other times). Times are stored in UTC.
+ */
+export const panelInterviews = pgTable(
+  "panel_interviews",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    orgId: orgRef(),
+    candidacyId: uuid("candidacy_id").notNull().references(() => candidacies.id, { onDelete: "cascade" }),
+    title: text("title").notNull(),
+    durationMin: integer("duration_min").notNull(),
+    /** Video link or address, shown to the candidate and panel. */
+    location: text("location").notNull(),
+    /** Offered start times (ISO, UTC). */
+    slots: jsonb("slots").notNull().$type<string[]>(),
+    scheduledAt: ts("scheduled_at"),
+    status: text("status").notNull().default("proposed").$type<"proposed" | "scheduled" | "reschedule_requested" | "completed" | "cancelled">(),
+    candidateMessage: text("candidate_message"),
+    /** What the panel scores (1–5 each). */
+    competencies: jsonb("competencies").notNull().$type<string[]>(),
+    /** Bumped on every reschedule so calendar clients update the same event. */
+    sequence: integer("sequence").notNull().default(0),
+    createdBy: uuid("created_by").references(() => users.id, { onDelete: "set null" }),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [index("panel_candidacy").on(t.candidacyId)],
+);
+
+/** One panelist's independent scorecard for a panel interview. */
+export const panelScorecards = pgTable(
+  "panel_scorecards",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    interviewId: uuid("interview_id").notNull().references(() => panelInterviews.id, { onDelete: "cascade" }),
+    panelistId: uuid("panelist_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    /** Competency → 1–5 (absent = not assessed). */
+    ratings: jsonb("ratings").$type<Record<string, number>>(),
+    recommendation: text("recommendation"),
+    strengths: text("strengths"),
+    concerns: text("concerns"),
+    submittedAt: ts("submitted_at"),
+    remindedAt: ts("reminded_at"),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [uniqueIndex("scorecard_interview_panelist").on(t.interviewId, t.panelistId)],
+);
+
+/** The final hiring decision (offer / reject / hold), with its reasoning, after the AI rounds and any panel. */
+export const hiringDecisions = pgTable("hiring_decisions", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  orgId: orgRef(),
+  candidacyId: uuid("candidacy_id").notNull().references(() => candidacies.id, { onDelete: "cascade" }),
+  decision: text("decision").notNull().$type<"offer" | "reject" | "hold">(),
+  reason: text("reason").notNull(),
+  /** What the decision was made on: AI recommendation and panel summary at the time. */
+  basis: jsonb("basis"),
+  decidedBy: uuid("decided_by").references(() => users.id, { onDelete: "set null" }),
+  candidateNotifiedAt: ts("candidate_notified_at"),
+  createdAt: createdAt(),
+});
