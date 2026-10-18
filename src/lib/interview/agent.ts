@@ -40,6 +40,7 @@ export interface TurnInput {
     canAdvance: boolean;
     exerciseNote?: string;
     hintRequested?: boolean;
+    practice?: boolean;
   };
 }
 
@@ -274,19 +275,25 @@ async function mockTurn(input: TurnInput, exec: ToolExecutor, onText: (delta: st
   if (m.hintRequested) await exec("give_hint", { level: 1 });
   if (m.instruction === "closing" || m.instruction === "time_up") {
     await exec("end_interview", { reason: m.instruction });
+    if (m.practice) return emit("Tip: answer with a specific example — the situation, what you did, and the result. That's the end of the practice. Good luck with your interview!");
     return emit(`Thank you for your time today. That concludes the ${ROUND_LABEL[input.round]}. The hiring team will review your interview and get back to you.`);
   }
   if (m.canAdvance && m.instruction === "continue") {
     const res = await exec("advance_section", { reason: "mock: objective covered" });
     if (!res.isError) {
       const nextKey = /section_key=(\w+)/.exec(res.content)?.[1];
+      if (nextKey === "wrapup" && m.practice) return emit("Nice work. Two quick tips: use a specific example, and it's fine to take a moment to think. Any questions about how the real interview works?");
       if (nextKey === "wrapup") return emit("We're nearly done. Do you have any questions for me about the role or the team?");
       return emit(`Let's move on. ${/first_question=(.*)$/m.exec(res.content)?.[1] ?? "Tell me about a recent challenge you worked on."}`);
     }
   }
   if (m.sectionKey === "wrapup" && m.lastCandidate) {
     await exec("end_interview", { reason: "wrap-up complete" });
+    if (m.practice) return emit("Great — that's the end of the practice. It wasn't scored. Good luck with your real interview!");
     return emit("Thank you — those are great questions. The hiring team will follow up with next steps. This concludes the round.");
+  }
+  if (m.instruction === "open" && m.practice) {
+    return emit(`Hello, I'm ${input.persona}. This is a short practice interview — nothing here is scored. ${m.pool[0] ?? "To warm up, what do you enjoy most about your work?"}`);
   }
   if (m.instruction === "open") {
     return emit(`Hello, I'm ${input.persona}, an AI interviewer at ${input.companyName}. This is the ${ROUND_LABEL[input.round]} for ${input.roleTitle}. ${m.pool[0] ?? "Could you start by telling me about yourself?"}`);

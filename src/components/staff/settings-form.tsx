@@ -54,6 +54,12 @@ export function SettingsForm({ initial }: { initial: OrgSettings }) {
             </span>
           </label>
           <label className="flex items-start gap-2 text-sm">
+            <input type="checkbox" className="mt-1" checked={s.practiceEnabled} onChange={(e) => set("practiceEnabled", e.target.checked)} />
+            <span>
+              Offer candidates a short <b>practice interview</b> before their first round. It is never scored or shown to the hiring team; only the fact that it was taken is.
+            </span>
+          </label>
+          <label className="flex items-start gap-2 text-sm">
             <input type="checkbox" className="mt-1" checked={s.require2fa} onChange={(e) => set("require2fa", e.target.checked)} />
             <span>
               Require <b>two-factor sign-in</b> for everyone in this organisation. Staff without it are asked to set it up at their next sign-in (Security page).
@@ -81,7 +87,7 @@ export function SettingsForm({ initial }: { initial: OrgSettings }) {
             try {
               const r = await api<OrgSettings>("/api/settings", {
                 method: "PUT",
-                body: { companyName: s.companyName, companyBlurb: s.companyBlurb, supportEmail: s.supportEmail, values: s.values.filter((v) => v.name.trim()), askCompensation: s.askCompensation, require2fa: s.require2fa, retentionDays: s.retentionDays, consentText: s.consentText, calibration: s.calibration },
+                body: { companyName: s.companyName, companyBlurb: s.companyBlurb, supportEmail: s.supportEmail, values: s.values.filter((v) => v.name.trim()), askCompensation: s.askCompensation, practiceEnabled: s.practiceEnabled, require2fa: s.require2fa, retentionDays: s.retentionDays, consentText: s.consentText, calibration: s.calibration },
               });
               setS(r);
               setMsg("Saved.");

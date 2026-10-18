@@ -43,6 +43,8 @@ interface Props {
   /** Pause allowance, and the approved extra time already folded into durationMin (accommodation). */
   pauses: { count: number; minutes: number };
   extraTimePct: number;
+  /** Unscored practice run: no integrity signals, no survey, practice wording. */
+  practice?: boolean;
 }
 
 type IntegrityEvent = { type: "blur" | "paste" | "copy" | "fast_answer" | "camera_off"; payload?: Record<string, string | number | boolean> };
@@ -179,7 +181,7 @@ export function InterviewRoom(props: Props) {
     const hb = setInterval(() => fetch(`${base}/heartbeat`, { method: "POST" }).catch(() => undefined), 15_000);
     const flush = setInterval(() => {
       const events = integrity.current.splice(0);
-      if (events.length) fetch(`${base}/integrity`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ events }) }).catch(() => undefined);
+      if (events.length && !props.practice) fetch(`${base}/integrity`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ events }) }).catch(() => undefined);
     }, 10_000);
     const onVis = () => {
       if (document.hidden) blurAt.current = Date.now();
@@ -219,7 +221,7 @@ export function InterviewRoom(props: Props) {
     setError(null);
     try {
       if (mode === "voice") await navigator.mediaDevices?.getUserMedia({ audio: true }).then((s) => s.getTracks().forEach((t) => t.stop()));
-      const res = await fetch(`/api/c/${props.token}/rounds/${props.roundIndex}/start`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ mode, language }) });
+      const res = await fetch(props.practice ? `/api/c/${props.token}/practice/start` : `/api/c/${props.token}/rounds/${props.roundIndex}/start`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ mode, language }) });
       const data = await res.json();
       if (!res.ok) throw new Error(data?.error?.message ?? "Could not start the round");
       setSessionId(data.sessionId);
@@ -264,12 +266,15 @@ export function InterviewRoom(props: Props) {
           <BrandMark brand={props.brand} />
         </div>
         <Card>
-          <h1 className="text-lg font-semibold">
-            Round {props.roundIndex + 1}: {props.roundLabel}
-          </h1>
+          <h1 className="text-lg font-semibold">{props.practice ? "Practice interview (not scored)" : `Round ${props.roundIndex + 1}: ${props.roundLabel}`}</h1>
           <p className="mt-1 text-sm text-slate-600">
             About {props.durationMin} minutes with {props.personaName}, an AI interviewer at {props.companyName}. Sections: {props.sections.join(" · ")}.
           </p>
+          {props.practice && (
+            <p className="mt-2 rounded-lg bg-brand-50 px-3 py-2 text-sm text-slate-700">
+              A short warm-up to try the format, the controls and voice mode. Nothing you say here is scored or shown to the hiring team, and the questions are not from your real interview. You can practise again afterwards.
+            </p>
+          )}
           <div className="mt-4 space-y-2 text-sm">
             <Check ok label="Browser supports live interview streaming" />
             <Check ok={!props.hasExercises || wide} label={props.hasExercises ? "Screen is wide enough for the exercise panel (1024px+)" : "Screen size OK"} warn={props.hasExercises && !wide ? "Please use a laptop or desktop for this round." : undefined} />
@@ -311,7 +316,7 @@ export function InterviewRoom(props: Props) {
           {error && <p className="mt-3 text-sm text-red-600">{error.message}</p>}
           <div className="mt-5 flex gap-2">
             <Button onClick={start} disabled={starting}>
-              {starting ? "Starting…" : "Start round"}
+              {starting ? "Starting…" : props.practice ? "Start practice" : "Start round"}
             </Button>
             <Link href={`/c/${props.token}`} className="rounded-lg px-3.5 py-2 text-sm text-slate-600 hover:bg-slate-100">
               Back
@@ -367,7 +372,16 @@ export function InterviewRoom(props: Props) {
                 </div>
               </div>
             ))}
-            {ended && (
+            {ended && props.practice && (
+              <Card>
+                <p className="font-medium">Practice complete — nicely done!</p>
+                <p className="mt-1 text-sm text-slate-600">This was not scored or shared with the hiring team. When you&apos;re ready, start your real interview from your interview page.</p>
+                <Link href={`/c/${props.token}`} className="mt-3 inline-block text-sm font-medium text-brand-600 hover:underline">
+                  Back to your interview page →
+                </Link>
+              </Card>
+            )}
+            {ended && !props.practice && (
               <Card>
                 <p className="font-medium">This round is complete — thank you!</p>
                 <p className="mt-1 text-sm text-slate-600">Your responses have been submitted. The hiring team will review them and let you know about next steps.</p>

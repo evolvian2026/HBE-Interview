@@ -1,4 +1,4 @@
-import { and, asc, eq, inArray } from "drizzle-orm";
+import { and, asc, eq, gte, inArray } from "drizzle-orm";
 import { db, schema } from "../db";
 import { HttpError } from "../auth/staff";
 import { audit } from "../audit";
@@ -23,7 +23,7 @@ export async function pendingSurveyRound(candidacyId: string): Promise<number | 
   const ended = await db
     .select({ roundIndex: schema.roundSessions.roundIndex })
     .from(schema.roundSessions)
-    .where(and(eq(schema.roundSessions.candidacyId, candidacyId), eq(schema.roundSessions.status, "ended")))
+    .where(and(eq(schema.roundSessions.candidacyId, candidacyId), eq(schema.roundSessions.status, "ended"), gte(schema.roundSessions.roundIndex, 0)))
     .orderBy(asc(schema.roundSessions.roundIndex));
   if (!ended.length) return null;
   const rated = new Set(

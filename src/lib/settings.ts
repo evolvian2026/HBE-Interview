@@ -25,6 +25,8 @@ export interface OrgSettings {
   calibration: CalibrationSettings;
   /** Customised candidate emails; a missing key uses the built-in default. */
   emailTemplates: Partial<Record<TemplateKey, TemplateText>>;
+  /** Candidates may take a short, unscored practice interview before their first round. */
+  practiceEnabled: boolean;
 }
 
 /** Platform-wide settings, managed by platform admins (models are a cost/quality decision for the operator). */
@@ -56,6 +58,7 @@ export const DEFAULT_SETTINGS: OrgSettings = {
   require2fa: false,
   calibration: DEFAULT_CALIBRATION,
   emailTemplates: {},
+  practiceEnabled: true,
 };
 
 export const DEFAULT_PLATFORM_SETTINGS: PlatformSettings = {

@@ -38,6 +38,9 @@ import { SENIORITY_LABEL, type Language } from "../core/types";
 import { audit } from "../audit";
 import { emitEvent } from "../services/integrations";
 import { adjustmentFor } from "../services/accommodations";
+import { PRACTICE_INDEX, isPractice, practiceRound } from "../core/practice";
+import { getSettings } from "../settings";
+import { limit } from "../security/rate-limit";
 
 export interface PublicState {
   sessionId: string;
@@ -152,6 +155,12 @@ export async function startRound(candidacyId: string, roundIndex: number, mode: 
     state = { ...state, plan: { scenarios: [...others.slice(0, 2), ethics[Math.floor(Math.random() * ethics.length)]].filter(Boolean).map((s) => s.id) } };
   }
   const deadline = new Date(now.getTime() + round.durationMin * (adjust?.timeFactor ?? 1) * 60_000);
+  // A practice run left open must not keep running beside the real round.
+  const [practice] = await db
+    .select({ id: schema.roundSessions.id })
+    .from(schema.roundSessions)
+    .where(and(eq(schema.roundSessions.candidacyId, candidacyId), eq(schema.roundSessions.roundIndex, PRACTICE_INDEX), eq(schema.roundSessions.status, "active")));
+  if (practice) await endSession(practice.id, "real_round_started");
   const [created] = await db
     .insert(schema.roundSessions)
     .values({
@@ -177,6 +186,54 @@ export async function startRound(candidacyId: string, roundIndex: number, mode: 
   }
   await db.update(schema.candidacies).set({ stage: "in_round", updatedAt: now }).where(eq(schema.candidacies.id, candidacyId));
   await audit({ type: "candidate", id: candidacyId }, "round.start", "round_session", created.id, { roundIndex, type: round.type, mode, language });
+  return created;
+}
+
+/**
+ * Start (or resume) the candidate's unscored practice interview. Allowed before the first round and between rounds;
+ * a finished practice can be taken again (the previous one is replaced). It never changes the candidacy's stage.
+ */
+export async function startPractice(candidacyId: string, mode: "text" | "voice", language = "en") {
+  const [cand] = await db
+    .select({ candidacy: schema.candidacies, version: schema.driveVersions })
+    .from(schema.candidacies)
+    .innerJoin(schema.driveVersions, eq(schema.candidacies.driveVersionId, schema.driveVersions.id))
+    .where(eq(schema.candidacies.id, candidacyId));
+  if (!cand) throw new HttpError(404, "Candidacy not found");
+  if (!(await getSettings(cand.candidacy.orgId)).practiceEnabled) throw new HttpError(403, "Practice interviews aren't offered for this role.");
+  if (!["ready", "round_available"].includes(cand.candidacy.stage)) throw new HttpError(409, "Practice is available before a round, once your resume is processed.");
+  const allowed = (cand.version.config as { languages?: string[] }).languages ?? ["en"];
+  if (!allowed.includes(language)) throw new HttpError(400, "This interview language is not available for this role.");
+  const where = and(eq(schema.roundSessions.candidacyId, candidacyId), eq(schema.roundSessions.roundIndex, PRACTICE_INDEX));
+  const [existing] = await db.select().from(schema.roundSessions).where(where);
+  if (existing?.status === "active") return existing;
+  await limit(`practice:${candidacyId}`, 5, 24 * 3600, "You've practised several times today — please come back tomorrow, or go ahead with your interview.");
+  if (existing) await db.delete(schema.roundSessions).where(eq(schema.roundSessions.id, existing.id));
+  const config = cand.version.config as never;
+  const round = practiceRound(config);
+  const now = new Date();
+  const state = startFirstSection(initState(round, paramIds(round.type)), now);
+  const [created] = await db
+    .insert(schema.roundSessions)
+    .values({
+      candidacyId,
+      roundIndex: PRACTICE_INDEX,
+      roundType: round.type,
+      status: "active",
+      mode,
+      language,
+      state,
+      startedAt: now,
+      deadlineAt: new Date(now.getTime() + round.durationMin * 60_000),
+      lastHeartbeatAt: now,
+    })
+    .onConflictDoNothing()
+    .returning();
+  if (!created) {
+    const [again] = await db.select().from(schema.roundSessions).where(where);
+    return again;
+  }
+  await audit({ type: "candidate", id: candidacyId, orgId: cand.candidacy.orgId }, "practice.start", "round_session", created.id, { mode, language, again: !!existing });
   return created;
 }
 
@@ -329,7 +386,7 @@ export async function handleTurn(
           const opened = await ensureExerciseOpen(ctx, state, t);
           state = opened.state;
           const sec = currentSection(state)!;
-          const guide = sectionGuide(ctx.round!.type, sec.key, ctx.settings.askCompensation);
+          const guide = sectionGuide(ctx.round!.type, sec.key, ctx.settings.askCompensation, ctx.practice);
           const pool = questionPool({ ...ctx, state }, state);
           return {
             content: `ok section_key=${sec.key} title="${sec.title}" minutes=${sec.minutes}\nobjective=${guide.objective}\n${opened.note ? `exercise=${opened.note}\n` : ""}first_question=${pool[0] ?? ""}\nBriefly signpost the new section and ask its first question.`,
@@ -389,7 +446,8 @@ export async function handleTurn(
         liveState: liveStateText({ ...ctx, session: { ...ctx.session, deadlineAt } }, state, now, instruction, [exerciseNote ? `Exercise just opened: ${exerciseNote}` : "", exerciseText, passages].filter(Boolean).join("\n"), pool),
         mock: {
           sectionKey: sec?.key ?? "",
-          sectionParam: sectionGuide(ctx.round.type, sec?.key ?? "", false).param,
+          sectionParam: sectionGuide(ctx.round.type, sec?.key ?? "", false, ctx.practice).param,
+          practice: ctx.practice,
           pool,
           instruction,
           lastCandidate,
@@ -485,6 +543,11 @@ export async function endSession(sessionId: string, reason: string) {
     .update(schema.roundSessions)
     .set({ status: "ended", endReason: reason, endedAt: now, state, updatedAt: now })
     .where(eq(schema.roundSessions.id, sessionId));
+  // Practice is never evaluated and never moves the candidacy on.
+  if (isPractice(ctx.session.roundIndex)) {
+    await audit({ type: "system", orgId: ctx.candidacy.orgId }, "practice.end", "round_session", sessionId, { reason, candidacyId: ctx.candidacy.id });
+    return;
+  }
   const rounds = enabledRounds(ctx.config);
   const isLast = ctx.session.roundIndex >= rounds.length - 1;
   if (ctx.config.schedulingMode === "single" && !isLast) {

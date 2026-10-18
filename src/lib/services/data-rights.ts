@@ -52,6 +52,7 @@ export async function exportCandidateData(candidacyId: string) {
     resume: resume ?? null,
     repositories: repos,
     rounds: sessions.map((s) => ({
+      ...(s.roundIndex < 0 ? { practice: "Unscored practice interview — never evaluated or shared as a score" } : {}),
       roundIndex: s.roundIndex,
       roundType: s.roundType,
       mode: s.mode,

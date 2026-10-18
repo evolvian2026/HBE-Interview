@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Product** | HBE Interview: an AI-powered, multi-round interview platform |
-| **Document status** | v2.3 — approved; Phases 1–12 built |
+| **Document status** | v2.4 — approved; Phases 1–13 built |
 | **Date** | 2026-10-16 |
 | **Owner** | Product Architect / Product Owner |
 | **Companion documents** | [FEATURES.md](FEATURES.md) (detailed feature specification) · [ARCHITECTURE.md](ARCHITECTURE.md) (detailed technical architecture) |
@@ -12,6 +12,7 @@
 
 | Version | Date | Change |
 |---|---|---|
+| 2.4 | 2026-10-18 | Phase 13 built — **practice interviews**: an optional, unscored ~6-minute warm-up with the AI interviewer (warm-up question, a role-style sample question that is never from the real interview, tips) so candidates can try the format, controls and voice mode first; never evaluated, never changes the candidate's stage, transcript never shown to staff (only that practice was taken); can be retaken (limited per day); an open practice closes when the real round starts; organisation setting, on by default |
 | 2.3 | 2026-10-18 | Phase 12 built — **SCIM 2.0 user provisioning** for Okta, Microsoft Entra ID and other identity providers: create, update, deactivate and deprovision staff accounts; roles from four fixed groups (HBE Admins / Recruiters / Hiring Managers / Viewers); verified-domain rule; deactivation and role changes revoke sessions; platform administrators invisible to SCIM; hashed, rotatable, pausable bearer token per organisation; every change audited |
 | 2.2 | 2026-10-18 | Phase 11 built — communications: **editable, branded candidate emails** (10 templates with validated placeholders, live preview, test send, reset; organisation logo and colour; every value escaped — fixing names previously inserted into email HTML unescaped), an **email log** on each candidate report, and **Slack / Microsoft Teams team notifications** (7 events, encrypted webhook URLs, names off by default, test, pause, retries, failure status) |
 | 2.1 | 2026-10-18 | Phase 10 built — sourcing and day-to-day flow: **talent-pool matching** on every active drive (explainable skill-fit score with aliases, years of experience, strong-match count) and **bulk re-invites**; a **staff inbox** of everything waiting on each person by role (scorecards due, upcoming panels, round decisions, completed panels ready for the final call, calibration reviews, adjustment and reschedule requests, AI drift, deletion requests) with a count in the navigation and an opt-in **daily email digest** |
@@ -468,6 +469,7 @@ Diagrams, component design, the interview state machine, data model, API specifi
 | **Phase 10 — built (v2.1)** | Talent-pool matching with explainable fit and bulk invites; staff inbox with navigation count and daily digest. Not built: AI (semantic) matching beyond skills, outreach email campaigns, Slack/Teams notifications |
 | **Phase 11 — built (v2.2)** | Branded, editable candidate emails with preview and log; Slack/Teams notifications. Not built: per-language email templates, SMS/WhatsApp, two-way chat-app actions (approve from Slack) |
 | **Phase 12 — built (v2.3)** | SCIM 2.0 provisioning (Users + role Groups) with session revocation and audit. Not built: SAML 2.0, SCIM Bulk, custom attribute mapping (e.g. drive assignment from the identity provider) |
+| **Phase 13 — built (v2.4)** | Unscored practice interviews before the real rounds. Not built: practice coding/design exercises, per-drive practice settings, AI feedback on practice answers |
 
 ### 10.1 Phase 1 build milestones
 

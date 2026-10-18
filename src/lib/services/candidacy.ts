@@ -113,7 +113,7 @@ export interface CandidateRoundView {
 }
 
 export async function candidateRounds(candidacy: typeof schema.candidacies.$inferSelect, config: DriveConfig): Promise<CandidateRoundView[]> {
-  const sessions = await db.select().from(schema.roundSessions).where(eq(schema.roundSessions.candidacyId, candidacy.id)).orderBy(asc(schema.roundSessions.roundIndex));
+  const sessions = (await db.select().from(schema.roundSessions).where(eq(schema.roundSessions.candidacyId, candidacy.id)).orderBy(asc(schema.roundSessions.roundIndex))).filter((s) => s.roundIndex >= 0);
   // The round awaiting review is the next one once the current round has ended; if the candidate was put on
   // hold after being advanced (current round not yet taken), it is the current round itself.
   const currentDone = sessions.some((x) => x.roundIndex === candidacy.currentRoundIndex && x.status === "ended");

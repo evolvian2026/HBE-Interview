@@ -10,6 +10,7 @@ const Body = z.object({
   supportEmail: z.string().max(200).optional(),
   values: z.array(z.object({ name: z.string().trim().min(1).max(80), description: z.string().max(500), behaviors: z.array(z.string().max(200)).max(6) })).min(1).max(8).optional(),
   askCompensation: z.boolean().optional(),
+  practiceEnabled: z.boolean().optional(),
   require2fa: z.boolean().optional(),
   retentionDays: z.number().int().min(30).max(730).optional(),
   consentText: z.string().min(50).max(8000).optional(),

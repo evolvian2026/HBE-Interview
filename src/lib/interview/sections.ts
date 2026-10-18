@@ -1,4 +1,5 @@
 import type { RoundType } from "../core/types";
+import { PRACTICE_GUIDE } from "../core/practice";
 
 /** Objective shown to the interviewer for each section, plus the parameter it mainly evidences. */
 export const SECTION_GUIDE: Record<RoundType, Record<string, { objective: string; param: string }>> = {
@@ -33,7 +34,7 @@ export const SECTION_GUIDE: Record<RoundType, Record<string, { objective: string
   },
 };
 
-export function sectionGuide(round: RoundType, key: string, askCompensation: boolean) {
-  const g = SECTION_GUIDE[round][key] ?? { objective: "Continue the interview.", param: Object.values(SECTION_GUIDE[round])[0].param };
+export function sectionGuide(round: RoundType, key: string, askCompensation: boolean, practice = false) {
+  const g = (practice ? PRACTICE_GUIDE[key] : undefined) ?? SECTION_GUIDE[round][key] ?? { objective: "Continue the interview.", param: Object.values(SECTION_GUIDE[round])[0].param };
   return { ...g, objective: g.objective.replace("{COMP}", askCompensation ? ", and their expected compensation range (they may prefer to discuss it later)" : "") };
 }

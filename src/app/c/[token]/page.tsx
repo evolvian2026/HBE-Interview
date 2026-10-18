@@ -21,6 +21,8 @@ import { PanelCard } from "@/components/candidate/panel-card";
 import { TalentPoolCard } from "@/components/candidate/talent-pool-card";
 import { pendingDeletion } from "@/lib/services/data-rights";
 import { pendingSurveyRound, type ReleasedFeedback } from "@/lib/services/feedback";
+import { practiceSession } from "@/lib/services/practice";
+import { PRACTICE_MINUTES } from "@/lib/core/practice";
 
 export const dynamic = "force-dynamic";
 
@@ -53,6 +55,7 @@ export default async function CandidateHub({ params }: { params: Promise<{ token
   const outcome = await candidateOutcome(candidacy.id);
   const timeFactor = accommodation?.status === "approved" ? 1 + (accommodation.approvedExtraTimePct ?? 0) / 100 : 1;
   const canAskAdjustments = !["invited", "declined", "expired", "rejected", "completed", "shortlisted", "panel", "offer"].includes(candidacy.stage);
+  const practice = settings.practiceEnabled && ["ready", "round_available"].includes(candidacy.stage) ? { session: await practiceSession(candidacy.id) } : null;
   const released = candidacy.feedbackReleasedAt ? (candidacy.feedbackSummary as ReleasedFeedback | null) : null;
 
   const steps = [
@@ -94,6 +97,21 @@ export default async function CandidateHub({ params }: { params: Promise<{ token
                 : "Each round is a separate session. The next round unlocks after the hiring team reviews the previous one — we'll email you."}
           </p>
         </div>
+        {practice && (
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-dashed border-slate-300 p-4">
+            <div>
+              <p className="font-medium">{`Practice interview · ~${PRACTICE_MINUTES} min · optional`}</p>
+              <p className="text-xs text-slate-600">
+                {practice.session?.status === "ended"
+                  ? "You've practised — you can try again if you'd like. It's never scored or shared with the hiring team."
+                  : "Try the format, the controls and voice mode with a short warm-up first. It's never scored or shared with the hiring team."}
+              </p>
+            </div>
+            <Link href={`/c/${token}/practice`} className="rounded-lg border border-brand-600 px-3.5 py-2 text-sm font-medium text-brand-700 hover:bg-brand-50">
+              {practice.session?.status === "active" ? "Rejoin practice" : practice.session ? "Practise again" : "Try a practice"}
+            </Link>
+          </div>
+        )}
         <ol className="space-y-3">
           {rounds.map((r) => {
             const st = ROUND_STATUS[r.status];

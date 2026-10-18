@@ -25,7 +25,7 @@ export async function ReportDocument({ candidacyId, masked, includeTranscript = 
   const reports = await db.select().from(schema.roundReports).where(eq(schema.roundReports.candidacyId, candidacyId));
   const [combined] = await db.select().from(schema.combinedReports).where(eq(schema.combinedReports.candidacyId, candidacyId));
   const [fit] = await db.select().from(schema.practicalFit).where(eq(schema.practicalFit.candidacyId, candidacyId));
-  const sessions = await db.select().from(schema.roundSessions).where(eq(schema.roundSessions.candidacyId, candidacyId));
+  const sessions = (await db.select().from(schema.roundSessions).where(eq(schema.roundSessions.candidacyId, candidacyId))).filter((s) => s.roundIndex >= 0);
   const boards = sessions.length
     ? (await db.select({ sessionId: schema.exerciseResponses.sessionId, shapes: schema.exerciseResponses.whiteboard, png: schema.exerciseResponses.whiteboardPng }).from(schema.exerciseResponses).where(inArray(schema.exerciseResponses.sessionId, sessions.map((s) => s.id)))).filter(
         (b) => b.png && ((b.shapes as unknown[] | null)?.length ?? 0) > 0,

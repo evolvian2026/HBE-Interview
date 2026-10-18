@@ -7,6 +7,7 @@ import type { SessionState } from "../core/interview";
 import type { ResumeAnalysis } from "../ai/analyzers";
 import { getSettings } from "../settings";
 import { enabledRounds } from "../core/rounds";
+import { isPractice, practiceRound } from "../core/practice";
 
 export type SessionRow = typeof schema.roundSessions.$inferSelect;
 export type MessageRow = typeof schema.messages.$inferSelect;
@@ -31,7 +32,8 @@ export async function loadSessionContext(sessionId: string) {
     .where(eq(schema.roundSessions.id, sessionId));
   if (!row) return null;
   const config = row.version.config as DriveConfig;
-  const round = enabledRounds(config)[row.session.roundIndex];
+  const practice = isPractice(row.session.roundIndex);
+  const round = practice ? practiceRound(config) : enabledRounds(config)[row.session.roundIndex];
   const [resume] = await db.select().from(schema.resumes).where(eq(schema.resumes.candidacyId, row.candidacy.id));
   const repos = await db.select().from(schema.repositories).where(eq(schema.repositories.candidacyId, row.candidacy.id));
   const priorReports = await db
@@ -49,12 +51,13 @@ export async function loadSessionContext(sessionId: string) {
       focusAreas: ((r.roundSpecific as { focusAreas?: string[] })?.focusAreas ?? []) as string[],
     }));
   const settings = await getSettings(row.candidacy.orgId);
-  const kb = round?.type === "hr" ? await db.select().from(schema.kbDocuments).where(eq(schema.kbDocuments.orgId, row.candidacy.orgId)).orderBy(asc(schema.kbDocuments.title)) : [];
+  const kb = round?.type === "hr" && !practice ? await db.select().from(schema.kbDocuments).where(eq(schema.kbDocuments.orgId, row.candidacy.orgId)).orderBy(asc(schema.kbDocuments.title)) : [];
   // Small knowledge bases go whole into the cached dossier; large ones are searched per question (passages).
   const kbMode: "inline" | "retrieval" = kb.reduce((n, d) => n + d.content.length + d.title.length, 0) > KB_INLINE_LIMIT ? "retrieval" : "inline";
   if (kbMode === "retrieval") await ensureKbIndexed(row.candidacy.orgId);
   const [fit] = await db.select().from(schema.practicalFit).where(eq(schema.practicalFit.candidacyId, row.candidacy.id));
   return {
+    practice,
     session: row.session,
     state: row.session.state as SessionState,
     candidacy: row.candidacy,

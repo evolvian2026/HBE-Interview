@@ -32,6 +32,7 @@
     "smoke:phase10": "tsx scripts/smoke-phase10.ts",
     "smoke:phase11": "tsx scripts/smoke-phase11.ts",
     "smoke:phase12": "tsx scripts/smoke-phase12.ts",
+    "smoke:phase13": "tsx scripts/smoke-phase13.ts",
     "ui-check:phase6": "tsx e2e/ui-phase6.ts",
     "ui-check:phase7": "tsx e2e/ui-phase7.ts",
     "ui-check:phase8": "tsx e2e/ui-phase8.ts",
@@ -39,6 +40,7 @@
     "ui-check:phase10": "tsx e2e/ui-phase10.ts",
     "ui-check:phase11": "tsx e2e/ui-phase11.ts",
     "ui-check:phase12": "tsx e2e/ui-phase12.ts",
+    "ui-check:phase13": "tsx e2e/ui-phase13.ts",
     "mock-oidc": "tsx scripts/mock-oidc.ts",
     "a11y": "tsx e2e/a11y-check.ts"
   },

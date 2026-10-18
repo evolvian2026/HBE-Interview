@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { asc, desc, eq, inArray, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, sql } from "drizzle-orm";
 import { notFound } from "next/navigation";
 import { db, schema } from "@/lib/db";
 import { canSeeDrive, hasRole, isUuid, requireStaffPage } from "@/lib/auth/staff";
@@ -32,6 +32,7 @@ import { PanelInterviewView } from "@/components/staff/panel-view";
 import { PanelAdmin, PanelScheduler } from "@/components/staff/panel-scheduler";
 import { DecisionPanel } from "@/components/staff/decision-panel";
 import { emailsFor } from "@/lib/services/emails";
+import { practiceSummary } from "@/lib/services/practice";
 import { TEMPLATES, type TemplateKey } from "@/lib/core/templates";
 
 export const dynamic = "force-dynamic";
@@ -70,7 +71,9 @@ export default async function CandidatePage({ params }: { params: Promise<{ id: 
   const rounds = enabledRounds(config);
   const [resume] = await db.select().from(schema.resumes).where(eq(schema.resumes.candidacyId, id));
   const repos = await db.select().from(schema.repositories).where(eq(schema.repositories.candidacyId, id));
-  const sessions = await db.select().from(schema.roundSessions).where(eq(schema.roundSessions.candidacyId, id)).orderBy(asc(schema.roundSessions.roundIndex));
+  // Practice sessions (index -1) are never shown to staff: only the fact that one was taken.
+  const sessions = await db.select().from(schema.roundSessions).where(and(eq(schema.roundSessions.candidacyId, id), gte(schema.roundSessions.roundIndex, 0))).orderBy(asc(schema.roundSessions.roundIndex));
+  const practice = await practiceSummary(id);
   const reports = await db.select().from(schema.roundReports).where(eq(schema.roundReports.candidacyId, id));
   const [combined] = await db.select().from(schema.combinedReports).where(eq(schema.combinedReports.candidacyId, id));
   const [fit] = await db.select().from(schema.practicalFit).where(eq(schema.practicalFit.candidacyId, id));
@@ -130,6 +133,12 @@ export default async function CandidatePage({ params }: { params: Promise<{ id: 
             )}{" "}
             · drive version v{row.v.version}
           </p>
+          {practice && (
+            <p className="mt-1 text-xs text-slate-600">
+              <Badge>{practice.status === "ended" ? "practice taken" : "practising now"}</Badge>{" "}
+              {`Took the optional practice interview${practice.attempts > 1 ? ` (${practice.attempts} times)` : ""}. Practice is never scored and its transcript isn't shown.`}
+            </p>
+          )}
         </div>
         <CandidateActions
           candidacyId={id}

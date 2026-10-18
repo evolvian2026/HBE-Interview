@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Document status** | v2.3 — approved; Phases 1–12 built (as-built notes: ARCHITECTURE §0; integration reference: [API.md](API.md)) |
+| **Document status** | v2.4 — approved; Phases 1–13 built (as-built notes: ARCHITECTURE §0; integration reference: [API.md](API.md)) |
 | **Date** | 2026-10-16 |
 | **Related** | [PRD.md](PRD.md) (product requirements) · [ARCHITECTURE.md](ARCHITECTURE.md) (technical architecture) |
 
@@ -1330,3 +1330,27 @@ Candidates can request extra time (+25% or +50%) through a link on the consent s
 | SAML 2.0 single sign-on | OIDC covers the same providers |
 | SCIM Bulk operations | Providers fall back to one request per change |
 | Mapping custom attributes (e.g. drive assignment) | Drives are assigned in HBE Interview |
+
+## 28. Phase 13 features (v2.4)
+
+### 28.1 Practice interviews
+
+- **Who and when:** once a candidate has finished onboarding and a round is available (before round 1 or between rounds), the candidate page shows an optional **Practice interview · ~6 min** card above the rounds. Admins can switch it off in *Settings → Compliance & privacy* (on by default).
+- **What happens:** the same interview room (text or voice, the role's interview languages, pause and skip controls) with the drive's interviewer persona, in three short sections:
+  1. **Warm-up** — the interviewer says this is unscored practice and asks an easy question;
+  2. **Sample question** — one question in the style of the role (technical problem, piece of work, or leading a team for managers), never one from the real interview, with one natural follow-up;
+  3. **Tips & wrap-up** — one or two general tips (structure, specific examples, it's fine to ask or pause), then the practice ends itself.
+  The interviewer sees only the candidate's first name and the role — nothing from the resume, repositories or earlier rounds.
+- **Never scored:** practice is never evaluated, creates no report, doesn't move the candidate's stage, records no integrity signals, isn't counted in analytics, cost-per-round or insights, and has no experience survey.
+- **Again and hand-over:** a finished practice can be retaken (the previous one is replaced; at most 5 starts a day). If a practice is still open when the candidate starts the real round, it is closed automatically.
+- **Staff:** the candidate report shows only *practice taken* (or *practising now*) and how many times — **never the transcript**. Starts and ends are audited.
+- **Data rights:** the candidate's data download includes the practice transcript, labelled as unscored practice; it is deleted with the rest of the candidacy.
+
+### 28.2 Not built yet
+
+| Item | Note |
+|---|---|
+| Practice coding or design exercises | Practice is conversation-only; the room's snippet editor is available |
+| Per-drive practice settings | One organisation-wide switch |
+| AI feedback on practice answers | Tips are general, by design, so practice can't be used to tune answers |
+

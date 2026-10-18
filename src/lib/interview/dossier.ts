@@ -5,6 +5,7 @@ import { SECTION_QUESTIONS, SCENARIOS } from "../content";
 import { sectionGuide } from "./sections";
 import type { SessionContext } from "./load";
 import type { RepoInsight } from "../ai/analyzers";
+import { PRACTICE_INSTRUCTION, practiceQuestion } from "../core/practice";
 
 export function roleBlock(ctx: SessionContext): string {
   const p = ctx.config.roleProfile;
@@ -37,6 +38,8 @@ export function dossierBlock(ctx: SessionContext): string {
   const round = ctx.round!.type;
   const firstName = ctx.candidate.name.split(/\s+/)[0] ?? "the candidate";
   parts.push(`Candidate first name: ${firstName}`);
+  // Practice runs see only the first name and the role: nothing from the resume, repositories or earlier rounds.
+  if (ctx.practice) return `<candidate_dossier>\n${parts.join("\n\n")}\n\n${PRACTICE_INSTRUCTION}\n</candidate_dossier>`;
   if (a) {
     const prof = a.profile;
     parts.push(
@@ -114,6 +117,7 @@ ${(ins?.questions ?? []).map((q, i) => `${i + 1}. [${q.kind}] ${q.question} (fil
 export function questionPool(ctx: SessionContext, state: SessionState): string[] {
   const sec = currentSection(state);
   if (!sec) return [];
+  if (ctx.practice) return sec.key === "practice_sample" ? [practiceQuestion(ctx.config)].filter((q) => !state.usedRefs.includes(`q:${hash(q)}`)) : [];
   const round = ctx.round!.type;
   const pool: string[] = [];
   if (round === "technical" && sec.key === "github") {
@@ -164,7 +168,7 @@ export function liveStateText(ctx: SessionContext, state: SessionState, now: Dat
   const sec = currentSection(state);
   const round = ctx.round!;
   const left = timeLeftSec(ctx.session.deadlineAt, now, state);
-  const guide = sec ? sectionGuide(round.type, sec.key, ctx.settings.askCompensation) : null;
+  const guide = sec ? sectionGuide(round.type, sec.key, ctx.settings.askCompensation, ctx.practice) : null;
   const secLeft = sec ? Math.max(0, Math.round((sec.minutes * 60 - sectionElapsedSec(sec, now)) / 60)) : 0;
   const coverage = PARAMETERS[round.type]
     .filter((p) => (round.weights[p.id] ?? 0) > 0)
@@ -183,7 +187,8 @@ export function liveStateText(ctx: SessionContext, state: SessionState, now: Dat
     `Follow-ups used on the current topic: ${state.followUps} of ${LIMITS.maxFollowUps}.`,
     exerciseText,
     pool.length ? `Suggested questions for this section (adapt them; you may write your own):\n${pool.map((q) => `- ${q}`).join("\n")}` : "",
-    `Server instruction: ${INSTRUCTION_TEXT[instruction]}`,
+    ctx.practice ? `Practice mode: ${PRACTICE_INSTRUCTION}` : "",
+    `Server instruction: ${ctx.practice && instruction === "closing" ? "Wrap-up: give one or two friendly tips, wish them luck for the real interview, then call end_interview." : INSTRUCTION_TEXT[instruction]}`,
   ]
     .filter(Boolean)
     .join("\n");

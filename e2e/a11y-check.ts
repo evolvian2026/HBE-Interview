@@ -34,8 +34,9 @@ async function main() {
   ).rows;
   const [fresh] = (await db.query("select access_token from candidacies where stage = 'invited' and org_id = (select org_id from users where email = $1) order by created_at desc limit 1", [process.env.ADMIN_EMAIL!.toLowerCase()])).rows;
   const [lobby] = (await db.query("select access_token, current_round_index from candidacies c where stage in ('ready','round_available') and org_id = (select org_id from users where email = $1) and not exists (select 1 from round_sessions s where s.candidacy_id = c.id and s.round_index = c.current_round_index) order by created_at desc limit 1", [process.env.ADMIN_EMAIL!.toLowerCase()])).rows;
-  const [live] = (await db.query("select c.access_token, s.round_index from round_sessions s join candidacies c on c.id = s.candidacy_id where s.status = 'active' and c.org_id = (select org_id from users where email = $1) order by s.created_at desc limit 1", [process.env.ADMIN_EMAIL!.toLowerCase()])).rows;
+  const [live] = (await db.query("select c.access_token, s.round_index from round_sessions s join candidacies c on c.id = s.candidacy_id where s.status = 'active' and s.round_index >= 0 and c.org_id = (select org_id from users where email = $1) order by s.created_at desc limit 1", [process.env.ADMIN_EMAIL!.toLowerCase()])).rows;
   const [queued] = (await db.query("select r.id from round_reports r join candidacies c on c.id = r.candidacy_id where r.calibration_requested_at is not null and r.status = 'ready' and c.org_id = (select org_id from users where email = $1) order by r.calibration_requested_at desc limit 1", [process.env.ADMIN_EMAIL!.toLowerCase()])).rows;
+  const [practice] = (await db.query("select access_token from candidacies c where stage in ('ready','round_available') and org_id = (select org_id from users where email = $1) and not exists (select 1 from round_sessions s where s.candidacy_id = c.id and s.round_index = -1 and s.status = 'active') order by created_at desc limit 1", [process.env.ADMIN_EMAIL!.toLowerCase()])).rows;
   const [adjusted] = (await db.query("select c.access_token from accommodations a join candidacies c on c.id = a.candidacy_id where c.org_id = (select org_id from users where email = $1) order by a.updated_at desc limit 1", [process.env.ADMIN_EMAIL!.toLowerCase()])).rows;
   const [panel] = (await db.query("select p.id, c.access_token from panel_interviews p join candidacies c on c.id = p.candidacy_id where c.org_id = (select org_id from users where email = $1) order by p.created_at desc limit 1", [process.env.ADMIN_EMAIL!.toLowerCase()])).rows;
   await db.end();
@@ -101,6 +102,13 @@ async function main() {
       await cand.waitForSelector("text=AI interviewer at", { timeout: 30_000 });
       failures += await audit(cand, "interview room");
     }
+  }
+  if (practice) {
+    await cand.goto(`${BASE}/c/${practice.access_token}`);
+    failures += await audit(cand, "candidate hub (practice offer)");
+    await cand.goto(`${BASE}/c/${practice.access_token}/practice`);
+    await cand.waitForSelector("text=Start practice");
+    failures += await audit(cand, "practice lobby");
   }
   if (live) {
     await cand.goto(`${BASE}/c/${live.access_token}/round/${live.round_index}`);

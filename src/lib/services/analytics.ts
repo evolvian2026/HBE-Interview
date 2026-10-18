@@ -26,7 +26,7 @@ export async function driveAnalytics(driveId: string) {
   const cands = await db.select().from(schema.candidacies).where(eq(schema.candidacies.driveId, driveId));
   const ids = cands.map((c) => c.id);
   const none = <T,>(): T[] => [];
-  const sessions = ids.length ? await db.select().from(schema.roundSessions).where(inArray(schema.roundSessions.candidacyId, ids)) : none<typeof schema.roundSessions.$inferSelect>();
+  const sessions = ids.length ? await db.select().from(schema.roundSessions).where(and(inArray(schema.roundSessions.candidacyId, ids), gte(schema.roundSessions.roundIndex, 0))) : none<typeof schema.roundSessions.$inferSelect>();
   const reports = ids.length ? await db.select().from(schema.roundReports).where(inArray(schema.roundReports.candidacyId, ids)) : none<typeof schema.roundReports.$inferSelect>();
   const combined = ids.length ? await db.select().from(schema.combinedReports).where(inArray(schema.combinedReports.candidacyId, ids)) : none<typeof schema.combinedReports.$inferSelect>();
   const resumes = ids.length ? await db.select({ candidacyId: schema.resumes.candidacyId, status: schema.resumes.status }).from(schema.resumes).where(inArray(schema.resumes.candidacyId, ids)) : [];
@@ -179,7 +179,7 @@ export async function aiUsage(sinceDays: number | null, orgId: string | null) {
     .select({ n: sql<number>`count(*)::int` })
     .from(schema.roundSessions)
     .innerJoin(schema.candidacies, eq(schema.roundSessions.candidacyId, schema.candidacies.id))
-    .where(and(eq(schema.roundSessions.status, "ended"), gte(schema.roundSessions.endedAt, since), orgId ? eq(schema.candidacies.orgId, orgId) : undefined));
+    .where(and(eq(schema.roundSessions.status, "ended"), gte(schema.roundSessions.endedAt, since), gte(schema.roundSessions.roundIndex, 0), orgId ? eq(schema.candidacies.orgId, orgId) : undefined));
   const total = byStage.reduce((a, r) => a + r.cost, 0);
   const totalIn = byStage.reduce((a, r) => a + r.input + r.cacheRead + r.cacheWrite, 0);
   return {

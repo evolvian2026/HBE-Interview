@@ -57,7 +57,7 @@ export async function listOrgs() {
         .select({ orgId: schema.candidacies.orgId, n: sql<number>`count(*)::int` })
         .from(schema.roundSessions)
         .innerJoin(schema.candidacies, eq(schema.roundSessions.candidacyId, schema.candidacies.id))
-        .where(and(eq(schema.roundSessions.status, "ended"), gte(schema.roundSessions.endedAt, since30)))
+        .where(and(eq(schema.roundSessions.status, "ended"), gte(schema.roundSessions.endedAt, since30), gte(schema.roundSessions.roundIndex, 0)))
         .groupBy(schema.candidacies.orgId)
     ).map((r) => [r.orgId, r.n] as const),
   );
