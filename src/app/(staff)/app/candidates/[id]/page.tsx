@@ -155,7 +155,7 @@ export default async function CandidatePage({ params }: { params: Promise<{ id: 
             <div className="mt-1 text-xs text-slate-700">
               <Badge tone={test.passed ? "green" : test.reviewStatus === "pending" ? "amber" : test.submittedAt ? "red" : "blue"}>{`screening test${test.submittedAt ? `: ${test.percent}%` : " in progress"}`}</Badge>{" "}
               {test.submittedAt &&
-                `${test.passed ? "Passed" : test.reviewStatus === "pending" ? "Below the pass mark — your decision" : "Not passed"} · ${SECTIONS.filter((s) => (test.score as ScreeningScore | null)?.bySection[s]).map((s) => `${s} ${(test.score as ScreeningScore).bySection[s]!.correct}/${(test.score as ScreeningScore).bySection[s]!.total}`).join(" · ")} · ${Math.round((test.submittedAt.getTime() - test.startedAt.getTime()) / 60_000)} min${test.focusLosses ? ` · left the tab ${test.focusLosses}×` : ""}${test.submitReason === "time_up" ? " · submitted at time-out" : ""}`}
+                `${test.passed ? "Passed" : test.reviewStatus === "pending" ? "Below the pass mark — your decision" : "Not passed"} · ${SECTIONS.filter((s) => (test.score as ScreeningScore | null)?.bySection[s]).map((s) => `${s} ${(test.score as ScreeningScore).bySection[s]!.correct}/${(test.score as ScreeningScore).bySection[s]!.total}`).join(" · ")} · ${Math.max(1, Math.round((test.submittedAt.getTime() - test.startedAt.getTime()) / 60_000))} min${test.focusLosses ? ` · left the tab ${test.focusLosses}×` : ""}${test.submitReason === "time_up" ? " · submitted at time-out" : ""}`}
               {test.reviewStatus === "pending" && hasRole(user, "recruiter") && <ScreeningReview candidacyId={id} />}
             </div>
           )}

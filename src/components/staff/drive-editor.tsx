@@ -524,14 +524,14 @@ function ScreeningEditor({ value, onChange }: { value: ScreeningConfig | undefin
       </label>
       {v.enabled && (
         <div className="mt-3 space-y-3">
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <div className="grid grid-cols-2 gap-3">
             {SECTIONS.map((s) => (
               <Field key={s} label={SECTION_LABEL[s]}>
                 <Input type="number" min={0} max={30} value={v.sections[s]} onChange={(e) => onChange({ ...v, sections: { ...v.sections, [s]: Math.max(0, Math.min(30, Math.round(Number(e.target.value) || 0))) } })} />
               </Field>
             ))}
           </div>
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <div className="grid grid-cols-2 gap-3">
             <Field label="Time (minutes)">
               <Input type="number" min={5} max={180} value={v.durationMin} onChange={(e) => onChange({ ...v, durationMin: Math.round(Number(e.target.value) || 0) })} />
             </Field>

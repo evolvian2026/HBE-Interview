@@ -121,7 +121,7 @@ export default async function DriveScreeningPage({ params }: { params: Promise<{
                       {x.score?.bySection[s] ? `${x.score.bySection[s]!.correct}/${x.score.bySection[s]!.total}` : "—"}
                     </td>
                   ))}
-                  <td className="py-2 pr-3">{x.minutes != null ? `${x.minutes} min` : "—"}</td>
+                  <td className="py-2 pr-3">{x.minutes == null ? "—" : x.minutes < 1 ? "<1 min" : `${x.minutes} min`}</td>
                   <td className="py-2">{x.focusLosses ? `${x.focusLosses}×` : "—"}</td>
                 </tr>
               ))}

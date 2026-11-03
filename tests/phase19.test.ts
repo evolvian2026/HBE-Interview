@@ -90,3 +90,14 @@ describe("configuration and import", () => {
     expect(csvRowsToQuestions([["q", "x"]]).problems[0]).toMatch(/header/);
   });
 });
+
+describe("campus invites", () => {
+  it("reads an optional college column", async () => {
+    const { csvToInvitees } = await import("@/lib/csv");
+    expect(csvToInvitees("Name,Email,College\nAsha,asha@x.in,IIT Delhi\nRavi,ravi@x.in,")).toEqual([
+      { name: "Asha", email: "asha@x.in", college: "IIT Delhi" },
+      { name: "Ravi", email: "ravi@x.in" },
+    ]);
+    expect(csvToInvitees("Asha,asha@x.in")).toEqual([{ name: "Asha", email: "asha@x.in" }]);
+  });
+});

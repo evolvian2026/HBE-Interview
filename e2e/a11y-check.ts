@@ -36,6 +36,7 @@ async function main() {
   const [lobby] = (await db.query("select access_token, current_round_index from candidacies c where stage in ('ready','round_available') and org_id = (select org_id from users where email = $1) and not exists (select 1 from round_sessions s where s.candidacy_id = c.id and s.round_index = c.current_round_index) order by created_at desc limit 1", [process.env.ADMIN_EMAIL!.toLowerCase()])).rows;
   const [live] = (await db.query("select c.access_token, s.round_index from round_sessions s join candidacies c on c.id = s.candidacy_id where s.status = 'active' and s.round_index >= 0 and c.org_id = (select org_id from users where email = $1) order by s.created_at desc limit 1", [process.env.ADMIN_EMAIL!.toLowerCase()])).rows;
   const [queued] = (await db.query("select r.id from round_reports r join candidacies c on c.id = r.candidacy_id where r.calibration_requested_at is not null and r.status = 'ready' and c.org_id = (select org_id from users where email = $1) order by r.calibration_requested_at desc limit 1", [process.env.ADMIN_EMAIL!.toLowerCase()])).rows;
+  const [screenDrive] = (await db.query("select drive_id from screening_attempts where org_id = (select org_id from users where email = $1) order by created_at desc limit 1", [process.env.ADMIN_EMAIL!.toLowerCase()])).rows;
   const [hireReview] = (await db.query("select r.id from hire_reviews r join users u on u.id = r.reviewer_id where u.email = $1 order by r.created_at desc limit 1", [process.env.ADMIN_EMAIL!.toLowerCase()])).rows;
   const [codeMatch] = (await db.query("select id from code_matches where org_id = (select org_id from users where email = $1) order by created_at desc limit 1", [process.env.ADMIN_EMAIL!.toLowerCase()])).rows;
   const [benchRun] = (await db.query("select id from benchmark_runs where status = 'completed' and org_id = (select org_id from users where email = $1) order by created_at desc limit 1", [process.env.ADMIN_EMAIL!.toLowerCase()])).rows;
@@ -73,6 +74,8 @@ async function main() {
     ["test bench", "/app/test-bench"],
     ["copied-code checks", "/app/code-similarity?status=all"],
     ["hires", "/app/hires"],
+    ["question bank", "/app/question-bank"],
+    ...(screenDrive ? ([["test results", `/app/drives/${screenDrive.drive_id}/screening`]] as [string, string][]) : []),
     ["quality of hire", "/app/quality"],
     ...(hireReview ? ([["hire check-in", `/app/hires/review/${hireReview.id}`]] as [string, string][]) : []),
     ...(codeMatch ? ([["code match", `/app/code-similarity/${codeMatch.id}`]] as [string, string][]) : []),

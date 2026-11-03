@@ -30,6 +30,7 @@ An AI-powered, multi-round interview platform. Candidates upload a resume, link 
 | Phase 11 | **Editable, branded candidate emails** (preview, test, email log) and **Slack / Teams notifications** |
 | Phase 12 | **SCIM 2.0 user provisioning** for Okta / Microsoft Entra ID: automatic create, update, deactivate and roles from groups |
 | Phase 13 | **Practice interviews**: an optional, unscored ~6-minute warm-up with the AI interviewer before the real rounds |
+| Phase 19 | **Screening tests**: timed, auto-marked aptitude tests (quantitative, logical, verbal, technical) before the AI interview, with campus results by college |
 | Phase 18 | **Calendar sync**: Google / Microsoft 365 free-busy suggestions for panels and automatic Meet / Teams links on booking |
 | Phase 17 | **Quality of hire**: 90/180-day manager check-ins on hires and which interview signals actually predict success |
 | Phase 16 | **Copied-code detection**: disguised copies between candidates or of published solutions flagged for review, problem leak status and retiring leaked problems |
@@ -121,6 +122,8 @@ npm run smoke:phase17 # quality of hire: offers, joining, blind check-ins, remin
 npm run ui-check:phase17 # hires, a check-in before and after submitting, quality of hire
 npm run smoke:phase18 # calendar sync: connect, suggestions, Meet/Teams on booking, reschedule/cancel, failures (CALENDAR_MOCK=true)
 npm run ui-check:phase18 # connect a calendar, suggested times, booked interview with a link
+npm run smoke:phase19 # screening tests: bank, setting, paper without answers, pass/review/reject, time limits, results by college
+npm run ui-check:phase19 # test settings, a candidate taking the test, results by college
 npm run mock-oidc    # standalone mock OIDC provider on :4610 for trying SSO locally
 npm run a11y         # axe-core WCAG 2.1 AA checks on staff and candidate screens
 ```

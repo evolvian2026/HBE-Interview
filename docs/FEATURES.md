@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Document status** | v2.9 — approved; Phases 1–18 built (as-built notes: ARCHITECTURE §0; integration reference: [API.md](API.md)) |
+| **Document status** | v3.0 — approved; Phases 1–19 built (as-built notes: ARCHITECTURE §0; integration reference: [API.md](API.md)) |
 | **Date** | 2026-10-16 |
 | **Related** | [PRD.md](PRD.md) (product requirements) · [ARCHITECTURE.md](ARCHITECTURE.md) (technical architecture) |
 
@@ -1503,4 +1503,42 @@ Voice mode can use a cloud speech service — **Microsoft Azure AI Speech** — 
 | Candidates choosing from live availability | Candidates choose from the times the scheduler offered |
 | Zoom | Google Meet and Microsoft Teams only |
 | Organisation-wide calendar access (admin consent / service account) | Each person connects their own calendar |
+
+## 34. Phase 19 features (v3.0)
+
+### 34.1 Screening tests
+
+- **Setting it up (drive editor → Screening test):**
+  - questions per section — **Quantitative aptitude**, **Logical reasoning**, **Verbal ability**, **Technical fundamentals** (0–30 each);
+  - time limit (5–180 minutes) and pass mark (%);
+  - below the pass mark: **hold for a recruiter to decide** or **reject automatically**;
+  - whether candidates see their score.
+  Publishing checks that the question bank has enough questions for each section.
+- **For the candidate:** after consent, the candidate page shows *Next: a short screening test*, with the number of questions, the time and the sections. Uploading a resume and adding projects are blocked until the test is passed, including through the API.
+  - The test page shows the rules (the timer keeps running if the page is closed; no penalty for wrong answers; answers are saved as you go; leaving the page is recorded), then one question at a time.
+  - It has a timer, a navigator showing answered and marked questions, *Mark for review*, *Clear answer*, and *Submit* with a count of unanswered questions.
+  - When time runs out the answers given so far are submitted — by the page, by the server when an answer arrives late, and by the maintenance pass for abandoned tests.
+- **Fair and hard to share:** each candidate gets a random paper (per section, from the built-in and the organisation's own questions) with the options in a random order. The correct answers never leave the server. Switching away from the test tab is counted and shown to recruiters as context.
+- **Marking:** automatic, with no AI involved; the score is overall and per section.
+  - At or above the pass mark, the candidate moves on to their resume.
+  - Below it, on a *review* drive, the candidate sees "being reviewed" and recruiters get an inbox item and buttons on the report (*Let them continue* / *Don't continue*).
+  - On a *reject* drive, the candidate is rejected and sent the rejection email.
+- **Results (drive → Test results):**
+  - submitted, in progress, passed and waiting counts;
+  - score distribution, average by section, and a **breakdown by college** (took the test, average, pass rate, top score);
+  - every candidate's score, section scores, time taken and tab-leave count;
+  - CSV export.
+  The candidate report shows the result line too.
+- **Question bank (Admin → Question bank; recruiters and admins):** 48 built-in questions (12 per section, each with a worked explanation) plus the organisation's own. Add them one by one or import a CSV (`section, difficulty, question, a, b, c, d, answer (A–D), explanation`) with per-row problems reported. Retire questions from future tests (past attempts keep their copy).
+- **Campus drives:** invites (typed or CSV) take an optional **college** column, shown on the candidate report and used in the results.
+- **Data:** the candidate's data download includes their test score, section scores and their own answers by question number — not the questions or the answer key (the employer's test content). Tests are deleted with the candidate's data. Starting and submitting tests, decisions, questions and exports are audited.
+
+### 34.2 Not built yet
+
+| Item | Note |
+|---|---|
+| Adaptive tests and negative marking | Fixed papers; wrong answers score zero |
+| Question analytics (difficulty, discrimination) | Section averages per drive only |
+| Webcam proctoring during the test | Tab-leave count only; webcam proctoring applies to the AI rounds |
+| Booking test slots for campus sessions | Candidates take the test any time before the invite expires |
 
