@@ -7,6 +7,8 @@ import { api } from "../api";
 import { buildDefaultDriveConfig, enabledRounds, rescaleSections, validateDriveConfig } from "@/lib/core/rounds";
 import { PARAMETERS } from "@/lib/core/rubrics";
 import { INTERVIEW_LANGUAGES } from "@/lib/core/languages";
+import { DEFAULT_SCREENING, SECTIONS, type ScreeningConfig } from "@/lib/core/screening";
+import { SECTION_LABEL } from "@/lib/content/aptitude";
 import {
   CATEGORY_LABEL,
   RECOMMENDATION_LABEL,
@@ -442,6 +444,7 @@ export function DriveEditor({ driveId, initial, published }: { driveId: string; 
                 </span>
               </label>
             </div>
+            <ScreeningEditor value={c.screening} onChange={(screening) => update({ screening })} />
             <div className="grid grid-cols-2 gap-3">
               <Field label="Invite valid for (days)">
                 <Input type="number" value={c.inviteExpiryDays} onChange={(e) => update({ inviteExpiryDays: Number(e.target.value) })} />
@@ -503,6 +506,52 @@ export function DriveEditor({ driveId, initial, published }: { driveId: string; 
         {msg && <span className={cx("text-sm", msg.tone === "green" ? "text-emerald-700" : "text-red-600")}>{msg.text}</span>}
         {published && <span className="ml-auto text-xs text-slate-500">Publishing a new version applies to new candidates only; in-progress candidates keep their version.</span>}
       </div>
+    </div>
+  );
+}
+
+/** Screening test settings: a timed multiple-choice test after consent, before the resume and AI rounds. */
+function ScreeningEditor({ value, onChange }: { value: ScreeningConfig | undefined; onChange: (v: ScreeningConfig) => void }) {
+  const v = { ...DEFAULT_SCREENING, ...(value ?? {}), sections: { ...DEFAULT_SCREENING.sections, ...(value?.sections ?? {}) } };
+  const total = SECTIONS.reduce((n, s) => n + (v.sections[s] ?? 0), 0);
+  return (
+    <div className="rounded-lg bg-slate-50 p-3 text-sm">
+      <label className="flex items-start gap-2">
+        <input type="checkbox" className="mt-1" checked={v.enabled} onChange={(e) => onChange({ ...v, enabled: e.target.checked })} />
+        <span>
+          <b>Screening test</b> — a timed multiple-choice test after consent, before the resume and AI interview. Marked automatically (no AI cost); useful for campus and high-volume drives.
+        </span>
+      </label>
+      {v.enabled && (
+        <div className="mt-3 space-y-3">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            {SECTIONS.map((s) => (
+              <Field key={s} label={SECTION_LABEL[s]}>
+                <Input type="number" min={0} max={30} value={v.sections[s]} onChange={(e) => onChange({ ...v, sections: { ...v.sections, [s]: Math.max(0, Math.min(30, Math.round(Number(e.target.value) || 0))) } })} />
+              </Field>
+            ))}
+          </div>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <Field label="Time (minutes)">
+              <Input type="number" min={5} max={180} value={v.durationMin} onChange={(e) => onChange({ ...v, durationMin: Math.round(Number(e.target.value) || 0) })} />
+            </Field>
+            <Field label="Pass mark (%)">
+              <Input type="number" min={0} max={100} value={v.passMark} onChange={(e) => onChange({ ...v, passMark: Math.max(0, Math.min(100, Math.round(Number(e.target.value) || 0))) })} />
+            </Field>
+            <Field label="Below the pass mark">
+              <Select value={v.onFail} onChange={(e) => onChange({ ...v, onFail: e.target.value as ScreeningConfig["onFail"] })}>
+                <option value="review">Hold for a recruiter to decide</option>
+                <option value="reject">Reject automatically</option>
+              </Select>
+            </Field>
+            <label className="flex items-end gap-2 pb-2">
+              <input type="checkbox" checked={v.showScore} onChange={(e) => onChange({ ...v, showScore: e.target.checked })} />
+              <span>Show candidates their score</span>
+            </label>
+          </div>
+          <p className="text-xs text-slate-600">{`${total} questions, picked at random per candidate with options shuffled. The built-in bank has 12 per section; add your own under Admin → Question bank.`}</p>
+        </div>
+      )}
     </div>
   );
 }

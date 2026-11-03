@@ -34,14 +34,14 @@ export function InviteForm({ driveId }: { driveId: string }) {
               const f = e.target.files?.[0];
               if (!f) return;
               setFromCsv(true);
-              setText(csvToInvitees(await f.text()).map((p) => `${p.name}, ${p.email}`).join("\n"));
+              setText(csvToInvitees(await f.text()).map((p) => [p.name, p.email, p.college].filter(Boolean).join(", ")).join("\n"));
               e.target.value = "";
             }}
           />
         </label>
-        <span>Columns: name, email (header row optional; up to 200 rows)</span>
+        <span>Columns: name, email, and optionally college (header row optional; up to 200 rows)</span>
       </div>
-      <Textarea rows={3} value={text} onChange={(e) => setText(e.target.value)} placeholder={"One per line: Name, email\nPriya Sharma, priya@example.com"} />
+      <Textarea rows={3} value={text} onChange={(e) => setText(e.target.value)} placeholder={"One per line: Name, email[, college]\nPriya Sharma, priya@example.com, IIT Delhi"} />
       <Button
         disabled={busy || !text.trim()}
         onClick={async () => {
@@ -51,7 +51,7 @@ export function InviteForm({ driveId }: { driveId: string }) {
             .split("\n")
             .map((l) => l.split(/[,\t;]/).map((x) => x.trim()))
             .filter((p) => p.length >= 2)
-            .map(([name, email]) => ({ name, email }));
+            .map(([name, email, ...rest]) => ({ name, email, ...(rest.join(", ").trim() ? { college: rest.join(", ").trim() } : {}) }));
           try {
             const r = await api<{ results: Result[] }>(`/api/drives/${driveId}/invites`, { body: { candidates, source: fromCsv ? "csv" : "invite" } });
             setResults(r.results);

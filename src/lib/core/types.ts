@@ -111,6 +111,8 @@ export interface DriveConfig {
   languages?: string[];
   /** Opt-in webcam proctoring (K-7): periodic low-res snapshots with an AI presence check. */
   proctoring?: { webcam: boolean; intervalSec: number };
+  /** Phase 19: timed multiple-choice screening test after consent, before the resume and AI rounds. */
+  screening?: import("./screening").ScreeningConfig;
 }
 
 export interface ParameterDef {

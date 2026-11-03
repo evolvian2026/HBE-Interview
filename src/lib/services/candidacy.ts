@@ -22,7 +22,7 @@ async function upsertCandidate(orgId: string, name: string, email: string) {
 
 export type CandidacySource = "invite" | "csv" | "open" | "api" | "reinvite";
 
-export async function createCandidacy(drive: typeof schema.drives.$inferSelect, name: string, email: string, source: CandidacySource) {
+export async function createCandidacy(drive: typeof schema.drives.$inferSelect, name: string, email: string, source: CandidacySource, college?: string | null) {
   if (!drive.currentVersionId) throw new HttpError(400, "This drive is not published yet.");
   const [version] = await db.select().from(schema.driveVersions).where(eq(schema.driveVersions.id, drive.currentVersionId));
   const config = version.config as DriveConfig;
@@ -41,6 +41,7 @@ export async function createCandidacy(drive: typeof schema.drives.$inferSelect, 
       candidateId: candidate.id,
       accessToken: newAccessToken(),
       source,
+      college: college?.trim().slice(0, 160) || null,
       expiresAt: new Date(Date.now() + config.inviteExpiryDays * 86_400_000),
     })
     .returning();
@@ -49,7 +50,7 @@ export async function createCandidacy(drive: typeof schema.drives.$inferSelect, 
 }
 
 /** Invite candidates to a drive of the actor's organisation (staff user or API key). */
-export async function inviteCandidates(driveId: string, list: { name: string; email: string }[], actor: { id: string | null; orgId: string }, via: "ui" | "api" = "ui", source: "invite" | "csv" = "invite") {
+export async function inviteCandidates(driveId: string, list: { name: string; email: string; college?: string }[], actor: { id: string | null; orgId: string }, via: "ui" | "api" = "ui", source: "invite" | "csv" = "invite") {
   const [drive] = await db.select().from(schema.drives).where(and(eq(schema.drives.id, driveId), eq(schema.drives.orgId, actor.orgId)));
   if (!drive) throw new HttpError(404, "Drive not found");
   if (drive.status !== "active") throw new HttpError(400, "Publish (activate) the drive before inviting candidates.");
@@ -61,7 +62,7 @@ export async function inviteCandidates(driveId: string, list: { name: string; em
       ids.push(undefined);
       continue;
     }
-    const { candidacy, created } = await createCandidacy(drive, item.name, item.email, via === "api" ? "api" : source);
+    const { candidacy, created } = await createCandidacy(drive, item.name, item.email, via === "api" ? "api" : source, item.college);
     if (created) await sendInviteEmail(candidacy.id).catch((e) => console.error("invite email failed", e));
     ids.push(candidacy.id);
     out.push({ name: item.name, email: item.email, link: candidateLink(candidacy.accessToken), status: created ? "invited" : "already_invited" });

@@ -69,6 +69,7 @@ export default async function StaffLayout({ children }: { children: React.ReactN
                         { href: "/app/usage", label: "AI usage" },
                         { href: "/app/test-bench", label: "Test bench" },
                         { href: "/app/code-similarity", label: "Copied-code checks" },
+                        { href: "/app/question-bank", label: "Question bank" },
                         { href: "/app/audit", label: "Audit log" },
                       ]
                     : []),

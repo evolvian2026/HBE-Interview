@@ -40,6 +40,7 @@ export async function exportCandidateData(candidacyId: string) {
   const survey = await db.select({ roundIndex: schema.candidateFeedback.roundIndex, overall: schema.candidateFeedback.overall, fairness: schema.candidateFeedback.fairness, clarity: schema.candidateFeedback.clarity, technical: schema.candidateFeedback.technical, comment: schema.candidateFeedback.comment }).from(schema.candidateFeedback).where(eq(schema.candidateFeedback.candidacyId, candidacyId));
   const panels = await db.select().from(schema.panelInterviews).where(eq(schema.panelInterviews.candidacyId, candidacyId));
   const hire = await (await import("./hires")).hireForCandidacy(candidacyId);
+  const test = await (await import("./screening")).attemptFor(candidacyId);
   const [adj] = await db
     .select({ requested: { extraTimePct: schema.accommodations.extraTimePct, extraBreaks: schema.accommodations.extraBreaks, details: schema.accommodations.details }, status: schema.accommodations.status, approvedExtraTimePct: schema.accommodations.approvedExtraTimePct, approvedExtraBreaks: schema.accommodations.approvedExtraBreaks, note: schema.accommodations.decisionNote })
     .from(schema.accommodations)
@@ -67,6 +68,17 @@ export async function exportCandidateData(candidacyId: string) {
     practicalDetails: fit?.data ?? null,
     adjustmentRequest: adj ?? null,
     panelInterviews: panels.map((p) => ({ title: p.title, scheduledAt: p.scheduledAt, durationMin: p.durationMin, location: p.location, status: p.status })),
+    screeningTest: test
+      ? {
+          startedAt: test.startedAt,
+          submittedAt: test.submittedAt,
+          percent: test.percent,
+          passed: test.passed,
+          // Your answers by question number and section. The questions and the answer key stay with the employer (test content).
+          sectionScores: (test.score as { bySection?: unknown } | null)?.bySection ?? null,
+          answers: (test.paper as { qid: string; section: string }[]).map((q, i) => ({ question: i + 1, section: q.section, yourAnswer: "ABCDEF"[(test.answers as Record<string, number>)[q.qid]] ?? null })),
+        }
+      : null,
     hire: hire ? { status: hire.status, joinedAt: hire.joinedAt, leftAt: hire.leftAt, checkIns: hire.reviews.filter((r) => r.submittedAt).map((r) => ({ checkpoint: `${r.checkpoint} days`, submittedAt: r.submittedAt, rating: r.rating, skills: r.technical, workingWithOthers: r.collaboration, values: r.values, wouldRehire: r.wouldRehire, note: r.note })) } : null,
     surveyAnswers: survey,
     feedbackReleasedToYou: row.c.feedbackReleasedAt ? row.c.feedbackSummary : null,

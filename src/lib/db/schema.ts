@@ -164,6 +164,8 @@ export const candidacies = pgTable(
     finalStatus: text("final_status"),
     /** How the candidacy started: staff invite, CSV, open link, API, or a talent-pool re-invite. */
     source: text("source").$type<"invite" | "csv" | "open" | "api" | "reinvite">(),
+    /** Campus drives: the candidate's college (from the invite or CSV). */
+    college: text("college"),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
@@ -999,3 +1001,52 @@ export const calendarConnections = pgTable("calendar_connections", {
   lastError: text("last_error"),
   connectedAt: ts("connected_at").notNull().defaultNow(),
 });
+
+/* ------------------------------- Phase 19 --------------------------------- */
+
+/** An organisation's own aptitude question (the built-in bank lives in code). */
+export const aptitudeQuestions = pgTable(
+  "aptitude_questions",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    orgId: orgRef(),
+    section: text("section").notNull().$type<"quant" | "logical" | "verbal" | "technical">(),
+    difficulty: text("difficulty").notNull().default("medium").$type<"easy" | "medium" | "hard">(),
+    stem: text("stem").notNull(),
+    options: jsonb("options").notNull().$type<string[]>(),
+    answer: integer("answer").notNull(),
+    explanation: text("explanation"),
+    active: boolean("active").notNull().default(true),
+    createdBy: uuid("created_by").references(() => users.id, { onDelete: "set null" }),
+    createdAt: createdAt(),
+  },
+  (t) => [index("aptitude_org_section").on(t.orgId, t.section)],
+);
+
+/** A candidate's screening test: their paper (with the correct options, never sent to them), answers and result. */
+export const screeningAttempts = pgTable(
+  "screening_attempts",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    candidacyId: uuid("candidacy_id").notNull().unique().references(() => candidacies.id, { onDelete: "cascade" }),
+    orgId: orgRef(),
+    driveId: uuid("drive_id").notNull().references(() => drives.id, { onDelete: "cascade" }),
+    paper: jsonb("paper").notNull(),
+    answers: jsonb("answers").notNull().$type<Record<string, number>>(),
+    startedAt: ts("started_at").notNull(),
+    deadlineAt: ts("deadline_at").notNull(),
+    submittedAt: ts("submitted_at"),
+    submitReason: text("submit_reason").$type<"submitted" | "time_up">(),
+    score: jsonb("score"),
+    percent: real("percent"),
+    passed: boolean("passed"),
+    /** Below the pass mark on a "review" drive: pending until a recruiter decides. */
+    reviewStatus: text("review_status").$type<"pending" | "passed" | "failed">(),
+    reviewedBy: uuid("reviewed_by").references(() => users.id, { onDelete: "set null" }),
+    reviewedAt: ts("reviewed_at"),
+    reviewNote: text("review_note"),
+    focusLosses: integer("focus_losses").notNull().default(0),
+    createdAt: createdAt(),
+  },
+  (t) => [index("screening_drive").on(t.driveId)],
+);

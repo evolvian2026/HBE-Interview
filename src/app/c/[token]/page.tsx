@@ -12,6 +12,9 @@ import { ConsentStep } from "@/components/candidate/consent-step";
 import { ResumeStep } from "@/components/candidate/resume-step";
 import { ProfileStep } from "@/components/candidate/profile-step";
 import { ProjectsStep } from "@/components/candidate/projects-step";
+import { screeningState } from "@/lib/services/screening";
+import { SECTION_LABEL } from "@/lib/content/aptitude";
+import { SECTIONS } from "@/lib/core/screening";
 import { FeedbackSurvey } from "@/components/candidate/feedback-survey";
 import { YourData } from "@/components/candidate/your-data";
 import { AccommodationCard } from "@/components/candidate/accommodation-card";
@@ -48,6 +51,7 @@ export default async function CandidateHub({ params }: { params: Promise<{ token
   const [resume] = await db.select().from(schema.resumes).where(eq(schema.resumes.candidacyId, candidacy.id));
   const rounds = await candidateRounds(candidacy, config);
   const needsProjects = needsProjectsStep(config);
+  const test = await screeningState(candidacy);
   const surveyRound = await pendingSurveyRound(candidacy.id);
   const deletion = await pendingDeletion(candidacy.id);
   const accommodation = await getAccommodation(candidacy.id);
@@ -60,6 +64,7 @@ export default async function CandidateHub({ params }: { params: Promise<{ token
 
   const steps = [
     { key: "consent", label: "Consent", done: candidacy.stage !== "invited" },
+    ...(test.required ? [{ key: "test", label: "Test", done: test.status === "passed" }] : []),
     { key: "resume", label: "Resume", done: !!resume && ["parsed", "confirmed"].includes(resume.status) },
     { key: "profile", label: "Profile", done: resume?.status === "confirmed" },
     ...(needsProjects ? [{ key: "projects", label: "Projects", done: !["invited", "onboarding"].includes(candidacy.stage) }] : []),
@@ -70,6 +75,22 @@ export default async function CandidateHub({ params }: { params: Promise<{ token
   if (candidacy.stage === "declined") body = <p className="text-sm text-slate-600">You declined consent, so this interview can&apos;t continue. If this was a mistake, please contact the recruiter.</p>;
   else if (candidacy.stage === "expired" && !rounds.some((r) => r.status === "completed")) body = <p className="text-sm text-slate-600">This invitation has expired. Please contact the recruiter{settings.supportEmail ? ` at ${settings.supportEmail}` : ""}.</p>;
   else if (candidacy.stage === "invited") body = <ConsentStep token={token} text={settings.consentText} companyName={settings.companyName} webcamRequired={!!config.proctoring?.webcam} />;
+  else if (candidacy.stage === "onboarding" && test.required && test.status !== "passed")
+    body =
+      test.status === "review" ? (
+        <div className="space-y-2">
+          <h2 className="text-lg font-semibold">Screening test submitted</h2>
+          <p className="text-sm text-slate-600">Thank you — the hiring team is reviewing your result and will let you know the next step by email.</p>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          <h2 className="text-lg font-semibold">{test.status === "in_progress" ? "Your screening test is in progress" : "Next: a short screening test"}</h2>
+          <p className="text-sm text-slate-600">{`${SECTIONS.reduce((n, s) => n + (test.cfg.sections[s] ?? 0), 0)} multiple-choice questions in ${test.cfg.durationMin} minutes: ${SECTIONS.filter((s) => (test.cfg.sections[s] ?? 0) > 0).map((s) => SECTION_LABEL[s].toLowerCase()).join(", ")}. After the test you'll upload your resume and take the AI interview.`}</p>
+          <Link href={`/c/${token}/screening`} className="inline-block rounded-lg bg-brand-600 px-3.5 py-2 text-sm font-medium text-white hover:bg-brand-700">
+            {test.status === "in_progress" ? "Continue the test" : "Go to the test"}
+          </Link>
+        </div>
+      );
   else if (candidacy.stage === "onboarding" && (!resume || ["uploaded", "parsing", "failed"].includes(resume.status)))
     body = <ResumeStep token={token} initialStatus={resume?.status ?? "none"} initialError={resume?.error} />;
   else if (candidacy.stage === "onboarding" && resume?.status === "parsed") body = <ProfileStep token={token} profile={resume.parsed as ParsedResume} />;

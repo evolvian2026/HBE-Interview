@@ -6,6 +6,7 @@ import { pendingAccommodations } from "./accommodations";
 import { rescheduleRequests } from "./panel";
 import { openMatchCount } from "./similarity";
 import { offersToConfirm, reviewsDueFor } from "./hires";
+import { pendingReviews as pendingTests } from "./screening";
 
 export interface InboxItem {
   label: string;
@@ -164,6 +165,15 @@ export async function inbox(user: StaffUser, opts: { light?: boolean } = {}): Pr
       items: rs.slice(0, MAX).map((x) => ({ label: x.name, sub: `${x.d.title}${x.iv.candidateMessage ? ` · “${x.iv.candidateMessage.slice(0, 80)}”` : ""}`, href: `/app/candidates/${x.iv.candidacyId}` })),
       empty: "No requests.",
     });
+    const tests = await pendingTests(user);
+    if (tests.length)
+      sections.push({
+        key: "tests",
+        title: "Screening tests below the pass mark",
+        kind: "action",
+        count: tests.length,
+        items: tests.slice(0, MAX).map((t) => ({ label: t.name, sub: `${t.d.title} · ${t.percent}%`, href: `/app/candidates/${t.c.id}` })),
+      });
     const toConfirm = await offersToConfirm(user.orgId);
     if (toConfirm.length)
       sections.push({

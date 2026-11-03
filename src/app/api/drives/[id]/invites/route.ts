@@ -3,7 +3,7 @@ import { requireStaff } from "@/lib/auth/staff";
 import { handle, json } from "@/lib/http";
 import { inviteCandidates } from "@/lib/services/candidacy";
 
-const Body = z.object({ candidates: z.array(z.object({ name: z.string(), email: z.string() })).min(1).max(200), source: z.enum(["invite", "csv"]).default("invite") });
+const Body = z.object({ candidates: z.array(z.object({ name: z.string(), email: z.string(), college: z.string().max(160).optional() })).min(1).max(200), source: z.enum(["invite", "csv"]).default("invite") });
 
 export const POST = handle(async (req: Request, { params }: { params: Promise<{ id: string }> }) => {
   const user = await requireStaff("recruiter");

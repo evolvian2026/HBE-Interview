@@ -42,6 +42,14 @@ export async function publishDrive(driveId: string, user: StaffUser) {
   const config = d.draft as DriveConfig;
   const issues = validateDriveConfig(config);
   if (issues.length) throw new HttpError(400, issues.map((i) => i.message).join("; "));
+  // The screening test must be answerable from the organisation's question bank.
+  const { screeningOf, bankCounts } = await import("./screening");
+  const { configProblems } = await import("../core/screening");
+  const test = screeningOf(config);
+  if (test.enabled) {
+    const p = configProblems(test, await bankCounts(d.orgId));
+    if (p.length) throw new HttpError(400, p.join("; "));
+  }
   const [{ max }] = await db
     .select({ max: sql<number>`coalesce(max(${schema.driveVersions.version}), 0)` })
     .from(schema.driveVersions)

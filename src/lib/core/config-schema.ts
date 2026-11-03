@@ -57,4 +57,14 @@ export const DriveConfigSchema = z.object({
   reconnectWindowMin: z.number().int().min(5).max(60),
   languages: z.array(z.string().max(5)).min(1).max(12).optional(),
   proctoring: z.object({ webcam: z.boolean(), intervalSec: z.number().int().min(30).max(600) }).optional(),
+  screening: z
+    .object({
+      enabled: z.boolean(),
+      sections: z.object({ quant: z.number().int().min(0).max(30), logical: z.number().int().min(0).max(30), verbal: z.number().int().min(0).max(30), technical: z.number().int().min(0).max(30) }),
+      durationMin: z.number().int().min(5).max(180),
+      passMark: z.number().min(0).max(100),
+      onFail: z.enum(["reject", "review"]),
+      showScore: z.boolean(),
+    })
+    .optional(),
 });

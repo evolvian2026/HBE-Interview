@@ -33,8 +33,8 @@ export function parseCsv(text: string): string[][] {
   return rows.filter((r) => r.some(Boolean));
 }
 
-/** Extract (name, email) pairs from a CSV with an optional header row; columns may be in any order. */
-export function csvToInvitees(text: string, max = 200): { name: string; email: string }[] {
+/** Extract (name, email[, college]) from a CSV with an optional header row; columns may be in any order. */
+export function csvToInvitees(text: string, max = 200): { name: string; email: string; college?: string }[] {
   const rows = parseCsv(text);
   if (!rows.length) return [];
   const header = rows[0].map((h) => h.toLowerCase());
@@ -43,9 +43,10 @@ export function csvToInvitees(text: string, max = 200): { name: string; email: s
   const hasHeader = ni >= 0 || ei >= 0;
   if (!hasHeader || ei < 0) ei = rows[hasHeader ? 1 : 0]?.findIndex((c) => c.includes("@")) ?? -1;
   if (ni < 0) ni = ei === 0 ? 1 : 0;
+  const ci = hasHeader ? header.findIndex((h) => /college|institut|universit|campus/.test(h)) : -1;
   return rows
     .slice(hasHeader ? 1 : 0)
-    .map((r) => ({ name: r[ni] ?? "", email: r[ei] ?? "" }))
+    .map((r) => ({ name: r[ni] ?? "", email: r[ei] ?? "", ...(ci >= 0 && r[ci]?.trim() ? { college: r[ci].trim() } : {}) }))
     .filter((p) => p.email.includes("@"))
     .slice(0, max);
 }

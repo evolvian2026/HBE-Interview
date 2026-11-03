@@ -66,6 +66,11 @@ export default async function DrivePage({ params, searchParams }: { params: Prom
               <LinkButton variant="secondary" href={`/app/drives/${d.id}/fairness`}>
                 Fairness
               </LinkButton>
+              {config.screening?.enabled && (
+                <LinkButton variant="secondary" href={`/app/drives/${d.id}/screening`}>
+                  Test results
+                </LinkButton>
+              )}
               <LinkButton variant="secondary" href={`/app/drives/${d.id}/edit`}>
                 Configure
               </LinkButton>

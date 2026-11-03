@@ -36,6 +36,9 @@ import { emailsFor } from "@/lib/services/emails";
 import { practiceSummary } from "@/lib/services/practice";
 import { matchesForCandidacy } from "@/lib/services/similarity";
 import { hireForCandidacy } from "@/lib/services/hires";
+import { attemptFor } from "@/lib/services/screening";
+import { ScreeningReview } from "@/components/staff/screening";
+import { SECTIONS, type ScreeningScore } from "@/lib/core/screening";
 import { calendarProviders, calendarStatusFor } from "@/lib/services/calendar";
 import { TEMPLATES, type TemplateKey } from "@/lib/core/templates";
 
@@ -80,6 +83,7 @@ export default async function CandidatePage({ params }: { params: Promise<{ id: 
   const practice = await practiceSummary(id);
   const codeMatches = await matchesForCandidacy(user.orgId, id);
   const hire = await hireForCandidacy(id);
+  const test = await attemptFor(id);
   const reports = await db.select().from(schema.roundReports).where(eq(schema.roundReports.candidacyId, id));
   const benchCases = user.role === "admin" && reports.length
     ? await db.select({ id: schema.benchmarkCases.id, reportId: schema.benchmarkCases.sourceReportId }).from(schema.benchmarkCases).where(and(eq(schema.benchmarkCases.orgId, user.orgId), inArray(schema.benchmarkCases.sourceReportId, reports.map((r) => r.id))))
@@ -145,7 +149,16 @@ export default async function CandidatePage({ params }: { params: Promise<{ id: 
               </>
             )}{" "}
             · drive version v{row.v.version}
+            {row.c.college && ` · ${row.c.college}`}
           </p>
+          {test && (
+            <div className="mt-1 text-xs text-slate-700">
+              <Badge tone={test.passed ? "green" : test.reviewStatus === "pending" ? "amber" : test.submittedAt ? "red" : "blue"}>{`screening test${test.submittedAt ? `: ${test.percent}%` : " in progress"}`}</Badge>{" "}
+              {test.submittedAt &&
+                `${test.passed ? "Passed" : test.reviewStatus === "pending" ? "Below the pass mark — your decision" : "Not passed"} · ${SECTIONS.filter((s) => (test.score as ScreeningScore | null)?.bySection[s]).map((s) => `${s} ${(test.score as ScreeningScore).bySection[s]!.correct}/${(test.score as ScreeningScore).bySection[s]!.total}`).join(" · ")} · ${Math.round((test.submittedAt.getTime() - test.startedAt.getTime()) / 60_000)} min${test.focusLosses ? ` · left the tab ${test.focusLosses}×` : ""}${test.submitReason === "time_up" ? " · submitted at time-out" : ""}`}
+              {test.reviewStatus === "pending" && hasRole(user, "recruiter") && <ScreeningReview candidacyId={id} />}
+            </div>
+          )}
           {hire && (
             <p className="mt-1 text-xs text-slate-700">
               <Badge tone={hire.status === "joined" ? "green" : hire.status === "left" ? "amber" : "blue"}>{hire.status === "offered" ? "offer made" : hire.status}</Badge>{" "}

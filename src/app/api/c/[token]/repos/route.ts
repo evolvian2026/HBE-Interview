@@ -2,6 +2,7 @@ import { eq } from "drizzle-orm";
 import { z } from "zod";
 import { db, schema } from "@/lib/db";
 import { requireCandidacy } from "@/lib/auth/candidate";
+import { requireScreeningPassed } from "@/lib/services/screening";
 import { HttpError } from "@/lib/auth/staff";
 import { handle, json } from "@/lib/http";
 import { enqueue } from "@/lib/jobs/queue";
@@ -28,6 +29,7 @@ export const POST = handle(async (req: Request, { params }: Ctx) => {
   const { token } = await params;
   const { candidacy } = await requireCandidacy(token);
   if (!["onboarding", "ready"].includes(candidacy.stage)) throw new HttpError(409, "Project links can no longer be changed");
+  await requireScreeningPassed(candidacy);
   const body = Body.parse(await req.json());
   for (const p of body.projects) {
     if (p.url && !parseRepoUrl(p.url)) throw new HttpError(400, `"${p.url}" is not a supported repository URL (github.com, gitlab.com or bitbucket.org)`);

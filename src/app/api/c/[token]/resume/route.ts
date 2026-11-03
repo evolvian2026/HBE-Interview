@@ -1,6 +1,7 @@
 import { eq } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
 import { requireCandidacy } from "@/lib/auth/candidate";
+import { requireScreeningPassed } from "@/lib/services/screening";
 import { HttpError } from "@/lib/auth/staff";
 import { handle, json } from "@/lib/http";
 import { enqueue } from "@/lib/jobs/queue";
@@ -24,6 +25,7 @@ export const POST = handle(async (req: Request, { params }: Ctx) => {
   const { token } = await params;
   const { candidacy } = await requireCandidacy(token);
   if (candidacy.stage !== "onboarding") throw new HttpError(409, "Your profile is already confirmed");
+  await requireScreeningPassed(candidacy);
   const form = await req.formData();
   const file = form.get("file");
   if (!(file instanceof File)) throw new HttpError(400, "Please choose a file");

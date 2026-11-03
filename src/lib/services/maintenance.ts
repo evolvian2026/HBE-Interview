@@ -53,6 +53,9 @@ export async function periodicMaintenance() {
   }
   // 5) Panel scorecards still open a day after the interview.
   await sendScorecardReminders(now).catch((e) => console.error("scorecard reminders failed", e));
+  // 5a) Screening tests whose time ran out are submitted with the answers given.
+  const { closeOverdueAttempts } = await import("./screening");
+  await closeOverdueAttempts(now).catch((e) => console.error("screening auto-submit failed", e));
   // 5b) Post-hire check-ins that are due (each reminded at most weekly).
   const { sendReviewReminders } = await import("./hires");
   await sendReviewReminders(now).catch((e) => console.error("hire review reminders failed", e));
