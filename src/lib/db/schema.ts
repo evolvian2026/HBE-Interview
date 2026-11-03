@@ -850,3 +850,20 @@ export const benchmarkResults = pgTable(
   },
   (t) => [index("benchmark_result_run").on(t.runId)],
 );
+
+/* ------------------------------- Phase 15 --------------------------------- */
+
+/** Cloud speech usage for natural voice: characters spoken (tts) or milliseconds of audio transcribed (stt). No audio or text is kept. */
+export const speechUsage = pgTable(
+  "speech_usage",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    orgId: orgRef(),
+    kind: text("kind").notNull().$type<"tts" | "stt">(),
+    units: integer("units").notNull(),
+    provider: text("provider").notNull(),
+    error: text("error"),
+    createdAt: createdAt(),
+  },
+  (t) => [index("speech_usage_org_created").on(t.orgId, t.createdAt)],
+);

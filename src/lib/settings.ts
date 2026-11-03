@@ -2,6 +2,7 @@ import { eq } from "drizzle-orm";
 import { db, schema } from "./db";
 import { DEFAULT_CALIBRATION, type CalibrationSettings } from "./core/calibration";
 import type { TemplateKey, TemplateText } from "./core/templates";
+import { DEFAULT_VOICE, type VoiceSettings } from "./core/speech";
 
 export interface OrgValue {
   name: string;
@@ -29,6 +30,8 @@ export interface OrgSettings {
   practiceEnabled: boolean;
   /** Re-run the scoring test bench automatically about once a month (catches drift from model updates). */
   testBenchMonthly: boolean;
+  /** The interviewer's voice: natural (cloud speech, when configured) or the browser's; English accent; female or male. */
+  voice: VoiceSettings;
 }
 
 /** Platform-wide settings, managed by platform admins (models are a cost/quality decision for the operator). */
@@ -62,6 +65,7 @@ export const DEFAULT_SETTINGS: OrgSettings = {
   emailTemplates: {},
   practiceEnabled: true,
   testBenchMonthly: false,
+  voice: DEFAULT_VOICE,
 };
 
 export const DEFAULT_PLATFORM_SETTINGS: PlatformSettings = {

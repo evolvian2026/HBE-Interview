@@ -12,6 +12,7 @@ const Body = z.object({
   askCompensation: z.boolean().optional(),
   practiceEnabled: z.boolean().optional(),
   testBenchMonthly: z.boolean().optional(),
+  voice: z.object({ engine: z.enum(["natural", "browser"]), accent: z.enum(["en-IN", "en-US", "en-GB"]), gender: z.enum(["female", "male"]) }).optional(),
   require2fa: z.boolean().optional(),
   retentionDays: z.number().int().min(30).max(730).optional(),
   consentText: z.string().min(50).max(8000).optional(),
