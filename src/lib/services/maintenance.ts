@@ -53,6 +53,9 @@ export async function periodicMaintenance() {
   }
   // 5) Panel scorecards still open a day after the interview.
   await sendScorecardReminders(now).catch((e) => console.error("scorecard reminders failed", e));
+  // 5b) Post-hire check-ins that are due (each reminded at most weekly).
+  const { sendReviewReminders } = await import("./hires");
+  await sendReviewReminders(now).catch((e) => console.error("hire review reminders failed", e));
   // 6) Daily inbox digest for staff who asked for it.
   await sendDigests(now).catch((e) => console.error("digest failed", e));
   // 7) Retention purge (daily).
@@ -93,6 +96,9 @@ export async function periodicMaintenance() {
 export async function purgeCandidacy(candidacyId: string, reason: string, actor: { type: "staff" | "system"; id?: string; orgId?: string } = { type: "system" }) {
   const [c] = await db.select().from(schema.candidacies).where(eq(schema.candidacies.id, candidacyId));
   if (!c) return;
+  // A hire record stays for quality-of-hire statistics, without anything identifying (notes cleared, link removed).
+  const { anonymiseHire } = await import("./hires");
+  await anonymiseHire(candidacyId);
   await db.delete(schema.candidacies).where(eq(schema.candidacies.id, candidacyId));
   // Remove the candidate record if they have no other candidacies.
   const others = await db.select({ id: schema.candidacies.id }).from(schema.candidacies).where(eq(schema.candidacies.candidateId, c.candidateId)).limit(1);

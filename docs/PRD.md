@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Product** | HBE Interview: an AI-powered, multi-round interview platform |
-| **Document status** | v2.7 — approved; Phases 1–16 built |
+| **Document status** | v2.8 — approved; Phases 1–17 built |
 | **Date** | 2026-10-16 |
 | **Owner** | Product Architect / Product Owner |
 | **Companion documents** | [FEATURES.md](FEATURES.md) (detailed feature specification) · [ARCHITECTURE.md](ARCHITECTURE.md) (detailed technical architecture) |
@@ -12,6 +12,7 @@
 
 | Version | Date | Change |
 |---|---|---|
+| 2.8 | 2026-11-03 | Phase 17 built — **quality of hire**: an offer creates a hire record with the interview signals frozen at that moment (final score, AI recommendation, round scores, panel hire votes); recruiters record joining (with the manager), declined offers and leavers; managers give 90- and 180-day check-ins (overall rating, optional skills / working with others / values, would-hire-again, note) without seeing the interview results, with inbox items and weekly reminders; a quality page relates interview signals to later ratings (rank correlation, top vs bottom half, AI recommendation vs outcome, rehire share, early attrition) and says when it is too early to tell. Hire records survive deletion of interview data in anonymised form |
 | 2.7 | 2026-11-03 | Phase 16 built — **copied-code detection**: each candidate's final coding submission is normalised (identifiers, strings, numbers, comments and layout set aside) and fingerprinted, then compared with other candidates' code for the same problem and language in the organisation and with known published solutions (added by admins; custom problems' reference solutions included automatically). Close matches go to a review queue with a side-by-side view; recruiters record "coincidence" or "likely copied" with a note; candidate reports and the inbox show the flag as context only (scores never change). Per-problem leak status, retiring a problem from new interviews, checking past rounds |
 | 2.6 | 2026-11-03 | Phase 15 built — **natural voice**: the interviewer speaks with Azure AI Speech neural voices (Indian, American or British English, female or male; native voices for Hindi, Tamil, Telugu, Bengali, Marathi and the other interview languages), and spoken answers are recorded and transcribed by the service (works in every modern browser, including Firefox and Safari; better with Indian accents), then shown for editing before sending. Audio is never stored; only usage (characters, minutes) is recorded for cost. Falls back to the browser's speech when not configured or turned off; admin voice settings with a sample |
 | 2.5 | 2026-11-03 | Phase 14 built — **scoring test bench**: a fixed set of evaluated rounds (anonymised copies of real rounds, rounds with blind reviews, or cases written by hand) with the scores the team agreed on, re-scored on demand or monthly through the same pipeline live rounds use, with the current evaluator model or one being tried; average difference, within-one-point and hire-call agreement, lean, per-parameter breakdown, consistency over repeated scoring, comparison with a baseline run, a pass / needs a look / not in line verdict, CSV and cost per run. Never changes a candidate's report; cases from real rounds are deleted with the candidate's data |
@@ -473,6 +474,7 @@ Diagrams, component design, the interview state machine, data model, API specifi
 | **Phase 11 — built (v2.2)** | Branded, editable candidate emails with preview and log; Slack/Teams notifications. Not built: per-language email templates, SMS/WhatsApp, two-way chat-app actions (approve from Slack) |
 | **Phase 12 — built (v2.3)** | SCIM 2.0 provisioning (Users + role Groups) with session revocation and audit. Not built: SAML 2.0, SCIM Bulk, custom attribute mapping (e.g. drive assignment from the identity provider) |
 | **Phase 13 — built (v2.4)** | Unscored practice interviews before the real rounds. Not built: practice coding/design exercises, per-drive practice settings, AI feedback on practice answers |
+| **Phase 17 — built (v2.8)** | Quality-of-hire tracking. Not built: HRIS sync of joining/leaving dates, performance data imported from review tools, adverse-impact analysis of outcomes |
 | **Phase 16 — built (v2.7)** | Copied-code detection and problem leak monitoring. Not built: cross-language comparison, comparing with public code on the internet automatically, similarity for written exercises |
 | **Phase 15 — built (v2.6)** | Natural voice (cloud text-to-speech and speech-to-text) with browser fallback. Not built: live captions while speaking with the cloud service, streaming (sentence-by-sentence) speech, a second speech provider, per-drive voices |
 | **Phase 14 — built (v2.5)** | Scoring test bench for the AI evaluator. Not built: testing interviewer (question-asking) behaviour, prompt versions edited in the app, blocking a model switch on a failed run, test sets shared between organisations |

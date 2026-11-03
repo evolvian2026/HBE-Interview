@@ -374,6 +374,8 @@ export async function recordDecision(user: StaffUser, candidacyId: string, input
     .values({ orgId: user.orgId, candidacyId, decision: input.decision, reason: input.reason.trim(), basis, decidedBy: user.id, candidateNotifiedAt: notify ? new Date() : null })
     .returning();
   await db.update(schema.candidacies).set({ stage, finalStatus: stage, updatedAt: new Date() }).where(eq(schema.candidacies.id, candidacyId));
+  // An offer starts the quality-of-hire record (with the interview signals as they are now).
+  if (input.decision === "offer") await (await import("./hires")).ensureHire(candidacyId);
   await audit({ type: "staff", id: user.id, orgId: user.orgId }, `decision.${input.decision}`, "candidacy", candidacyId, { notified: notify, panelSplit: panels.some((p) => p.summary.split), ai: basis.ai?.recommendation ?? null });
   await notifyAboutCandidacy(candidacyId, "candidate.decided", "Final decision", (who, drive) => `${user.name} recorded ${input.decision === "offer" ? "an offer" : input.decision === "reject" ? "a rejection" : "a hold"} for ${who} (${drive}).`);
   await emitEvent(user.orgId, "candidate.decided", { candidacyId, decision: input.decision, aiRecommendation: basis.ai?.recommendation ?? null, panelConsensus: panels[0]?.summary.consensus ?? null });

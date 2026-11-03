@@ -58,6 +58,7 @@ export default async function StaffLayout({ children }: { children: React.ReactN
             {user.role !== "viewer" && <Link href="/app/panel" className="whitespace-nowrap rounded-md px-2.5 py-1.5 text-slate-700 hover:bg-slate-100">My interviews</Link>}
             {(user.role === "recruiter" || user.role === "admin") && <Link href="/app/talent" className="whitespace-nowrap rounded-md px-2.5 py-1.5 text-slate-700 hover:bg-slate-100">Talent</Link>}
             {(user.role === "recruiter" || user.role === "admin") && <Link href="/app/insights" className="whitespace-nowrap rounded-md px-2.5 py-1.5 text-slate-700 hover:bg-slate-100">Insights</Link>}
+            {user.role !== "viewer" && <Link href="/app/hires" className="whitespace-nowrap rounded-md px-2.5 py-1.5 text-slate-700 hover:bg-slate-100">Hires</Link>}
             {user.role !== "viewer" && <Link href="/app/calibration" className="whitespace-nowrap rounded-md px-2.5 py-1.5 text-slate-700 hover:bg-slate-100">Calibration</Link>}
             {(user.role === "admin" || user.platformAdmin) && (
               <AdminMenu

@@ -29,9 +29,14 @@ export default async function InsightsPage({ searchParams }: { searchParams: Pro
         title="Hiring insights"
         subtitle={`Candidates who started in the last ${period} days${sp.drive ? ` on ${drives.find((d) => d.id === sp.drive)?.title ?? "one drive"}` : ", all drives"}: how far they got, how long it took, where they came from, and how people's decisions compare with the AI.`}
         actions={
+          <span className="flex flex-wrap gap-2">
+          <Link href="/app/quality" className="rounded-lg bg-white px-3.5 py-2 text-sm font-medium text-slate-700 ring-1 ring-slate-300 hover:bg-slate-50">
+            Quality of hire →
+          </Link>
           <a href={`/api/insights/export?days=${period}${sp.drive ? `&drive=${sp.drive}` : ""}`} className="rounded-lg bg-white px-3.5 py-2 text-sm font-medium text-slate-700 ring-1 ring-slate-300 hover:bg-slate-50">
             Export CSV
           </a>
+          </span>
         }
       />
       <nav aria-label="Filters" className="mb-6 flex flex-wrap items-center gap-2 text-sm">

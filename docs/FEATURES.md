@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Document status** | v2.7 — approved; Phases 1–16 built (as-built notes: ARCHITECTURE §0; integration reference: [API.md](API.md)) |
+| **Document status** | v2.8 — approved; Phases 1–17 built (as-built notes: ARCHITECTURE §0; integration reference: [API.md](API.md)) |
 | **Date** | 2026-10-16 |
 | **Related** | [PRD.md](PRD.md) (product requirements) · [ARCHITECTURE.md](ARCHITECTURE.md) (technical architecture) |
 
@@ -1446,4 +1446,28 @@ Voice mode can use a cloud speech service — **Microsoft Azure AI Speech** — 
 | Comparing across languages | A solution translated into another language isn't matched |
 | Searching the internet for published solutions automatically | Admins add known solutions they find |
 | Similarity for written answers and system-design notes | Covered by the AI-written-answer signal (Phase 2) |
+
+## 32. Phase 17 features (v2.8)
+
+### 32.1 Quality of hire
+
+- **Hire records:** recording a final decision of **offer** creates a hire record and freezes what the interviews said at that moment: final score, AI recommendation, each round's score and the share of panel scorecards voting to hire. Offers recorded before this feature get a record automatically.
+- **Hires** (navigation; recruiters and admins see all, hiring managers see their drives and the people they manage): for each offer, recruiters record **joined** (date + manager), **declined**, or **left** (date + resigned / let go / other). Joining schedules two **check-ins**, at 90 and 180 days, with the manager; leaving cancels check-ins that would fall after it. Inbox: recruiters see offers older than two weeks with no joining recorded.
+- **Check-ins:** the manager (or an admin) rates the hire — overall 1–5, optionally skills for the role, working with others and fit with how we work, **would you hire them again?**, and a note.
+  - The form **does not show the interview results**, so they can't colour the rating; they appear after submitting.
+  - Check-ins open 14 days before they're due, appear in the manager's inbox, and overdue ones are emailed at most weekly. A submitted check-in can be changed for 14 days.
+- **Quality of hire** (Insights → *Quality of hire*; recruiters and admins), optionally per drive:
+  - offers, joined, declined; average latest manager rating; *would hire again* share; share who **left within 90 days**;
+  - for each interview signal (final score, each round, panel votes): **rank correlation** with the latest rating, the average rating of the top vs bottom half, and a plain-language reading (none / weak / moderate / strong). Below **10 rated hires** it says it's too early to tell;
+  - ratings by the **AI recommendation** at the time of the offer.
+  - It notes the built-in limit: only hired people are rated, so it can't show how rejected candidates would have done.
+- **Data:** when a candidate's interview data is deleted (retention or request), the hire record stays without a name (link removed, check-in notes cleared, ratings kept) so the statistics keep their history. The person's data download includes their hire record and check-ins. Hire updates and check-ins are audited.
+
+### 32.2 Not built yet
+
+| Item | Note |
+|---|---|
+| Syncing joining and leaving dates from an HR system | Recruiters record them; the REST API can be extended |
+| Importing performance-review scores | Managers give the check-ins here |
+| Outcome fairness analysis by cohort | The fairness monitor (Phase 3) covers interview pass rates |
 

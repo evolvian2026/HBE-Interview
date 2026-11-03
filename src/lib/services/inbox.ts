@@ -5,6 +5,7 @@ import { calibrationQueue, calibrationStats } from "./calibration";
 import { pendingAccommodations } from "./accommodations";
 import { rescheduleRequests } from "./panel";
 import { openMatchCount } from "./similarity";
+import { offersToConfirm, reviewsDueFor } from "./hires";
 
 export interface InboxItem {
   label: string;
@@ -31,6 +32,17 @@ const MAX = 8;
 export async function inbox(user: StaffUser, opts: { light?: boolean } = {}): Promise<InboxSection[]> {
   const now = new Date();
   const sections: InboxSection[] = [];
+
+  // Check-ins on people this person manages (due, or opening in the next two weeks).
+  const checkIns = await reviewsDueFor(user);
+  if (checkIns.length)
+    sections.push({
+      key: "checkins",
+      title: "Check-ins on your new hires",
+      kind: "action",
+      count: checkIns.filter((c) => c.dueAt.getTime() <= now.getTime()).length,
+      items: checkIns.slice(0, MAX).map((c) => ({ label: c.name ?? "Former candidate", sub: `${c.checkpoint}-day check-in · ${c.roleTitle} · ${c.dueAt.getTime() <= now.getTime() ? "due" : "opens"} ${c.dueAt.toLocaleDateString()}`, href: `/app/hires/review/${c.id}`, at: c.dueAt.toISOString() })),
+    });
 
   // Panel scorecards due and upcoming interviews (anyone who sits on panels).
   if (hasRole(user, "hiring_manager")) {
@@ -152,6 +164,16 @@ export async function inbox(user: StaffUser, opts: { light?: boolean } = {}): Pr
       items: rs.slice(0, MAX).map((x) => ({ label: x.name, sub: `${x.d.title}${x.iv.candidateMessage ? ` · “${x.iv.candidateMessage.slice(0, 80)}”` : ""}`, href: `/app/candidates/${x.iv.candidacyId}` })),
       empty: "No requests.",
     });
+    const toConfirm = await offersToConfirm(user.orgId);
+    if (toConfirm.length)
+      sections.push({
+        key: "offers",
+        title: "Offers waiting for a joining date",
+        kind: "action",
+        count: toConfirm.length,
+        items: toConfirm.slice(0, MAX).map((h) => ({ label: h.name ?? "Former candidate", sub: `${h.roleTitle} · offer made ${h.createdAt.toLocaleDateString()}`, href: "/app/hires", at: h.createdAt.toISOString() })),
+        more: { href: "/app/hires", label: "Hires" },
+      });
     const codeOpen = await openMatchCount(user.orgId);
     sections.push({
       key: "code",

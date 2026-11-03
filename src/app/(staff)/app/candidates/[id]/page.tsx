@@ -35,6 +35,7 @@ import { DecisionPanel } from "@/components/staff/decision-panel";
 import { emailsFor } from "@/lib/services/emails";
 import { practiceSummary } from "@/lib/services/practice";
 import { matchesForCandidacy } from "@/lib/services/similarity";
+import { hireForCandidacy } from "@/lib/services/hires";
 import { TEMPLATES, type TemplateKey } from "@/lib/core/templates";
 
 export const dynamic = "force-dynamic";
@@ -77,6 +78,7 @@ export default async function CandidatePage({ params }: { params: Promise<{ id: 
   const sessions = await db.select().from(schema.roundSessions).where(and(eq(schema.roundSessions.candidacyId, id), gte(schema.roundSessions.roundIndex, 0))).orderBy(asc(schema.roundSessions.roundIndex));
   const practice = await practiceSummary(id);
   const codeMatches = await matchesForCandidacy(user.orgId, id);
+  const hire = await hireForCandidacy(id);
   const reports = await db.select().from(schema.roundReports).where(eq(schema.roundReports.candidacyId, id));
   const benchCases = user.role === "admin" && reports.length
     ? await db.select({ id: schema.benchmarkCases.id, reportId: schema.benchmarkCases.sourceReportId }).from(schema.benchmarkCases).where(and(eq(schema.benchmarkCases.orgId, user.orgId), inArray(schema.benchmarkCases.sourceReportId, reports.map((r) => r.id))))
@@ -139,6 +141,15 @@ export default async function CandidatePage({ params }: { params: Promise<{ id: 
             )}{" "}
             · drive version v{row.v.version}
           </p>
+          {hire && (
+            <p className="mt-1 text-xs text-slate-700">
+              <Badge tone={hire.status === "joined" ? "green" : hire.status === "left" ? "amber" : "blue"}>{hire.status === "offered" ? "offer made" : hire.status}</Badge>{" "}
+              {`${hire.joinedAt ? `Joined ${hire.joinedAt.toLocaleDateString()}. ` : ""}${hire.reviews.filter((r) => r.submittedAt).map((r) => `${r.checkpoint}-day check-in: ${r.rating}/5`).join(" · ")} `}
+              <Link href="/app/hires" className="text-brand-600 hover:underline">
+                Hires
+              </Link>
+            </p>
+          )}
           {codeMatches.length > 0 && (
             <p className="mt-1 text-xs text-slate-700">
               <Badge tone={codeMatches.some((m) => m.status === "copied") ? "red" : "amber"}>similar code</Badge>{" "}

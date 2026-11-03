@@ -929,3 +929,52 @@ export const codeMatches = pgTable(
   },
   (t) => [unique("code_match_pair").on(t.aId, t.bId, t.referenceId).nullsNotDistinct(), index("code_match_org_status").on(t.orgId, t.status)],
 );
+
+/* ------------------------------- Phase 17 --------------------------------- */
+
+/**
+ * Someone the organisation made an offer to, with the interview signals frozen at the offer. Outlives the candidacy:
+ * when interview data is deleted, `candidacyId` is cleared and the record stays (no name) for quality-of-hire stats.
+ */
+export const hires = pgTable(
+  "hires",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    orgId: orgRef(),
+    candidacyId: uuid("candidacy_id").unique().references(() => candidacies.id, { onDelete: "set null" }),
+    driveId: uuid("drive_id").references(() => drives.id, { onDelete: "set null" }),
+    roleTitle: text("role_title").notNull(),
+    status: text("status").notNull().default("offered").$type<"offered" | "joined" | "declined" | "left">(),
+    joinedAt: ts("joined_at"),
+    leftAt: ts("left_at"),
+    leftReason: text("left_reason").$type<"resigned" | "let_go" | "other">(),
+    managerId: uuid("manager_id").references(() => users.id, { onDelete: "set null" }),
+    snapshot: jsonb("snapshot").notNull(),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [index("hires_org_created").on(t.orgId, t.createdAt)],
+);
+
+/** The manager's check-in on a hire at 90 or 180 days (overall rating, optional dimension ratings, would rehire). */
+export const hireReviews = pgTable(
+  "hire_reviews",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    hireId: uuid("hire_id").notNull().references(() => hires.id, { onDelete: "cascade" }),
+    orgId: orgRef(),
+    checkpoint: integer("checkpoint").notNull(),
+    dueAt: ts("due_at").notNull(),
+    reviewerId: uuid("reviewer_id").references(() => users.id, { onDelete: "set null" }),
+    rating: integer("rating"),
+    technical: integer("technical"),
+    collaboration: integer("collaboration"),
+    values: integer("values"),
+    wouldRehire: text("would_rehire").$type<"yes" | "no" | "unsure">(),
+    note: text("note"),
+    submittedAt: ts("submitted_at"),
+    remindedAt: ts("reminded_at"),
+    createdAt: createdAt(),
+  },
+  (t) => [uniqueIndex("hire_review_checkpoint").on(t.hireId, t.checkpoint), index("hire_review_due").on(t.reviewerId, t.dueAt)],
+);
