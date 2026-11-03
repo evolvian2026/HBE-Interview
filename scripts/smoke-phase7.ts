@@ -104,8 +104,11 @@ async function run(admin: Client, orgId: string, q: Q, stamp: number) {
   const reEval = async (id: string, since: Date) => {
     await admin.json("POST", `/api/reports/${id}/reevaluate`, {});
     return waitFor(`re-evaluation of ${id}`, async () => {
-      const [r] = await q<{ status: string; updated_at: Date; calibration_requested_at: Date | null; calibration_reason: string | null }>("select status, updated_at, calibration_requested_at, calibration_reason from round_reports where id = $1", [id]);
-      return r.status === "ready" && r.updated_at > since ? r : null;
+      const [r] = await q<{ status: string; updated_at: Date; calibration_requested_at: Date | null; calibration_reason: string | null; session_id: string }>("select status, updated_at, calibration_requested_at, calibration_reason, session_id from round_reports where id = $1", [id]);
+      if (r.status !== "ready" || r.updated_at <= since) return null;
+      // The report is marked ready before sampling runs; wait for the whole evaluation job to finish.
+      const [job] = await q<{ status: string }>("select status from jobs where singleton_key = $1", [`evaluate:${r.session_id}`]);
+      return job?.status === "done" ? r : null;
     });
   };
   const s1 = await reEval(rSample.id, new Date());

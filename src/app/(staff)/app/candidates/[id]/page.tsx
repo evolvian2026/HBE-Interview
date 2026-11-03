@@ -576,8 +576,8 @@ export default async function CandidatePage({ params }: { params: Promise<{ id: 
                   <ol className="mt-3 space-y-2 text-sm">
                     {transcript.map((m) => (
                       <li key={m.id} id={`${session?.id}-M${m.seq}`} className={cx("rounded-lg p-2", m.role === "candidate" ? "bg-brand-50/50" : m.role === "system" ? "bg-amber-50" : "bg-slate-50")}>
-                        <span className="mr-2 font-mono text-[10px] text-slate-500">M{m.seq}</span>
-                        <span className="mr-2 text-xs font-medium text-slate-500">{m.role === "ai" ? r.personaName + " (AI)" : m.role === "candidate" ? "Candidate" : "Note"} · {m.sectionKey}</span>
+                        <span className="mr-2 font-mono text-[10px] text-slate-600">M{m.seq}</span>
+                        <span className="mr-2 text-xs font-medium text-slate-600">{m.role === "ai" ? r.personaName + " (AI)" : m.role === "candidate" ? "Candidate" : "Note"} · {m.sectionKey}</span>
                         {(m.meta as { inputMode?: string } | null)?.inputMode === "voice" && <Badge>voice</Badge>}
                         <p className="mt-1 whitespace-pre-wrap">{m.content}</p>
                       </li>

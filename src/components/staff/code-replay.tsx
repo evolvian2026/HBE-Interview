@@ -37,7 +37,7 @@ export function CodeReplay({ frames }: { frames: ReplayFrame[] }) {
         <Badge tone={f.kind === "submit" ? "green" : f.kind === "run" ? "blue" : "slate"}>{f.kind}</Badge>
         {f.total != null && <span className="text-slate-600">{f.passed}/{f.total} tests</span>}
       </div>
-      <pre className="max-h-80 overflow-auto rounded bg-slate-900 p-2 text-xs text-slate-100">{f.code}</pre>
+      <pre tabIndex={0} aria-label="Code" className="max-h-80 overflow-auto rounded bg-slate-900 p-2 text-xs text-slate-100">{f.code}</pre>
     </div>
   );
 }

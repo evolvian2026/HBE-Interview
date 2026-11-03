@@ -93,7 +93,7 @@ export default async function BlindReviewPage({ params }: { params: Promise<{ re
                   Hidden tests passed: <b>{packet.code.passed}/{packet.code.total}</b>
                 </p>
               )}
-              <pre className="max-h-96 overflow-auto rounded-lg bg-slate-900 p-3 text-xs text-slate-100">{packet.code.code}</pre>
+              <pre tabIndex={0} aria-label="Submitted code" className="max-h-96 overflow-auto rounded-lg bg-slate-900 p-3 text-xs text-slate-100">{packet.code.code}</pre>
             </Card>
           )}
           {packet.written.map((w, i) => (
@@ -115,11 +115,11 @@ export default async function BlindReviewPage({ params }: { params: Promise<{ re
             </Card>
           ))}
           <Card title={`Transcript (${packet.transcript.length} messages)`}>
-            <ol className="max-h-[48rem] space-y-2 overflow-auto text-sm">
+            <ol tabIndex={0} aria-label="Transcript" className="max-h-[48rem] space-y-2 overflow-auto text-sm">
               {packet.transcript.map((m) => (
                 <li key={m.seq} className={cx("rounded-lg p-2", m.role === "candidate" ? "bg-brand-50/50" : "bg-slate-50")}>
-                  <span className="mr-2 font-mono text-[10px] text-slate-500">M{m.seq}</span>
-                  <span className="text-xs font-medium text-slate-500">
+                  <span className="mr-2 font-mono text-[10px] text-slate-600">M{m.seq}</span>
+                  <span className="text-xs font-medium text-slate-600">
                     {m.role === "ai" ? `${packet.personaName} (AI)` : "Candidate"} · {m.sectionKey}
                   </span>
                   <p className="mt-1 whitespace-pre-wrap">{m.content}</p>

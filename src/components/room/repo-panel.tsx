@@ -18,7 +18,7 @@ export function RepoPanel({ ws }: { ws: RepoWorkspace }) {
             {[...new Map(r.questions.map((q) => [q.filePath, q])).values()].map((q) => (
               <div key={q.filePath}>
                 <p className="font-mono text-xs text-slate-500">{q.filePath}</p>
-                <pre className="mt-1 max-h-48 overflow-auto rounded bg-slate-900 p-2 text-xs text-slate-100">{q.snippet}</pre>
+                <pre tabIndex={0} aria-label="Code snippet" className="mt-1 max-h-48 overflow-auto rounded bg-slate-900 p-2 text-xs text-slate-100">{q.snippet}</pre>
               </div>
             ))}
           </div>

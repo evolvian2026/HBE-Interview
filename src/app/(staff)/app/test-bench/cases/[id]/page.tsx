@@ -50,11 +50,11 @@ export default async function CasePage({ params }: { params: Promise<{ id: strin
         <div className="space-y-6">
           <Card title="What the evaluator reads">
             <h3 className="mb-1 text-xs font-semibold uppercase text-slate-500">Transcript</h3>
-            <pre className="max-h-[32rem] overflow-auto whitespace-pre-wrap rounded-lg bg-slate-50 p-3 text-xs leading-relaxed">{d.bundle.transcriptText}</pre>
+            <pre tabIndex={0} aria-label="Transcript" className="max-h-[32rem] overflow-auto whitespace-pre-wrap rounded-lg bg-slate-50 p-3 text-xs leading-relaxed">{d.bundle.transcriptText}</pre>
             {d.bundle.artifactsText && (
               <>
                 <h3 className="mb-1 mt-4 text-xs font-semibold uppercase text-slate-500">Exercises and code</h3>
-                <pre className="max-h-80 overflow-auto whitespace-pre-wrap rounded-lg bg-slate-50 p-3 text-xs">{d.bundle.artifactsText}</pre>
+                <pre tabIndex={0} aria-label="Exercises and code" className="max-h-80 overflow-auto whitespace-pre-wrap rounded-lg bg-slate-50 p-3 text-xs">{d.bundle.artifactsText}</pre>
               </>
             )}
           </Card>
