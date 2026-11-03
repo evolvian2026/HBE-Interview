@@ -4,6 +4,7 @@ import { evaluateRoundJob, evaluateRoundFailed, combinedReportJob, combinedRepor
 import { proctorCheckJob } from "../services/proctor";
 import { deliverWebhookFailed, deliverWebhookJob } from "../services/integrations";
 import { deliverChannelJob } from "../services/channels";
+import { benchmarkCaseFailed, benchmarkCaseJob } from "../services/benchmark";
 
 type Handler = (payload: Record<string, unknown>) => Promise<void>;
 
@@ -21,4 +22,6 @@ export const handlers: Record<string, Handler> = {
   "deliver-webhook": (p) => deliverWebhookJob(p as { deliveryId: string }),
   "deliver-webhook:failed": (p) => deliverWebhookFailed(p as { deliveryId: string }),
   "notify-channel": (p) => deliverChannelJob(p as unknown as Parameters<typeof deliverChannelJob>[0]),
+  "benchmark-case": (p) => benchmarkCaseJob(p as { resultId: string }),
+  "benchmark-case:failed": (p) => benchmarkCaseFailed(p as { resultId: string; error?: string }),
 };

@@ -81,6 +81,9 @@ export async function periodicMaintenance() {
     // Candidate deletion requests not actioned or declined by their due date are fulfilled automatically.
     const { fulfilOverdueDeletions } = await import("./data-rights");
     await fulfilOverdueDeletions();
+    // Monthly scoring test bench runs, for organisations that turned them on.
+    const { scheduledRuns } = await import("./benchmark");
+    await scheduledRuns(now).catch((e) => console.error("scheduled test bench failed", e));
     // Webhook payloads carry candidate names/emails — keep delivery history for 30 days only.
     await db.delete(schema.webhookDeliveries).where(lt(schema.webhookDeliveries.createdAt, new Date(now.getTime() - 30 * 86_400_000)));
   }

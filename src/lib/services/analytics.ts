@@ -188,7 +188,8 @@ export async function aiUsage(sinceDays: number | null, orgId: string | null) {
     calls: byStage.reduce((a, r) => a + r.calls, 0),
     errors: byStage.reduce((a, r) => a + r.errors, 0),
     roundsEnded,
-    perRound: roundsEnded ? total / roundsEnded : null,
+    // Scoring test bench runs are not interviews: leave them out of the cost per round.
+    perRound: roundsEnded ? byStage.filter((r) => r.stage !== "test_bench").reduce((a, r) => a + r.cost, 0) / roundsEnded : null,
     cacheShare: totalIn ? byStage.reduce((a, r) => a + r.cacheRead, 0) / totalIn : null,
   };
 }

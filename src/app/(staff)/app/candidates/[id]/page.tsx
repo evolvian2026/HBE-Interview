@@ -25,6 +25,7 @@ import { reviewsForCandidacy } from "@/lib/services/calibration";
 import { getAccommodation } from "@/lib/services/accommodations";
 import { AccommodationPanel } from "@/components/staff/accommodation-panel";
 import { RequestCalibrationButton } from "@/components/staff/request-calibration-button";
+import { AddToBenchButton } from "@/components/staff/test-bench";
 import type { SessionState } from "@/lib/core/interview";
 import { decisionsFor, eligiblePanelists, panelForCandidacy } from "@/lib/services/panel";
 import { defaultCompetencies } from "@/lib/core/panel";
@@ -75,6 +76,9 @@ export default async function CandidatePage({ params }: { params: Promise<{ id: 
   const sessions = await db.select().from(schema.roundSessions).where(and(eq(schema.roundSessions.candidacyId, id), gte(schema.roundSessions.roundIndex, 0))).orderBy(asc(schema.roundSessions.roundIndex));
   const practice = await practiceSummary(id);
   const reports = await db.select().from(schema.roundReports).where(eq(schema.roundReports.candidacyId, id));
+  const benchCases = user.role === "admin" && reports.length
+    ? await db.select({ id: schema.benchmarkCases.id, reportId: schema.benchmarkCases.sourceReportId }).from(schema.benchmarkCases).where(and(eq(schema.benchmarkCases.orgId, user.orgId), inArray(schema.benchmarkCases.sourceReportId, reports.map((r) => r.id))))
+    : [];
   const [combined] = await db.select().from(schema.combinedReports).where(eq(schema.combinedReports.candidacyId, id));
   const [fit] = await db.select().from(schema.practicalFit).where(eq(schema.practicalFit.candidacyId, id));
   const sessionIds = sessions.map((s) => s.id);
@@ -310,6 +314,7 @@ export default async function CandidatePage({ params }: { params: Promise<{ id: 
                     {hasRole(user, "recruiter") && (session.state as SessionState).adjust && <Badge tone="blue">adjusted timing</Badge>}
                     {rep && (rep.status === "ready" || rep.status === "failed") && hasRole(user, "recruiter") && <ReevaluateButton reportId={rep.id} />}
                     {rep?.status === "ready" && canDecide && (rep.calibrationRequestedAt ? !calibration.some((c) => c.r.reportId === rep.id) && <Badge>blind review queued</Badge> : <RequestCalibrationButton reportId={rep.id} />)}
+                    {rep?.status === "ready" && user.role === "admin" && <AddToBenchButton reportId={rep.id} caseId={benchCases.find((b) => b.reportId === rep.id)?.id ?? null} />}
                   </span>
                 )
               }

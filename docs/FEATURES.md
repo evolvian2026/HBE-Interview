@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Document status** | v2.4 — approved; Phases 1–13 built (as-built notes: ARCHITECTURE §0; integration reference: [API.md](API.md)) |
+| **Document status** | v2.5 — approved; Phases 1–14 built (as-built notes: ARCHITECTURE §0; integration reference: [API.md](API.md)) |
 | **Date** | 2026-10-16 |
 | **Related** | [PRD.md](PRD.md) (product requirements) · [ARCHITECTURE.md](ARCHITECTURE.md) (technical architecture) |
 
@@ -1353,4 +1353,38 @@ Candidates can request extra time (+25% or +50%) through a link on the consent s
 | Practice coding or design exercises | Practice is conversation-only; the room's snippet editor is available |
 | Per-drive practice settings | One organisation-wide switch |
 | AI feedback on practice answers | Tips are general, by design, so practice can't be used to tune answers |
+
+## 29. Phase 14 features (v2.5)
+
+### 29.1 Scoring test bench
+
+*Admin → Test bench* (admins only) checks that the AI evaluator still scores the way your team does, before you change the evaluator model and on a regular schedule.
+
+- **Test cases** — each is a frozen copy of exactly what the evaluator reads for one round (transcript, exercises and code, repository summary, role profile and rubric), plus the **expected scores** per parameter and the expected recommendation:
+  - **From a real round:** *Add to test bench* on any evaluated round in a candidate's report. The copy is anonymised (name, email, phone, social links and code-host username removed) and titled by round, drive and a short id. It is **deleted automatically with the candidate's data** (retention period or deletion request).
+  - **From blind reviews:** *Add blind-reviewed rounds* adds every round with a calibration review (Phase 7) in one go, with the reviewer's scores as expected — the best reference, because those scores were given without seeing the AI's.
+  - **Written by hand:** *Write a case* — type a short interview ("Interviewer:" / "Candidate:" lines), pick a drive (role and rubric) and round, and set the expected scores. No candidate data, so it's kept until deleted. Useful before you have real interviews, or for situations you want covered (a confident but shallow answer, a strong answer in simple words).
+  - Expected scores can be edited at any time (with notes for whoever reviews a disagreement later); cases can be left out of runs or deleted. A case whose expected scores are still the AI's own is flagged until someone confirms them.
+- **Runs** re-score every active case through the **same scoring pipeline as live rounds** (two evaluator passes, a third on disagreement, verified evidence, hint cap, knockouts, recommendation bands), with:
+  - the **current evaluator model**, or **another model to try** before switching (the live model is unchanged);
+  - each case scored **once, twice or three times**, to check consistency.
+  Runs happen in the background (one at a time per organisation, up to 100 cases) and never change a candidate's report.
+- **Results:**
+  - a verdict — **In line with your team** / **Needs a look** / **Not in line** — with the reasons in plain language;
+  - average difference per parameter (1–5 scale), share within one point, share with the same hire / no-hire call, and the **lean** (stricter or more generous than your team);
+  - a per-parameter table, and each case with your team's and the AI's recommendation, score and every parameter that differs; **big misses** (2+ points apart, or the other side of the hire line) and **inconsistent** cases (different recommendation, or 10+ points apart, when scored again) are highlighted;
+  - a **comparison with the baseline run** (or the previous run): average score shift and the cases that crossed the hire line or moved 10+ points. The first completed run becomes the baseline; an admin can move it;
+  - CSV export and the AI cost of the run.
+- **Verdict thresholds:** in line when the average difference is 0.6 or less, at least 85% of hire calls match, the lean is under 0.5 points and there are no big misses or inconsistent cases. Not in line when the average difference is above 1.0, under 70% of hire calls match, or more than 20% of cases are big misses or inconsistent. Anything in between needs a look. Fewer than 5 cases shows a warning.
+- **Monthly runs:** an option re-runs the bench about every 30 days with the current model, to catch drift from model updates.
+- **Audit and cost:** adding, editing and deleting cases, starting, finishing and cancelling runs, moving the baseline and exports are audited. Test-bench AI calls appear under their own stage (`test_bench`) in *AI usage* and are not counted in the cost per round.
+
+### 29.2 Not built yet
+
+| Item | Note |
+|---|---|
+| Testing the interviewer (which questions it asks) | The bench tests scoring; the interviewer is reviewed through transcripts and calibration |
+| Editing prompts in the app and testing prompt versions | Prompt changes ship with releases; run the bench after each release |
+| Blocking a model switch when a run fails | The verdict is advisory; platform admins switch models in *Platform* |
+| Test sets shared between organisations | Each organisation's cases stay its own |
 

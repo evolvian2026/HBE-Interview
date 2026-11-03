@@ -51,6 +51,11 @@ export interface CallContext {
   candidacyId?: string | null;
   /** Organisation billed for the call; resolved from the candidacy when omitted. */
   orgId?: string | null;
+  /** Scoring test bench: try a specific model instead of the tier's, and record the calls against the run. */
+  model?: string;
+  benchmarkRunId?: string;
+  /** Recorded stage name instead of the call's own (e.g. "test_bench"), so usage reports keep it apart. */
+  stage?: string;
 }
 
 export async function recordAiCall(
@@ -68,7 +73,7 @@ export async function recordAiCall(
       orgId = c?.orgId ?? null;
     }
     await db.insert(schema.aiCalls).values({
-      stage,
+      stage: ctx.stage ?? stage,
       orgId,
       model,
       inputTokens: usage?.input_tokens ?? null,
@@ -78,6 +83,7 @@ export async function recordAiCall(
       latencyMs: Date.now() - started,
       sessionId: ctx.sessionId ?? null,
       candidacyId: ctx.candidacyId ?? null,
+      benchmarkRunId: ctx.benchmarkRunId ?? null,
       error: error ?? null,
     });
   } catch (e) {
@@ -121,7 +127,7 @@ function jsonFormat<T>(schema: z.ZodType<T>): Anthropic.Beta.BetaJSONOutputForma
 export async function structured<T>(opts: StructuredOptions<T>): Promise<T> {
   if (isMock()) return await opts.mock();
   await refreshModelOverrides();
-  const model = modelFor(opts.tier);
+  const model = opts.ctx?.model || modelFor(opts.tier);
   const messages: Anthropic.Beta.BetaMessageParam[] = [{ role: "user", content: opts.user }];
   let lastError = "";
   for (let attempt = 0; attempt < 2; attempt++) {

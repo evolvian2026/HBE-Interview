@@ -25,7 +25,7 @@ import { RECOMMENDATION_LABEL, ROUND_LABEL } from "../core/types";
 import { writtenExerciseInfo } from "../content";
 import { getProblem } from "./problems";
 import { languageInfo } from "../core/languages";
-import { isMock, modelFor } from "../ai/gateway";
+import { isMock, modelFor, type CallContext } from "../ai/gateway";
 import type { RepoInsight } from "../ai/analyzers";
 import { enqueue } from "../jobs/queue";
 import { getSettings } from "../settings";
@@ -38,7 +38,7 @@ import { notifyAboutCandidacy } from "./channels";
 
 /* ----------------------------- Evidence bundle ---------------------------- */
 
-interface BundleExtras {
+export interface BundleExtras {
   codeTexts: string[];
   artifactTexts: string[];
   maxHintLevel: number;
@@ -70,7 +70,7 @@ function integritySummary(events: (typeof schema.integrityEvents.$inferSelect)[]
   return { concern, summary, counts: { ...counts, blurSeconds: Math.round(blurMs / 1000), bigPastes, generated: generated.length }, generated };
 }
 
-async function buildBundle(ctx: SessionContext): Promise<{ bundle: EvidenceBundle; extras: BundleExtras }> {
+export async function buildBundle(ctx: SessionContext, cctxExtra: Partial<CallContext> = {}): Promise<{ bundle: EvidenceBundle; extras: BundleExtras }> {
   const round = ctx.round!;
   const sessionId = ctx.session.id;
   const msgs = await loadMessages(sessionId);
@@ -78,7 +78,7 @@ async function buildBundle(ctx: SessionContext): Promise<{ bundle: EvidenceBundl
   const candMsgs = msgs.filter((m) => m.role === "candidate");
   const protectedRefs = await findProtectedDisclosures(
     candMsgs.map((m) => ({ ref: `M${m.seq}`, content: m.content })),
-    { sessionId, candidacyId: ctx.candidacy.id },
+    { sessionId, candidacyId: ctx.candidacy.id, ...cctxExtra },
   ).catch(() => new Set<string>());
   const candidateBySeq = new Map<number, string>();
   const transcript = msgs
@@ -161,7 +161,7 @@ async function buildBundle(ctx: SessionContext): Promise<{ bundle: EvidenceBundl
         content: candidateBySeq.get(m.seq) ?? "",
         pasted: pastes.some((p) => p.createdAt <= m.createdAt && m.createdAt.getTime() - p.createdAt.getTime() < 180_000),
       })),
-    { sessionId, candidacyId: ctx.candidacy.id },
+    { sessionId, candidacyId: ctx.candidacy.id, ...cctxExtra },
   ).catch(() => [] as GeneratedFlag[]);
   const snaps = await db.select({ flagged: schema.proctorSnapshots.flagged, check: schema.proctorSnapshots.check }).from(schema.proctorSnapshots).where(eq(schema.proctorSnapshots.sessionId, sessionId));
   const checked = snaps.filter((s) => s.check);
@@ -239,13 +239,29 @@ function paramsOf(e: Evaluation) {
   return Object.fromEntries(e.parameters.map((p) => [p.id, p.score == null ? null : Math.max(1, Math.min(5, Math.round(p.score)))]));
 }
 
-export async function evaluateRoundJob(payload: { sessionId: string }) {
-  const ctx = await loadSessionContext(payload.sessionId);
-  if (!ctx || !ctx.round) return;
-  const round = ctx.round;
-  const cctx = { sessionId: ctx.session.id, candidacyId: ctx.candidacy.id };
-  const { bundle, extras } = await buildBundle(ctx);
-  const hasRepo = ctx.repos.some((r) => r.status === "ready");
+/** What re-scoring needs besides the bundle (serialisable, so the test bench can freeze it). */
+export interface ScoringExtras {
+  candidateBySeq: [number, string][];
+  codeTexts: string[];
+  artifactTexts: string[];
+  maxHintLevel: number;
+  hasRepo: boolean;
+  completed: boolean;
+  skips: number;
+}
+
+export function scoringExtras(extras: BundleExtras, opts: { hasRepo: boolean; completed: boolean; skips: number }): ScoringExtras {
+  return { candidateBySeq: [...extras.candidateBySeq], codeTexts: extras.codeTexts, artifactTexts: extras.artifactTexts, maxHintLevel: extras.maxHintLevel, ...opts };
+}
+
+/**
+ * The scoring pipeline for one round: multi-pass evaluation, median per parameter, evidence verification, hint cap,
+ * a targeted re-run for thin evidence, knockouts, round score, recommendation and confidence. Used for live rounds
+ * and by the scoring test bench, so the bench measures exactly what candidates get.
+ */
+export async function scoreBundle(bundle: EvidenceBundle, x: ScoringExtras, round: { type: RoundType; weights: Record<string, number> }, config: DriveConfig, cctx: CallContext) {
+  const extras = { candidateBySeq: new Map(x.candidateBySeq), codeTexts: x.codeTexts, artifactTexts: x.artifactTexts };
+  const hasRepo = x.hasRepo;
 
   // Multi-pass evaluation: 2 runs in parallel, a 3rd if any parameter differs by more than 1 point.
   const runs: Evaluation[] = await Promise.all([evaluateRound(bundle, cctx), evaluateRound(bundle, cctx)]);
@@ -261,7 +277,7 @@ export async function evaluateRoundJob(payload: { sessionId: string }) {
     const closest = perRun.filter(Boolean).sort((a, b) => Math.abs((a!.score ?? 0) - (med ?? 0)) - Math.abs((b!.score ?? 0) - (med ?? 0)))[0];
     const evidence = verifyEvidence(perRun.flatMap((p) => p?.evidence ?? []), extras, hasRepo).slice(0, 5);
     let score = med;
-    if (score != null && (id === "code_quality" || id === "problem_solving") && extras.maxHintLevel > 0) score = Math.min(score, Math.floor(hintCap(extras.maxHintLevel)));
+    if (score != null && (id === "code_quality" || id === "problem_solving") && x.maxHintLevel > 0) score = Math.min(score, Math.floor(hintCap(x.maxHintLevel)));
     params[id] = {
       score,
       justification: closest?.justification ?? "",
@@ -286,11 +302,22 @@ export async function evaluateRoundJob(payload: { sessionId: string }) {
 
   const primary = runs[0];
   const ethicsFailed = round.type === "managerial" && runs.filter((r) => r.ethicsConcern).length >= Math.ceil(runs.length / 2);
-  const knockouts = roundKnockouts(round.type, params, ctx.config, { ethicsFailed });
+  const knockouts = roundKnockouts(round.type, params, config, { ethicsFailed });
   const score = roundScore(params, round.weights);
-  const recommendation = roundRecommendation(score, knockouts, ctx.config);
+  const recommendation = roundRecommendation(score, knockouts, config);
+  const confidence = roundConfidence({ params, weights: round.weights, completed: x.completed, skips: x.skips, disagreement });
+  return { params, score, recommendation, confidence, knockouts, runs, disagreement, primary };
+}
+
+export async function evaluateRoundJob(payload: { sessionId: string }) {
+  const ctx = await loadSessionContext(payload.sessionId);
+  if (!ctx || !ctx.round) return;
+  const round = ctx.round;
+  const cctx = { sessionId: ctx.session.id, candidacyId: ctx.candidacy.id };
+  const { bundle, extras } = await buildBundle(ctx);
   const completed = ctx.session.endReason === "completed" || ctx.session.endReason === "time_up";
-  const confidence = roundConfidence({ params, weights: round.weights, completed, skips: ctx.state.skipsUsed, disagreement });
+  const x = scoringExtras(extras, { hasRepo: ctx.repos.some((r) => r.status === "ready"), completed, skips: ctx.state.skipsUsed });
+  const { params, score, recommendation, confidence, knockouts, runs, disagreement, primary } = await scoreBundle(bundle, x, round, ctx.config, cctx);
 
   let practicalFit = null;
   if (round.type === "hr" && ctx.practicalFit) {

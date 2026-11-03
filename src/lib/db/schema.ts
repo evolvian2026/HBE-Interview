@@ -405,6 +405,8 @@ export const aiCalls = pgTable("ai_calls", {
   orgId: uuid("org_id"),
   sessionId: uuid("session_id"),
   candidacyId: uuid("candidacy_id"),
+  /** Set for calls made by a scoring test bench run (Phase 14), so a run's cost can be shown. */
+  benchmarkRunId: uuid("benchmark_run_id"),
   error: text("error"),
   createdAt: createdAt(),
 });
@@ -764,3 +766,87 @@ export const scimConfigs = pgTable("scim_configs", {
   createdAt: createdAt(),
   updatedAt: updatedAt(),
 });
+
+/* ------------------------------- Phase 14 --------------------------------- */
+
+/**
+ * Scoring test bench: a fixed set of evaluated rounds with the scores people agreed on. A case freezes the anonymised
+ * evidence bundle the evaluator reads, so re-scoring it later tests only the evaluator (model + prompt), never a
+ * changed transcript. Cases made from a real round are deleted with that candidacy (retention or deletion request);
+ * written cases (`candidacyId` null) contain no candidate data and are kept.
+ */
+export const benchmarkCases = pgTable(
+  "benchmark_cases",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    orgId: orgRef(),
+    candidacyId: uuid("candidacy_id").references(() => candidacies.id, { onDelete: "cascade" }),
+    sourceReportId: uuid("source_report_id").references(() => roundReports.id, { onDelete: "set null" }),
+    title: text("title").notNull(),
+    roundType: text("round_type").notNull().$type<"technical" | "managerial" | "hr">(),
+    /** The evidence bundle (anonymised) and what evidence verification needs, frozen when the case was made. */
+    bundle: jsonb("bundle").notNull(),
+    extras: jsonb("extras").notNull(),
+    /** Drive configuration used for knockouts and recommendation bands. */
+    config: jsonb("config").notNull(),
+    /** What people agreed: parameter → 1–5 (null = not assessable) and the recommendation. */
+    expected: jsonb("expected").notNull().$type<{ params: Record<string, number | null>; recommendation: string }>(),
+    expectedSource: text("expected_source").notNull().$type<"calibration" | "override" | "ai" | "manual">(),
+    /** The AI's result on the live round when the case was made (reference only). */
+    original: jsonb("original").$type<{ params: Record<string, number | null>; recommendation: string; score: number | null; evaluator: string } | null>(),
+    notes: text("notes"),
+    active: boolean("active").notNull().default(true),
+    createdBy: uuid("created_by").references(() => users.id, { onDelete: "set null" }),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [uniqueIndex("benchmark_case_report").on(t.orgId, t.sourceReportId), index("benchmark_case_org").on(t.orgId, t.createdAt)],
+);
+
+/** One re-scoring of the active cases with a given evaluator model. */
+export const benchmarkRuns = pgTable(
+  "benchmark_runs",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    orgId: orgRef(),
+    label: text("label").notNull(),
+    /** Evaluator model used (the current one, or a model being tried before switching). */
+    model: text("model").notNull(),
+    modelOverride: boolean("model_override").notNull().default(false),
+    repeats: integer("repeats").notNull().default(1),
+    status: text("status").notNull().default("running").$type<"running" | "completed" | "failed" | "cancelled">(),
+    trigger: text("trigger").notNull().default("manual").$type<"manual" | "scheduled">(),
+    caseCount: integer("case_count").notNull(),
+    /** Metrics and verdict, written when the last case finishes. */
+    summary: jsonb("summary"),
+    isBaseline: boolean("is_baseline").notNull().default(false),
+    createdBy: uuid("created_by").references(() => users.id, { onDelete: "set null" }),
+    createdAt: createdAt(),
+    completedAt: ts("completed_at"),
+  },
+  (t) => [index("benchmark_run_org").on(t.orgId, t.createdAt)],
+);
+
+/** One case × repeat inside a run. `caseId` is nulled if the case is deleted later; the run keeps its numbers. */
+export const benchmarkResults = pgTable(
+  "benchmark_results",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    runId: uuid("run_id").notNull().references(() => benchmarkRuns.id, { onDelete: "cascade" }),
+    caseId: uuid("case_id").references(() => benchmarkCases.id, { onDelete: "set null" }),
+    caseTitle: text("case_title").notNull(),
+    repeat: integer("repeat").notNull().default(1),
+    status: text("status").notNull().default("queued").$type<"queued" | "done" | "failed" | "skipped">(),
+    /** Expected values copied at run start, so later edits to a case don't rewrite history. */
+    expected: jsonb("expected").notNull().$type<{ params: Record<string, number | null>; recommendation: string }>(),
+    params: jsonb("params").$type<Record<string, number | null>>(),
+    roundScore: real("round_score"),
+    recommendation: text("recommendation"),
+    confidence: text("confidence"),
+    disagreement: boolean("disagreement"),
+    error: text("error"),
+    createdAt: createdAt(),
+    completedAt: ts("completed_at"),
+  },
+  (t) => [index("benchmark_result_run").on(t.runId)],
+);

@@ -27,6 +27,8 @@ export interface OrgSettings {
   emailTemplates: Partial<Record<TemplateKey, TemplateText>>;
   /** Candidates may take a short, unscored practice interview before their first round. */
   practiceEnabled: boolean;
+  /** Re-run the scoring test bench automatically about once a month (catches drift from model updates). */
+  testBenchMonthly: boolean;
 }
 
 /** Platform-wide settings, managed by platform admins (models are a cost/quality decision for the operator). */
@@ -59,6 +61,7 @@ export const DEFAULT_SETTINGS: OrgSettings = {
   calibration: DEFAULT_CALIBRATION,
   emailTemplates: {},
   practiceEnabled: true,
+  testBenchMonthly: false,
 };
 
 export const DEFAULT_PLATFORM_SETTINGS: PlatformSettings = {
