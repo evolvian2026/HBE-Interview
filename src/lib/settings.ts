@@ -32,6 +32,8 @@ export interface OrgSettings {
   testBenchMonthly: boolean;
   /** The interviewer's voice: natural (cloud speech, when configured) or the browser's; English accent; female or male. */
   voice: VoiceSettings;
+  /** Coding problems no longer used for new interviews (e.g. their solutions are circulating). */
+  retiredProblems: string[];
 }
 
 /** Platform-wide settings, managed by platform admins (models are a cost/quality decision for the operator). */
@@ -66,6 +68,7 @@ export const DEFAULT_SETTINGS: OrgSettings = {
   practiceEnabled: true,
   testBenchMonthly: false,
   voice: DEFAULT_VOICE,
+  retiredProblems: [],
 };
 
 export const DEFAULT_PLATFORM_SETTINGS: PlatformSettings = {

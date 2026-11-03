@@ -30,7 +30,9 @@ export async function ensureExerciseOpen(ctx: SessionContext, state: SessionStat
   let note: string;
   const kind: ExerciseKind = sec.exercise;
   if (kind === "coding") {
-    const p = await pickProblemForDrive(ctx.candidacy.driveId, { difficulty: ctx.config.coding.difficulty, domain: profile.domain, skills: profile.mustHaveSkills, exclude: state.usedRefs });
+    // Problems the organisation retired (e.g. leaked solutions) aren't used for new interviews.
+    const exclude = [...state.usedRefs, ...ctx.settings.retiredProblems];
+    const p = await pickProblemForDrive(ctx.candidacy.driveId, { difficulty: ctx.config.coding.difficulty, domain: profile.domain, skills: profile.mustHaveSkills, exclude });
     refId = p.id;
     note = `Coding problem "${p.title}" (${p.difficulty}) is now open in the candidate's editor.\n${p.statement}`;
   } else if (kind === "system_design") {

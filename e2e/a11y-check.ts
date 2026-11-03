@@ -36,6 +36,7 @@ async function main() {
   const [lobby] = (await db.query("select access_token, current_round_index from candidacies c where stage in ('ready','round_available') and org_id = (select org_id from users where email = $1) and not exists (select 1 from round_sessions s where s.candidacy_id = c.id and s.round_index = c.current_round_index) order by created_at desc limit 1", [process.env.ADMIN_EMAIL!.toLowerCase()])).rows;
   const [live] = (await db.query("select c.access_token, s.round_index from round_sessions s join candidacies c on c.id = s.candidacy_id where s.status = 'active' and s.round_index >= 0 and c.org_id = (select org_id from users where email = $1) order by s.created_at desc limit 1", [process.env.ADMIN_EMAIL!.toLowerCase()])).rows;
   const [queued] = (await db.query("select r.id from round_reports r join candidacies c on c.id = r.candidacy_id where r.calibration_requested_at is not null and r.status = 'ready' and c.org_id = (select org_id from users where email = $1) order by r.calibration_requested_at desc limit 1", [process.env.ADMIN_EMAIL!.toLowerCase()])).rows;
+  const [codeMatch] = (await db.query("select id from code_matches where org_id = (select org_id from users where email = $1) order by created_at desc limit 1", [process.env.ADMIN_EMAIL!.toLowerCase()])).rows;
   const [benchRun] = (await db.query("select id from benchmark_runs where status = 'completed' and org_id = (select org_id from users where email = $1) order by created_at desc limit 1", [process.env.ADMIN_EMAIL!.toLowerCase()])).rows;
   const [benchCase] = (await db.query("select id from benchmark_cases where org_id = (select org_id from users where email = $1) order by created_at desc limit 1", [process.env.ADMIN_EMAIL!.toLowerCase()])).rows;
   const [practice] = (await db.query("select access_token from candidacies c where stage in ('ready','round_available') and org_id = (select org_id from users where email = $1) and not exists (select 1 from round_sessions s where s.candidacy_id = c.id and s.round_index = -1 and s.status = 'active') order by created_at desc limit 1", [process.env.ADMIN_EMAIL!.toLowerCase()])).rows;
@@ -69,6 +70,8 @@ async function main() {
     ["operations", "/app/platform/ops"],
     ["calibration", "/app/calibration"],
     ["test bench", "/app/test-bench"],
+    ["copied-code checks", "/app/code-similarity?status=all"],
+    ...(codeMatch ? ([["code match", `/app/code-similarity/${codeMatch.id}`]] as [string, string][]) : []),
     ["test bench: write a case", "/app/test-bench/cases/new"],
     ...(benchRun ? ([["test bench run", `/app/test-bench/runs/${benchRun.id}`]] as [string, string][]) : []),
     ...(benchCase ? ([["test bench case", `/app/test-bench/cases/${benchCase.id}`]] as [string, string][]) : []),

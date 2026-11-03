@@ -30,6 +30,7 @@ An AI-powered, multi-round interview platform. Candidates upload a resume, link 
 | Phase 11 | **Editable, branded candidate emails** (preview, test, email log) and **Slack / Teams notifications** |
 | Phase 12 | **SCIM 2.0 user provisioning** for Okta / Microsoft Entra ID: automatic create, update, deactivate and roles from groups |
 | Phase 13 | **Practice interviews**: an optional, unscored ~6-minute warm-up with the AI interviewer before the real rounds |
+| Phase 16 | **Copied-code detection**: disguised copies between candidates or of published solutions flagged for review, problem leak status and retiring leaked problems |
 | Phase 15 | **Natural voice**: lifelike interviewer voices (Indian/US/UK English and Indian languages) and cloud transcription of spoken answers via Azure AI Speech, with browser fallback |
 | Phase 14 | **Scoring test bench**: re-score a fixed set of rounds with agreed scores before changing the AI model, or monthly, to catch scoring drift |
 | Recruiter app | Drives list, drive editor, candidate table with round/final scores, practical fit and integrity, decisions queue, full candidate report with transcripts, code and repo analysis, notes, settings (company values, HR knowledge base, consent, retention, users & roles) |
@@ -111,6 +112,8 @@ npm run smoke:phase14 # test bench: cases (real, reviewed, written), runs, verdi
 npm run ui-check:phase14 # write a case, run the bench, result and case pages
 npm run smoke:phase15 # natural voice: speech, transcription, limits, isolation, fallback (SPEECH_MOCK=true)
 npm run ui-check:phase15 # voice settings, voice lobby, recording, transcript, next question (simulated mic)
+npm run smoke:phase16 # copied-code detection: matches, review, known solutions, leak status, retire, isolation
+npm run ui-check:phase16 # copied-code checks, side-by-side match, report flag
 npm run mock-oidc    # standalone mock OIDC provider on :4610 for trying SSO locally
 npm run a11y         # axe-core WCAG 2.1 AA checks on staff and candidate screens
 ```

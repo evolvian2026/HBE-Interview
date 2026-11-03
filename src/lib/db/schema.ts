@@ -11,6 +11,7 @@ import {
   bigserial,
   customType,
   uniqueIndex,
+  unique,
   index,
 } from "drizzle-orm/pg-core";
 
@@ -866,4 +867,65 @@ export const speechUsage = pgTable(
     createdAt: createdAt(),
   },
   (t) => [index("speech_usage_org_created").on(t.orgId, t.createdAt)],
+);
+
+/* ------------------------------- Phase 16 --------------------------------- */
+
+/** Normalised fingerprint of a candidate's final coding submission (copied-code detection). Deleted with the candidacy. */
+export const codeFingerprints = pgTable(
+  "code_fingerprints",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    orgId: orgRef(),
+    sessionId: uuid("session_id").notNull().references(() => roundSessions.id, { onDelete: "cascade" }),
+    candidacyId: uuid("candidacy_id").notNull().references(() => candidacies.id, { onDelete: "cascade" }),
+    driveId: uuid("drive_id").notNull().references(() => drives.id, { onDelete: "cascade" }),
+    problemId: text("problem_id").notNull(),
+    language: text("language").notNull(),
+    codeRunId: uuid("code_run_id").references(() => codeRuns.id, { onDelete: "set null" }),
+    /** [hash, first line, last line] per selected k-gram. */
+    hashes: jsonb("hashes").notNull().$type<[number, number, number][]>(),
+    createdAt: createdAt(),
+  },
+  (t) => [uniqueIndex("fingerprint_session_problem").on(t.sessionId, t.problemId), index("fingerprint_org_problem").on(t.orgId, t.problemId, t.language)],
+);
+
+/** A known published solution for a coding problem (e.g. found online), added by an admin. */
+export const codeReferences = pgTable(
+  "code_references",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    orgId: orgRef(),
+    problemId: text("problem_id").notNull(),
+    language: text("language").notNull(),
+    source: text("source").notNull(),
+    code: text("code").notNull(),
+    hashes: jsonb("hashes").notNull().$type<[number, number, number][]>(),
+    createdBy: uuid("created_by").references(() => users.id, { onDelete: "set null" }),
+    createdAt: createdAt(),
+  },
+  (t) => [index("code_reference_org_problem").on(t.orgId, t.problemId)],
+);
+
+/** Two submissions (or a submission and a known solution) that share most of their code. People review each one. */
+export const codeMatches = pgTable(
+  "code_matches",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    orgId: orgRef(),
+    problemId: text("problem_id").notNull(),
+    aId: uuid("a_id").notNull().references(() => codeFingerprints.id, { onDelete: "cascade" }),
+    bId: uuid("b_id").references(() => codeFingerprints.id, { onDelete: "cascade" }),
+    referenceId: uuid("reference_id").references(() => codeReferences.id, { onDelete: "cascade" }),
+    score: real("score").notNull(),
+    level: text("level").notNull().$type<"high" | "medium">(),
+    linesA: jsonb("lines_a").notNull().$type<[number, number][]>(),
+    linesB: jsonb("lines_b").notNull().$type<[number, number][]>(),
+    status: text("status").notNull().default("open").$type<"open" | "coincidence" | "copied">(),
+    reviewNote: text("review_note"),
+    reviewedBy: uuid("reviewed_by").references(() => users.id, { onDelete: "set null" }),
+    reviewedAt: ts("reviewed_at"),
+    createdAt: createdAt(),
+  },
+  (t) => [unique("code_match_pair").on(t.aId, t.bId, t.referenceId).nullsNotDistinct(), index("code_match_org_status").on(t.orgId, t.status)],
 );

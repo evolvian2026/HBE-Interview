@@ -34,6 +34,7 @@ import { PanelAdmin, PanelScheduler } from "@/components/staff/panel-scheduler";
 import { DecisionPanel } from "@/components/staff/decision-panel";
 import { emailsFor } from "@/lib/services/emails";
 import { practiceSummary } from "@/lib/services/practice";
+import { matchesForCandidacy } from "@/lib/services/similarity";
 import { TEMPLATES, type TemplateKey } from "@/lib/core/templates";
 
 export const dynamic = "force-dynamic";
@@ -75,6 +76,7 @@ export default async function CandidatePage({ params }: { params: Promise<{ id: 
   // Practice sessions (index -1) are never shown to staff: only the fact that one was taken.
   const sessions = await db.select().from(schema.roundSessions).where(and(eq(schema.roundSessions.candidacyId, id), gte(schema.roundSessions.roundIndex, 0))).orderBy(asc(schema.roundSessions.roundIndex));
   const practice = await practiceSummary(id);
+  const codeMatches = await matchesForCandidacy(user.orgId, id);
   const reports = await db.select().from(schema.roundReports).where(eq(schema.roundReports.candidacyId, id));
   const benchCases = user.role === "admin" && reports.length
     ? await db.select({ id: schema.benchmarkCases.id, reportId: schema.benchmarkCases.sourceReportId }).from(schema.benchmarkCases).where(and(eq(schema.benchmarkCases.orgId, user.orgId), inArray(schema.benchmarkCases.sourceReportId, reports.map((r) => r.id))))
@@ -137,6 +139,17 @@ export default async function CandidatePage({ params }: { params: Promise<{ id: 
             )}{" "}
             · drive version v{row.v.version}
           </p>
+          {codeMatches.length > 0 && (
+            <p className="mt-1 text-xs text-slate-700">
+              <Badge tone={codeMatches.some((m) => m.status === "copied") ? "red" : "amber"}>similar code</Badge>{" "}
+              {`${codeMatches.length} close match${codeMatches.length === 1 ? "" : "es"} with ${codeMatches.some((m) => m.reference) ? "other code or a known solution" : "another candidate's code"} (highest ${Math.round(codeMatches[0].score * 100)}%) · ${codeMatches.filter((m) => m.status === "open").length} to review${codeMatches.some((m) => m.status === "copied") ? " · marked likely copied" : ""}. Context only — scores are unchanged. `}
+              {hasRole(user, "recruiter") && (
+                <Link href={codeMatches.length === 1 ? `/app/code-similarity/${codeMatches[0].id}` : "/app/code-similarity?status=all"} className="text-brand-600 hover:underline">
+                  Compare the code
+                </Link>
+              )}
+            </p>
+          )}
           {practice && (
             <p className="mt-1 text-xs text-slate-600">
               <Badge>{practice.status === "ended" ? "practice taken" : "practising now"}</Badge>{" "}

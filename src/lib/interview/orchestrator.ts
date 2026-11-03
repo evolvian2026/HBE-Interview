@@ -560,6 +560,7 @@ export async function endSession(sessionId: string, reason: string) {
   }
   await db.insert(schema.roundReports).values({ sessionId, candidacyId: ctx.candidacy.id, roundIndex: ctx.session.roundIndex, roundType: ctx.session.roundType }).onConflictDoNothing();
   await enqueue("evaluate-round", { sessionId }, { singletonKey: `evaluate:${sessionId}`, maxAttempts: 5 });
+  if (Object.values(state.exercises).some((e) => e.kind === "coding")) await enqueue("code-fingerprint", { sessionId }, { singletonKey: `fingerprint:${sessionId}` });
   await audit({ type: "system" }, "round.end", "round_session", sessionId, { reason });
   await emitEvent(ctx.candidacy.orgId, "round.completed", { candidacyId: ctx.candidacy.id, driveId: ctx.candidacy.driveId, roundIndex: ctx.session.roundIndex, roundType: ctx.session.roundType, endReason: reason });
 }

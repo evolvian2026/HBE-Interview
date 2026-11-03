@@ -4,6 +4,7 @@ import { canSeeDrive, hasRole, type StaffRole, type StaffUser } from "../auth/st
 import { calibrationQueue, calibrationStats } from "./calibration";
 import { pendingAccommodations } from "./accommodations";
 import { rescheduleRequests } from "./panel";
+import { openMatchCount } from "./similarity";
 
 export interface InboxItem {
   label: string;
@@ -150,6 +151,16 @@ export async function inbox(user: StaffUser, opts: { light?: boolean } = {}): Pr
       more: { href: "/app/gate-queue", label: "All reschedule requests" },
       items: rs.slice(0, MAX).map((x) => ({ label: x.name, sub: `${x.d.title}${x.iv.candidateMessage ? ` · “${x.iv.candidateMessage.slice(0, 80)}”` : ""}`, href: `/app/candidates/${x.iv.candidacyId}` })),
       empty: "No requests.",
+    });
+    const codeOpen = await openMatchCount(user.orgId);
+    sections.push({
+      key: "code",
+      title: "Similar code to review",
+      kind: "action",
+      count: codeOpen,
+      items: codeOpen ? [{ label: `${codeOpen} close code match${codeOpen === 1 ? "" : "es"} between candidates or with a known solution`, href: "/app/code-similarity" }] : [],
+      empty: "Nothing to review.",
+      more: { href: "/app/code-similarity", label: "Copied-code checks" },
     });
     const drift = opts.light ? { alerts: [] as string[] } : await calibrationStats(user, { days: 90 });
     if (drift.alerts.length)

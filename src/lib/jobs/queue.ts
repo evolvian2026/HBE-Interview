@@ -10,7 +10,8 @@ export type JobType =
   | "proctor-check"
   | "deliver-webhook"
   | "notify-channel"
-  | "benchmark-case";
+  | "benchmark-case"
+  | "code-fingerprint";
 
 /**
  * Enqueue a durable job. With a singleton key, a job that is already queued/running is not duplicated,

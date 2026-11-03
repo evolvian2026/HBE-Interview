@@ -40,7 +40,7 @@ export function pickProblem(opts: { difficulty: Difficulty[]; domain: string; sk
   for (const [k, tags] of Object.entries(DOMAIN_TAGS)) if (text.includes(k)) tags.forEach((t) => wantTags.add(t));
   const pool = PROBLEMS.filter((p) => opts.difficulty.includes(p.difficulty) && !opts.exclude.includes(p.id));
   const fallback = PROBLEMS.filter((p) => !opts.exclude.includes(p.id));
-  const candidates = pool.length ? pool : fallback;
+  const candidates = pool.length ? pool : fallback.length ? fallback : PROBLEMS;
   const scored = candidates
     .map((p) => ({ p, s: p.tags.filter((t) => wantTags.has(t)).length + Math.random() * 0.5 }))
     .sort((a, b) => b.s - a.s);

@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Document status** | v2.6 — approved; Phases 1–15 built (as-built notes: ARCHITECTURE §0; integration reference: [API.md](API.md)) |
+| **Document status** | v2.7 — approved; Phases 1–16 built (as-built notes: ARCHITECTURE §0; integration reference: [API.md](API.md)) |
 | **Date** | 2026-10-16 |
 | **Related** | [PRD.md](PRD.md) (product requirements) · [ARCHITECTURE.md](ARCHITECTURE.md) (technical architecture) |
 
@@ -1425,4 +1425,25 @@ Voice mode can use a cloud speech service — **Microsoft Azure AI Speech** — 
 | Sentence-by-sentence streaming speech | Each message is synthesised whole (audio streams as it's produced) |
 | Other speech providers (Deepgram, ElevenLabs, Google) | The provider is isolated in one module so another can be added |
 | Voice per drive or per persona | One organisation-wide voice |
+
+## 31. Phase 16 features (v2.7)
+
+### 31.1 Copied-code detection
+
+- **What is compared:** when a round with live coding ends, the candidate's final code for each problem (the last submission, or the last code they ran if they never submitted) is fingerprinted and compared with:
+  - other candidates' code for the **same problem and language** in the organisation (a candidate is never compared with themselves);
+  - **known published solutions** — admins paste a solution they found online, with where it was found; for custom problems, the author's reference solution is included automatically.
+- **How:** code is turned into a sequence of tokens with variable names, strings, numbers, comments and layout set aside, so renaming variables, rewording comments or reformatting doesn't hide a copy; the starter template is ignored, and very short submissions aren't compared. Overlapping 8-token sequences are hashed and a representative subset kept ("winnowing", as in the MOSS plagiarism detector). The score is the share of the smaller submission's fingerprint found in the other. **55%** or more is a match to review, **75%** or more a high match. In the test suite, a disguised copy scores 100% and an independent solution to the same problem about 4%; real-world rates will vary, which is why every match goes to a person.
+- **Review:** *Copied-code checks* (recruiters and admins; also in the Admin menu and the inbox) lists matches to review. Each opens a **side-by-side view** with the shared lines highlighted and both candidates' drives, and a recruiter records **Coincidence / common approach** or **Likely copied** (a note is required), or reopens it. The candidate report shows a *similar code* flag with the number of matches, the highest score and the conclusion. **Matches are context for people only: they never change a score or a recommendation**, and hiring managers see the flag but not the other candidate's code.
+- **Problem leak status:** each coding problem shows how many submissions were checked in the last 6 months and its status — **likely leaked** when 3 or more candidates submitted near-identical code or 2 or more matched a known published solution, **watch** with fewer signals (matches marked as coincidence don't count). Admins can **retire** a problem so it isn't given in new interviews (interviews in progress keep it), and bring it back; at least one bank problem always stays in use.
+- **Past rounds:** *Check past rounds* (admins) fingerprints rounds that ended before this was available.
+- **Data:** fingerprints and matches are deleted with the candidate's data. Comparisons never cross organisations. Finding a match, reviewing, adding or removing known solutions, retiring problems and checking past rounds are audited.
+
+### 31.2 Not built yet
+
+| Item | Note |
+|---|---|
+| Comparing across languages | A solution translated into another language isn't matched |
+| Searching the internet for published solutions automatically | Admins add known solutions they find |
+| Similarity for written answers and system-design notes | Covered by the AI-written-answer signal (Phase 2) |
 
