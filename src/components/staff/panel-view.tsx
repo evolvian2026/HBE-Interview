@@ -13,6 +13,8 @@ const STATUS: Record<string, { label: string; tone: "blue" | "amber" | "green" |
 };
 
 /** One panel interview: booking, panel, and (when the viewer may see them) the scorecards side by side. */
+const CAL_LABEL: Record<string, string> = { google: "Google Calendar", microsoft: "Microsoft 365", mock: "test calendar" };
+
 export function PanelInterviewView({ v, actions, showLink }: { v: InterviewView; actions?: ReactNode; showLink?: boolean }) {
   const iv = v.interview;
   const st = STATUS[iv.status] ?? STATUS.scheduled;
@@ -38,8 +40,23 @@ export function PanelInterviewView({ v, actions, showLink }: { v: InterviewView;
       </div>
       <p className="mt-1 text-slate-700">
         {iv.scheduledAt ? <LocalTime iso={iv.scheduledAt.toISOString()} /> : `${iv.slots.length} time${iv.slots.length === 1 ? "" : "s"} offered`}
-        {` · ${iv.location}`}
+        {" · "}
+        {/^https:\/\//.test(iv.location) ? (
+          <a href={iv.location} target="_blank" rel="noreferrer" className="text-brand-700 underline">
+            {iv.location}
+          </a>
+        ) : (
+          iv.location
+        )}
       </p>
+      {iv.calendarEventId && (
+        <p className="mt-1 text-xs text-slate-600">{`In the panel's calendars (${CAL_LABEL[iv.calendarProvider ?? ""] ?? "calendar"})${iv.autoMeeting ? " · video link created automatically" : ""}`}</p>
+      )}
+      {iv.calendarError && (
+        <p role="alert" className="mt-1 rounded bg-amber-50 p-2 text-xs text-amber-900">
+          {iv.calendarError}
+        </p>
+      )}
       {iv.status === "reschedule_requested" && iv.candidateMessage && <p className="mt-1 rounded bg-amber-50 p-2 text-amber-900">{`Candidate: “${iv.candidateMessage}”`}</p>}
       <p className="mt-2 text-slate-700">
         Panel:{" "}

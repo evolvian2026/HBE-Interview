@@ -80,7 +80,12 @@ export interface ScheduleInput {
   slots: string[];
   panelistIds: string[];
   competencies: string[];
+  /** Create a Google Meet / Teams link in a connected calendar when the time is booked. */
+  autoMeeting?: boolean;
 }
+
+/** Keep the calendar event (and video link) in line with the interview; never fails the scheduling step. */
+const syncCalendar = async (id: string) => (await import("./calendar")).syncInterviewEvent(id);
 
 const PANEL_ROLES: StaffRole[] = ["hiring_manager", "recruiter", "admin"];
 
@@ -101,6 +106,10 @@ export async function scheduleInterview(user: StaffUser, candidacyId: string, in
   }
   const slots = input.slots.map((s) => new Date(s).toISOString()).sort();
   const single = slots.length === 1;
+  const calendar = await import("./calendar");
+  if (input.autoMeeting) await calendar.requireMeetingCalendar(user.id, ids);
+  const location = input.location.trim() || (input.autoMeeting ? calendar.AUTO_LOCATION : "");
+  if (location.length < 3) throw new HttpError(400, "Add where the interview happens (a video link or an address).");
   const [iv] = await db
     .insert(schema.panelInterviews)
     .values({
@@ -108,7 +117,8 @@ export async function scheduleInterview(user: StaffUser, candidacyId: string, in
       candidacyId,
       title: input.title.trim(),
       durationMin: input.durationMin,
-      location: input.location.trim(),
+      location,
+      autoMeeting: !!input.autoMeeting,
       slots,
       scheduledAt: single ? new Date(slots[0]) : null,
       status: single ? "scheduled" : "proposed",
@@ -119,9 +129,10 @@ export async function scheduleInterview(user: StaffUser, candidacyId: string, in
   await db.insert(schema.panelScorecards).values(panel.map((p) => ({ interviewId: iv.id, panelistId: p.id })));
   await db.update(schema.candidacies).set({ stage: "panel", updatedAt: new Date() }).where(eq(schema.candidacies.id, candidacyId));
   await audit({ type: "staff", id: user.id, orgId: user.orgId }, "panel.create", "candidacy", candidacyId, { interviewId: iv.id, slots: slots.length, panelists: panel.length });
-  await notifyCandidate(iv, single ? "scheduled" : "choose");
-  if (single) await onScheduled(iv);
-  return iv;
+  const booked = single ? ((await syncCalendar(iv.id)) ?? iv) : iv;
+  await notifyCandidate(booked, single ? "scheduled" : "choose");
+  if (single) await onScheduled(booked);
+  return booked;
 }
 
 async function onScheduled(iv: PanelInterview) {
@@ -157,9 +168,10 @@ export async function chooseSlot(candidacy: { id: string }, interviewId: string,
     .returning();
   if (!updated) throw new HttpError(409, "This interview was just updated — please reload.");
   await audit({ type: "candidate", id: candidacy.id }, "panel.slot_chosen", "candidacy", candidacy.id, { interviewId: iv.id, at: iso });
-  await notifyCandidate(updated, "scheduled");
-  await onScheduled(updated);
-  return updated;
+  const booked = (await syncCalendar(updated.id)) ?? updated;
+  await notifyCandidate(booked, "scheduled");
+  await onScheduled(booked);
+  return booked;
 }
 
 /** The candidate can't make any offered time (or the booked one) and asks for others. */
@@ -173,6 +185,7 @@ export async function requestOtherTimes(candidacy: { id: string }, interviewId: 
     .set({ status: "reschedule_requested", candidateMessage: message.trim() || null, scheduledAt: null, sequence: iv.sequence + (iv.scheduledAt ? 1 : 0), updatedAt: new Date() })
     .where(eq(schema.panelInterviews.id, iv.id));
   await audit({ type: "candidate", id: candidacy.id }, "panel.reschedule_request", "candidacy", candidacy.id, { interviewId: iv.id });
+  await syncCalendar(iv.id);
   await notifyAboutCandidacy(candidacy.id, "panel.reschedule_requested", "Reschedule request", (who, drive) => `${who} (${drive}) asked for other times for the ${iv.title}.`);
 }
 
@@ -197,9 +210,10 @@ export async function rescheduleInterview(user: StaffUser, interviewId: string, 
     .where(eq(schema.panelInterviews.id, iv.id))
     .returning();
   await audit({ type: "staff", id: user.id, orgId: user.orgId }, "panel.reschedule", "candidacy", iv.candidacyId, { interviewId: iv.id, slots: slots.length });
-  await notifyCandidate(updated, single ? "scheduled" : "choose");
-  if (single) await onScheduled(updated);
-  return updated;
+  const synced = (await syncCalendar(updated.id)) ?? updated;
+  await notifyCandidate(synced, single ? "scheduled" : "choose");
+  if (single) await onScheduled(synced);
+  return synced;
 }
 
 export async function cancelInterview(user: StaffUser, interviewId: string, reason: string) {
@@ -207,6 +221,7 @@ export async function cancelInterview(user: StaffUser, interviewId: string, reas
   if (iv.status === "cancelled") return;
   const [updated] = await db.update(schema.panelInterviews).set({ status: "cancelled", sequence: iv.sequence + 1, updatedAt: new Date() }).where(eq(schema.panelInterviews.id, iv.id)).returning();
   await audit({ type: "staff", id: user.id, orgId: user.orgId }, "panel.cancel", "candidacy", iv.candidacyId, { interviewId: iv.id, reason });
+  await syncCalendar(iv.id);
   await notifyCandidate(updated, "cancelled");
 }
 

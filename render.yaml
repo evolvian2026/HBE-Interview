@@ -57,3 +57,12 @@ services:
         sync: false
       - key: AZURE_SPEECH_REGION
         value: centralindia
+      # Calendar sync (optional): Google and/or Microsoft OAuth apps
+      - key: GOOGLE_CALENDAR_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CALENDAR_CLIENT_SECRET
+        sync: false
+      - key: MICROSOFT_CALENDAR_CLIENT_ID
+        sync: false
+      - key: MICROSOFT_CALENDAR_CLIENT_SECRET
+        sync: false

@@ -673,6 +673,12 @@ export const panelInterviews = pgTable(
     competencies: jsonb("competencies").notNull().$type<string[]>(),
     /** Bumped on every reschedule so calendar clients update the same event. */
     sequence: integer("sequence").notNull().default(0),
+    /** Phase 18: create a Google Meet / Teams link in the organiser's calendar when the time is booked. */
+    autoMeeting: boolean("auto_meeting").notNull().default(false),
+    calendarProvider: text("calendar_provider"),
+    calendarEventId: text("calendar_event_id"),
+    calendarOwnerId: uuid("calendar_owner_id").references(() => users.id, { onDelete: "set null" }),
+    calendarError: text("calendar_error"),
     createdBy: uuid("created_by").references(() => users.id, { onDelete: "set null" }),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
@@ -978,3 +984,18 @@ export const hireReviews = pgTable(
   },
   (t) => [uniqueIndex("hire_review_checkpoint").on(t.hireId, t.checkpoint), index("hire_review_due").on(t.reviewerId, t.dueAt)],
 );
+
+/* ------------------------------- Phase 18 --------------------------------- */
+
+/** A person's connected calendar (Google or Microsoft 365). Tokens are sealed (AES-256-GCM). */
+export const calendarConnections = pgTable("calendar_connections", {
+  userId: uuid("user_id").primaryKey().references(() => users.id, { onDelete: "cascade" }),
+  orgId: orgRef(),
+  provider: text("provider").notNull().$type<"google" | "microsoft" | "mock">(),
+  accountEmail: text("account_email").notNull(),
+  refreshToken: text("refresh_token").notNull(),
+  accessToken: text("access_token"),
+  accessExpiresAt: ts("access_expires_at"),
+  lastError: text("last_error"),
+  connectedAt: ts("connected_at").notNull().defaultNow(),
+});

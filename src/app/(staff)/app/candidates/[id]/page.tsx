@@ -36,6 +36,7 @@ import { emailsFor } from "@/lib/services/emails";
 import { practiceSummary } from "@/lib/services/practice";
 import { matchesForCandidacy } from "@/lib/services/similarity";
 import { hireForCandidacy } from "@/lib/services/hires";
+import { calendarProviders, calendarStatusFor } from "@/lib/services/calendar";
 import { TEMPLATES, type TemplateKey } from "@/lib/core/templates";
 
 export const dynamic = "force-dynamic";
@@ -114,6 +115,10 @@ export default async function CandidatePage({ params }: { params: Promise<{ id: 
   const panels = canDecide ? await panelForCandidacy(user, id) : [];
   const decisions = canDecide ? await decisionsFor(id) : [];
   const canSchedule = hasRole(user, "recruiter") && ["completed", "shortlisted", "on_hold", "panel"].includes(row.c.stage);
+  const schedulerPanelists = canSchedule ? await eligiblePanelists(user.orgId, row.d.id) : [];
+  const calStatus = canSchedule ? await calendarStatusFor([user.id, ...schedulerPanelists.map((p) => p.id)]) : new Map();
+  const calProviders = calendarProviders();
+  const calendarInfo = calProviders.length ? { connectedIds: [...calStatus.keys()], meIncluded: calStatus.has(user.id), meetingLabel: calProviders.find((p) => p.id === calStatus.get(user.id)?.provider)?.meetingLabel ?? calProviders[0].meetingLabel } : undefined;
   const canFinalDecide = canDecide && ["completed", "shortlisted", "on_hold", "panel", "offer", "gate_pending"].includes(row.c.stage);
   const pendingCards = panels.filter((p) => p.interview.status !== "cancelled").reduce((n, p) => n + p.panel.filter((m) => !m.submitted).length, 0);
   const [decider] = accommodation?.decidedBy ? await db.select({ name: schema.users.name }).from(schema.users).where(eq(schema.users.id, accommodation.decidedBy)) : [];
@@ -238,7 +243,7 @@ export default async function CandidatePage({ params }: { params: Promise<{ id: 
             {panels.map((v) => (
               <PanelInterviewView key={v.interview.id} v={v} showLink actions={hasRole(user, "recruiter") && !["cancelled", "completed"].includes(v.interview.status) ? <PanelAdmin interviewId={v.interview.id} cancellable /> : undefined} />
             ))}
-            {canSchedule && <PanelScheduler candidacyId={id} panelists={await eligiblePanelists(user.orgId, row.d.id)} defaultCompetencies={defaultCompetencies(config)} />}
+            {canSchedule && <PanelScheduler candidacyId={id} panelists={schedulerPanelists} defaultCompetencies={defaultCompetencies(config)} calendar={calendarInfo} />}
             {decisions.length > 0 && (
               <div className="text-sm">
                 <h3 className="mb-1 font-semibold">Decisions</h3>

@@ -30,6 +30,7 @@ An AI-powered, multi-round interview platform. Candidates upload a resume, link 
 | Phase 11 | **Editable, branded candidate emails** (preview, test, email log) and **Slack / Teams notifications** |
 | Phase 12 | **SCIM 2.0 user provisioning** for Okta / Microsoft Entra ID: automatic create, update, deactivate and roles from groups |
 | Phase 13 | **Practice interviews**: an optional, unscored ~6-minute warm-up with the AI interviewer before the real rounds |
+| Phase 18 | **Calendar sync**: Google / Microsoft 365 free-busy suggestions for panels and automatic Meet / Teams links on booking |
 | Phase 17 | **Quality of hire**: 90/180-day manager check-ins on hires and which interview signals actually predict success |
 | Phase 16 | **Copied-code detection**: disguised copies between candidates or of published solutions flagged for review, problem leak status and retiring leaked problems |
 | Phase 15 | **Natural voice**: lifelike interviewer voices (Indian/US/UK English and Indian languages) and cloud transcription of spoken answers via Azure AI Speech, with browser fallback |
@@ -69,6 +70,7 @@ npm run dev                   # http://localhost:3000 → sign in with the admin
 | `GITHUB_TOKEN` | Optional; raises GitHub's rate limit (public repos only; GitLab and Bitbucket public APIs need no token) |
 | `RUN_WORKER_IN_PROCESS` | `true` (default) runs background jobs inside the web server; set `false` and run `npm run worker` separately to scale them out |
 | `RESEND_API_KEY`, `EMAIL_FROM` | Optional email for invites / next-round notices (links can always be copied from the app) |
+| `GOOGLE_CALENDAR_CLIENT_ID`/`_SECRET`, `MICROSOFT_CALENDAR_CLIENT_ID`/`_SECRET` | Optional calendar sync (redirect URIs `<APP_BASE_URL>/api/calendar/callback/google` and `/microsoft`); `MICROSOFT_CALENDAR_TENANT` (default `common`); `CALENDAR_MOCK=true` for development/tests |
 | `AZURE_SPEECH_KEY`, `AZURE_SPEECH_REGION` | Optional natural voice (Azure AI Speech, e.g. region `centralindia`). Optional: `AZURE_SPEECH_API_VERSION`, `AZURE_STT_LOCALES`, `AZURE_SPEECH_VOICES`, `SPEECH_PRICE_PER_MILLION_CHARS`, `SPEECH_PRICE_PER_AUDIO_HOUR`. `SPEECH_MOCK=true` for development/tests |
 
 ## Deploying to Render + Neon
@@ -117,6 +119,8 @@ npm run smoke:phase16 # copied-code detection: matches, review, known solutions,
 npm run ui-check:phase16 # copied-code checks, side-by-side match, report flag
 npm run smoke:phase17 # quality of hire: offers, joining, blind check-ins, reminders, stats, anonymised retention
 npm run ui-check:phase17 # hires, a check-in before and after submitting, quality of hire
+npm run smoke:phase18 # calendar sync: connect, suggestions, Meet/Teams on booking, reschedule/cancel, failures (CALENDAR_MOCK=true)
+npm run ui-check:phase18 # connect a calendar, suggested times, booked interview with a link
 npm run mock-oidc    # standalone mock OIDC provider on :4610 for trying SSO locally
 npm run a11y         # axe-core WCAG 2.1 AA checks on staff and candidate screens
 ```

@@ -6,7 +6,8 @@ import { scheduleInterview } from "@/lib/services/panel";
 const Body = z.object({
   title: z.string().trim().min(3).max(120),
   durationMin: z.number().int().min(15).max(240),
-  location: z.string().trim().min(3).max(500),
+  location: z.string().trim().max(500),
+  autoMeeting: z.boolean().optional(),
   slots: z.array(z.string().max(40)).min(1).max(5),
   panelistIds: z.array(z.string()).min(1).max(8),
   competencies: z.array(z.string().max(60)).min(1).max(8),

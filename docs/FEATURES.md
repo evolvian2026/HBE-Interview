@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Document status** | v2.8 — approved; Phases 1–17 built (as-built notes: ARCHITECTURE §0; integration reference: [API.md](API.md)) |
+| **Document status** | v2.9 — approved; Phases 1–18 built (as-built notes: ARCHITECTURE §0; integration reference: [API.md](API.md)) |
 | **Date** | 2026-10-16 |
 | **Related** | [PRD.md](PRD.md) (product requirements) · [ARCHITECTURE.md](ARCHITECTURE.md) (technical architecture) |
 
@@ -1470,4 +1470,37 @@ Voice mode can use a cloud speech service — **Microsoft Azure AI Speech** — 
 | Syncing joining and leaving dates from an HR system | Recruiters record them; the REST API can be extended |
 | Importing performance-review scores | Managers give the check-ins here |
 | Outcome fairness analysis by cohort | The fairness monitor (Phase 3) covers interview pass rates |
+
+## 33. Phase 18 features (v2.9)
+
+### 33.1 Calendar sync and automatic meeting links
+
+- **Connecting:** on the *Security* page, each staff member (hiring managers and above) can connect **Google Calendar** or **Microsoft 365 (Outlook)** — whichever the server is set up for.
+  - Standard OAuth sign-in with the provider; the one-time state is checked on return.
+  - Tokens are stored encrypted, refreshed automatically, and the connection is flagged *needs attention* (with a Reconnect link) if the provider stops accepting them.
+  - Only **free/busy** times are read — never event titles or details. People can disconnect at any time; events already created stay in their calendar.
+- **Suggested times:** in *Arrange a panel interview*, **Suggest times when the panel is free** checks the connected calendars of the chosen panelists over the next 10 days, on weekdays between 9:00 and 18:00 in the scheduler's own time zone, and offers up to 12 times (a morning, midday and afternoon option per day, at least two hours ahead). It says whose calendars were checked and who **isn't connected** (check with them). Clicking a suggestion adds it to the offered times.
+- **Automatic video meeting:** with **Create the video meeting automatically** ticked, the location can be left empty. When a time is booked — straight away for a single time, or when the candidate picks one:
+  - HBE Interview creates the event in the scheduler's calendar (or, if they haven't connected one, the first connected panelist's), with a **Google Meet** or **Teams** link;
+  - the panelists are invited as attendees;
+  - the link becomes the interview's location, so the candidate's confirmation email and page show it.
+  The event also appears in calendars when the location is entered manually (no automatic link).
+- **Keeping it in line:** offering new times or a candidate asking for other times removes the event; booking the new time creates a fresh one with a new link; cancelling removes it. The calendar file (ICS) and emails keep working as before.
+- **Failures never block scheduling:** if a calendar can't be reached, the interview is still booked and the problem is shown on the interview ("Calendar update failed …") and on the person's Security page.
+- **Audit:** connecting and disconnecting calendars are audited; scheduling actions were already audited.
+
+### 33.2 Setting it up
+
+1. **Google:** in Google Cloud Console, create an OAuth client (Web application), enable the Google Calendar API, add the redirect URI `<APP_BASE_URL>/api/calendar/callback/google`, and set `GOOGLE_CALENDAR_CLIENT_ID` and `GOOGLE_CALENDAR_CLIENT_SECRET`. Scopes requested: `calendar.events`, `calendar.freebusy`, `openid`, `email`.
+2. **Microsoft 365:** in Microsoft Entra ID, register an app with the redirect URI `<APP_BASE_URL>/api/calendar/callback/microsoft`, add the delegated Graph permission `Calendars.ReadWrite`, create a client secret, and set `MICROSOFT_CALENDAR_CLIENT_ID` and `MICROSOFT_CALENDAR_CLIENT_SECRET` (optionally `MICROSOFT_CALENDAR_TENANT` to restrict to your tenant). Teams links need Microsoft 365 work accounts.
+3. Redeploy; each person connects their calendar on the Security page.
+
+### 33.3 Not built yet
+
+| Item | Note |
+|---|---|
+| Booking meeting rooms | Rooms can be added to the event in the calendar app |
+| Candidates choosing from live availability | Candidates choose from the times the scheduler offered |
+| Zoom | Google Meet and Microsoft Teams only |
+| Organisation-wide calendar access (admin consent / service account) | Each person connects their own calendar |
 

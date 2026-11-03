@@ -32,7 +32,22 @@ function SlotInputs({ slots, setSlots }: { slots: string[]; setSlots: (s: string
 }
 
 /** Recruiters: arrange a live panel interview after the AI rounds. */
-export function PanelScheduler({ candidacyId, panelists, defaultCompetencies }: { candidacyId: string; panelists: { id: string; name: string; role: string }[]; defaultCompetencies: string[] }) {
+/** datetime-local value for an ISO instant, in the browser's time zone. */
+const toLocalInput = (iso: string) => {
+  const d = new Date(iso);
+  const p = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
+};
+const fmtSlot = (iso: string) => new Date(iso).toLocaleString(undefined, { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+
+export interface CalendarInfo {
+  /** People (the scheduler and panelists) with a connected calendar. */
+  connectedIds: string[];
+  meIncluded: boolean;
+  meetingLabel: string | null;
+}
+
+export function PanelScheduler({ candidacyId, panelists, defaultCompetencies, calendar }: { candidacyId: string; panelists: { id: string; name: string; role: string }[]; defaultCompetencies: string[]; calendar?: CalendarInfo }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState("Final panel interview");
@@ -43,6 +58,16 @@ export function PanelScheduler({ candidacyId, panelists, defaultCompetencies }: 
   const [competencies, setCompetencies] = useState(defaultCompetencies.join("\n"));
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [autoMeeting, setAutoMeeting] = useState(false);
+  const [suggest, setSuggest] = useState<{ slots: string[]; checked: string[]; notConnected: string[]; failed: { name: string; reason: string }[] } | null>(null);
+  const [finding, setFinding] = useState(false);
+  const canMeet = !!calendar?.meetingLabel && (calendar.meIncluded || chosen.some((id) => calendar.connectedIds.includes(id)));
+  const addSlot = (iso: string) => {
+    const v = toLocalInput(iso);
+    if (slots.includes(v)) return;
+    const empty = slots.indexOf("");
+    setSlots(empty >= 0 ? slots.map((s, i) => (i === empty ? v : s)) : slots.length < 5 ? [...slots, v] : slots);
+  };
   if (!open)
     return (
       <Button variant="secondary" onClick={() => setOpen(true)}>
@@ -58,7 +83,7 @@ export function PanelScheduler({ candidacyId, panelists, defaultCompetencies }: 
         setBusy(true);
         try {
           await api(`/api/candidacies/${candidacyId}/panel`, {
-            body: { title, durationMin: duration, location, slots: slots.filter(Boolean).map(toIso), panelistIds: chosen, competencies: competencies.split("\n").map((c) => c.trim()).filter(Boolean) },
+            body: { title, durationMin: duration, location, autoMeeting: autoMeeting && canMeet, slots: slots.filter(Boolean).map(toIso), panelistIds: chosen, competencies: competencies.split("\n").map((c) => c.trim()).filter(Boolean) },
           });
           setOpen(false);
           router.refresh();
@@ -76,13 +101,62 @@ export function PanelScheduler({ candidacyId, panelists, defaultCompetencies }: 
         <Field label="Length (minutes)">
           <Input type="number" min={15} max={240} step={15} value={duration} onChange={(e) => setDuration(Number(e.target.value))} />
         </Field>
-        <Field label="Where (video link or address)">
-          <Input value={location} onChange={(e) => setLocation(e.target.value)} required minLength={3} maxLength={500} placeholder="https://meet.example.com/abc-defg" />
+        <Field label="Where (video link or address)" hint={autoMeeting && canMeet ? `The ${calendar?.meetingLabel} link is created when the time is booked.` : undefined}>
+          <Input value={location} onChange={(e) => setLocation(e.target.value)} required={!(autoMeeting && canMeet)} minLength={autoMeeting && canMeet ? 0 : 3} maxLength={500} disabled={autoMeeting && canMeet} placeholder={autoMeeting && canMeet ? "Created automatically" : "https://meet.example.com/abc-defg"} />
         </Field>
       </div>
+      {calendar?.meetingLabel && (
+        <label className={`flex items-start gap-2 text-sm ${canMeet ? "" : "opacity-60"}`}>
+          <input type="checkbox" className="mt-1" checked={autoMeeting && canMeet} disabled={!canMeet} onChange={(e) => setAutoMeeting(e.target.checked)} />
+          <span>{canMeet ? `Create the video meeting automatically (${calendar.meetingLabel}) and put the interview in the panel's calendars` : "Connect your calendar (Security page), or choose a panelist who has, to create the video meeting automatically"}</span>
+        </label>
+      )}
       <fieldset>
         <legend className="mb-1 text-sm font-medium text-slate-700">Times to offer</legend>
         <SlotInputs slots={slots} setSlots={setSlots} />
+        {calendar && (
+          <div className="mt-2 space-y-2 text-sm">
+            <Button
+              type="button"
+              variant="secondary"
+              disabled={finding || !chosen.length}
+              title={!chosen.length ? "Choose the panel first" : undefined}
+              onClick={async () => {
+                setFinding(true);
+                setError("");
+                try {
+                  setSuggest(await api("/api/calendar/suggest", { body: { panelistIds: chosen, durationMin: duration, timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone, days: 10, workStartHour: 9, workEndHour: 18 } }));
+                } catch (err) {
+                  setError((err as Error).message);
+                } finally {
+                  setFinding(false);
+                }
+              }}
+            >
+              {finding ? "Checking calendars…" : "Suggest times when the panel is free"}
+            </Button>
+            {suggest && (
+              <div className="rounded-lg bg-slate-50 p-3">
+                <p className="text-xs text-slate-700">
+                  {`Weekdays 9:00–18:00 your time, next 10 days. Checked: ${suggest.checked.join(", ") || "nobody"}.`}
+                  {suggest.notConnected.length > 0 && ` Not connected (check with them): ${suggest.notConnected.join(", ")}.`}
+                  {suggest.failed.map((f) => ` ${f.name}: ${f.reason}`).join("")}
+                </p>
+                {suggest.slots.length === 0 ? (
+                  <p className="mt-1 text-xs text-slate-700">No common free time found.</p>
+                ) : (
+                  <div className="mt-2 flex flex-wrap gap-1.5" role="group" aria-label="Suggested times">
+                    {suggest.slots.map((s) => (
+                      <button key={s} type="button" onClick={() => addSlot(s)} className="rounded-full bg-white px-2.5 py-1 text-xs text-slate-800 ring-1 ring-slate-300 hover:bg-brand-50">
+                        {`+ ${fmtSlot(s)}`}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
       </fieldset>
       <fieldset>
         <legend className="mb-1 text-sm font-medium text-slate-700">Panel</legend>
