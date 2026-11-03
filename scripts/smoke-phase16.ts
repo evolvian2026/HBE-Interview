@@ -143,6 +143,9 @@ async function main() {
 
 async function run(admin: Client, orgId: string, q: Q, stamp: number) {
   // Start clean for this problem (dev data only).
+  // Remove earlier runs' test candidates so each run starts from the same state.
+  await q("delete from candidacies where org_id = $1 and candidate_id in (select id from candidates where email like '%.code.%@example.com')", [orgId]);
+  await q("delete from candidates where email like '%.code.%@example.com' and not exists (select 1 from candidacies c where c.candidate_id = candidates.id)");
   await q("delete from code_matches where org_id = $1", [orgId]);
   await q("delete from code_references where org_id = $1", [orgId]);
   await q("delete from code_fingerprints where org_id = $1", [orgId]);
@@ -165,7 +168,8 @@ async function run(admin: Client, orgId: string, q: Q, stamp: number) {
     const token = inv.results[0].link.split("/c/")[1];
     const [{ id: cid }] = await q<{ id: string }>("select id from candidacies where access_token = $1", [token]);
     await q("update candidacies set stage = 'in_round', current_round_index = 0 where id = $1", [cid]);
-    const deadline = status === "active" ? "now() - interval '10 minutes'" : "now()";
+    // Dev's round stays open until the test makes it overdue (below), so maintenance can't close it early.
+    const deadline = status === "active" ? "now() + interval '1 hour'" : "now()";
     const [{ id: sid }] = await q<{ id: string }>(
       `insert into round_sessions (candidacy_id, round_index, round_type, status, mode, language, state, started_at, deadline_at, ended_at, last_heartbeat_at)
        values ($1, 0, 'technical', $2, 'text', 'en', $3, now() - interval '50 minutes', ${deadline}, ${status === "ended" ? "now()" : "null"}, now()) returning id`,
@@ -202,7 +206,8 @@ async function run(admin: Client, orgId: string, q: Q, stamp: number) {
   });
   const ab = pairs.find((p) => [p.a, p.b].sort().join() === [people.a.cid, people.b.cid].sort().join());
   check(ab && ab.level === "high" && ab.score >= 0.75, `a copy with renamed variables, new comments and layout is caught (${Math.round((ab?.score ?? 0) * 100)}%)`);
-  check(!pairs.some((p) => [p.a, p.b].includes(people.c.cid)), "an independent solution to the same problem is not flagged");
+  // (Earlier runs of this script leave identical fixtures behind, which rightly match each other; compare within this run.)
+  check(!pairs.some((p) => [p.a, p.b].includes(people.c.cid) && [p.a, p.b].some((x) => x === people.a.cid || x === people.b.cid)), "an independent solution to the same problem is not flagged");
   const sameCand = await q("select 1 from code_matches m join code_fingerprints fa on fa.id = m.a_id join code_fingerprints fb on fb.id = m.b_id where fa.candidacy_id = fb.candidacy_id");
   check(sameCand.length === 0, "a candidate is never matched with themselves");
 
@@ -228,6 +233,7 @@ async function run(admin: Client, orgId: string, q: Q, stamp: number) {
   check((await admin.req("GET", `/app/candidates/${people.a.cid}`)).text.includes("marked likely copied"), "both candidates' reports show the conclusion");
 
   /* ----------------------- A round ending normally is checked ----------------------- */
+  await q("update round_sessions set deadline_at = now() - interval '10 minutes' where id = $1", [people.d.sid]);
   await waitFor("Dev's round to be closed and checked", async () => {
     const r = await q("select 1 from code_fingerprints where session_id = $1", [people.d.sid]);
     return r.length ? r : null;
