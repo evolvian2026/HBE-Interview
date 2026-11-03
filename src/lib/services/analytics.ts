@@ -193,3 +193,17 @@ export async function aiUsage(sinceDays: number | null, orgId: string | null) {
     cacheShare: totalIn ? byStage.reduce((a, r) => a + r.cacheRead, 0) / totalIn : null,
   };
 }
+
+/** Natural voice usage and estimated cost (characters spoken, minutes transcribed). */
+export async function speechUsageSummary(sinceDays: number | null, orgId: string) {
+  const since = sinceDays ? new Date(Date.now() - sinceDays * 86_400_000) : new Date(0);
+  const rows = await db
+    .select({ kind: schema.speechUsage.kind, units: sql<number>`coalesce(sum(${schema.speechUsage.units}),0)::bigint`, n: sql<number>`count(*)::int` })
+    .from(schema.speechUsage)
+    .where(and(eq(schema.speechUsage.orgId, orgId), gte(schema.speechUsage.createdAt, since)))
+    .groupBy(schema.speechUsage.kind);
+  const { speechCost } = await import("../speech/service");
+  const tts = Number(rows.find((r) => r.kind === "tts")?.units ?? 0);
+  const stt = Number(rows.find((r) => r.kind === "stt")?.units ?? 0);
+  return { ttsChars: tts, sttMinutes: stt / 60_000, requests: rows.reduce((a, r) => a + r.n, 0), cost: speechCost("tts", tts) + speechCost("stt", stt) };
+}

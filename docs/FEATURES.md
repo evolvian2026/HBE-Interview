@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Document status** | v2.5 — approved; Phases 1–14 built (as-built notes: ARCHITECTURE §0; integration reference: [API.md](API.md)) |
+| **Document status** | v2.6 — approved; Phases 1–15 built (as-built notes: ARCHITECTURE §0; integration reference: [API.md](API.md)) |
 | **Date** | 2026-10-16 |
 | **Related** | [PRD.md](PRD.md) (product requirements) · [ARCHITECTURE.md](ARCHITECTURE.md) (technical architecture) |
 
@@ -1387,4 +1387,42 @@ Candidates can request extra time (+25% or +50%) through a link on the consent s
 | Editing prompts in the app and testing prompt versions | Prompt changes ship with releases; run the bench after each release |
 | Blocking a model switch when a run fails | The verdict is advisory; platform admins switch models in *Platform* |
 | Test sets shared between organisations | Each organisation's cases stay its own |
+
+## 30. Phase 15 features (v2.6)
+
+### 30.1 Natural voice
+
+Voice mode can use a cloud speech service — **Microsoft Azure AI Speech** — instead of the browser's built-in speech.
+
+- **The interviewer's voice:** each interviewer message is read aloud with a neural voice.
+  - English voices come in Indian, American or British English; Hindi, Tamil, Telugu, Bengali, Marathi, Spanish, French, German, Portuguese, Arabic and Japanese use native voices.
+  - Admins choose female or male.
+  - Markdown is removed before reading, code is replaced by "see the code on screen", and very long messages stop at a sentence with "the rest is on screen".
+  - Messages are escaped, so nothing in them can change the voice markup.
+  - *Repeat* replays the last question with the same voice.
+- **Spoken answers:** the candidate clicks **Speak** and records the answer (a level meter and a timer show the microphone is working; up to 5 minutes per answer), then **Done speaking**.
+  - The recording is sent to the speech service and the **text appears in the answer box to check and edit** before *Send* — nothing is sent to the interviewer automatically.
+  - This works in every modern browser (Chrome, Edge, Firefox, Safari), unlike browser dictation, and is more accurate with Indian accents.
+  - Spoken answers are timed from when the candidate started speaking, so a transcribed answer isn't mistaken for a pasted one.
+- **Languages:** cloud transcription covers English, Hindi, Spanish, French, German, Portuguese and Japanese. For other languages (e.g. Tamil, Telugu), the interviewer still uses the natural voice and answers use browser dictation (Chrome/Edge). More locales can be enabled per deployment (`AZURE_STT_LOCALES`).
+- **Privacy:** audio is passed to the speech service and **not stored** by HBE Interview — only the text the candidate sends is kept. The lobby tells candidates this when they choose voice. Only usage (characters spoken, seconds transcribed) is recorded, for cost.
+- **Fallbacks:** if the speech service isn't configured, is switched off, or fails for one message, the browser's own voice is used for that message. Voice remains optional; text mode is unchanged.
+- **Settings → Interviewer voice** (admins): natural or browser engine, English accent, female/male voice, and *Play a sample*.
+- **Usage:** *AI usage* shows characters spoken, minutes transcribed and an estimated cost (set `SPEECH_PRICE_*` to your Azure prices).
+- **Limits:** recordings up to about 12 MB and only audio formats; per-session rate limits on speech and transcription; transcription only while the round is active; candidates can only use their own interview's messages.
+
+### 30.2 Setting it up
+
+1. In the Azure portal, create a **Speech** resource (Azure AI services), preferably in **Central India** for data residency.
+2. Copy **Key 1** and the **region** into `AZURE_SPEECH_KEY` and `AZURE_SPEECH_REGION` (e.g. `centralindia`), then redeploy.
+3. In *Settings → Interviewer voice*, pick the accent and voice, play a sample, and save.
+
+### 30.3 Not built yet
+
+| Item | Note |
+|---|---|
+| Live captions while speaking (cloud) | The transcript appears after *Done speaking*; browser dictation shows live words |
+| Sentence-by-sentence streaming speech | Each message is synthesised whole (audio streams as it's produced) |
+| Other speech providers (Deepgram, ElevenLabs, Google) | The provider is isolated in one module so another can be added |
+| Voice per drive or per persona | One organisation-wide voice |
 

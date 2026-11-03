@@ -30,6 +30,7 @@ An AI-powered, multi-round interview platform. Candidates upload a resume, link 
 | Phase 11 | **Editable, branded candidate emails** (preview, test, email log) and **Slack / Teams notifications** |
 | Phase 12 | **SCIM 2.0 user provisioning** for Okta / Microsoft Entra ID: automatic create, update, deactivate and roles from groups |
 | Phase 13 | **Practice interviews**: an optional, unscored ~6-minute warm-up with the AI interviewer before the real rounds |
+| Phase 15 | **Natural voice**: lifelike interviewer voices (Indian/US/UK English and Indian languages) and cloud transcription of spoken answers via Azure AI Speech, with browser fallback |
 | Phase 14 | **Scoring test bench**: re-score a fixed set of rounds with agreed scores before changing the AI model, or monthly, to catch scoring drift |
 | Recruiter app | Drives list, drive editor, candidate table with round/final scores, practical fit and integrity, decisions queue, full candidate report with transcripts, code and repo analysis, notes, settings (company values, HR knowledge base, consent, retention, users & roles) |
 
@@ -66,6 +67,7 @@ npm run dev                   # http://localhost:3000 → sign in with the admin
 | `GITHUB_TOKEN` | Optional; raises GitHub's rate limit (public repos only; GitLab and Bitbucket public APIs need no token) |
 | `RUN_WORKER_IN_PROCESS` | `true` (default) runs background jobs inside the web server; set `false` and run `npm run worker` separately to scale them out |
 | `RESEND_API_KEY`, `EMAIL_FROM` | Optional email for invites / next-round notices (links can always be copied from the app) |
+| `AZURE_SPEECH_KEY`, `AZURE_SPEECH_REGION` | Optional natural voice (Azure AI Speech, e.g. region `centralindia`). Optional: `AZURE_SPEECH_API_VERSION`, `AZURE_STT_LOCALES`, `AZURE_SPEECH_VOICES`, `SPEECH_PRICE_PER_MILLION_CHARS`, `SPEECH_PRICE_PER_AUDIO_HOUR`. `SPEECH_MOCK=true` for development/tests |
 
 ## Deploying to Render + Neon
 
@@ -107,6 +109,8 @@ npm run smoke:phase13 # practice: run, never evaluated, staff see only that it w
 npm run ui-check:phase13 # practice offer, lobby, room, end screen, staff note
 npm run smoke:phase14 # test bench: cases (real, reviewed, written), runs, verdict, baseline, isolation
 npm run ui-check:phase14 # write a case, run the bench, result and case pages
+npm run smoke:phase15 # natural voice: speech, transcription, limits, isolation, fallback (SPEECH_MOCK=true)
+npm run ui-check:phase15 # voice settings, voice lobby, recording, transcript, next question (simulated mic)
 npm run mock-oidc    # standalone mock OIDC provider on :4610 for trying SSO locally
 npm run a11y         # axe-core WCAG 2.1 AA checks on staff and candidate screens
 ```

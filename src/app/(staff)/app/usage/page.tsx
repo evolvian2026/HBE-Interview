@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { requireStaffPage } from "@/lib/auth/staff";
-import { aiUsage, PRICES } from "@/lib/services/analytics";
+import { aiUsage, PRICES, speechUsageSummary } from "@/lib/services/analytics";
 import { orgBudget } from "@/lib/services/platform";
 import { Card, PageHeader, cx } from "@/components/ui";
 import { BarList, StatTile } from "@/components/charts";
@@ -21,6 +21,7 @@ export default async function UsagePage({ searchParams }: { searchParams: Promis
   const { range = "30" } = await searchParams;
   const u = await aiUsage(range === "all" ? null : Number(range), user.orgId);
   const budget = await orgBudget(user.orgId);
+  const speech = await speechUsageSummary(range === "all" ? null : Number(range), user.orgId);
   return (
     <div className="space-y-6">
       <PageHeader title="AI usage & cost" subtitle="Estimated from recorded token usage at list prices. Mock-mode calls are not recorded." />
@@ -42,6 +43,11 @@ export default async function UsagePage({ searchParams }: { searchParams: Promis
           sub={budget.budget == null ? "No monthly budget set (platform admins set it)" : `${usd(budget.spent)} of ${usd(budget.budget)} · target ≤ $1.50 per technical round`}
         />
       </div>
+      {speech.requests > 0 && (
+        <Card title="Natural voice (speech service)">
+          <p className="text-sm text-slate-700">{`${Math.round(speech.ttsChars / 1000)}k characters spoken · ${speech.sttMinutes.toFixed(1)} minutes of answers transcribed · about ${usd(speech.cost)} (estimate from SPEECH_PRICE_* settings; check your Azure bill).`}</p>
+        </Card>
+      )}
       <Card title="Cost by pipeline stage">
         {u.byStage.length ? (
           <BarList rows={u.byStage.map((r) => ({ label: `${r.stage} (${r.model.replace("claude-", "")})`, value: r.cost, display: usd(r.cost), hint: `${r.calls} calls` }))} caption="Estimated cost by stage" labelWidth="w-72" />

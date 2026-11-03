@@ -18,3 +18,13 @@ export function asHttp(e: unknown): never {
   if (e instanceof SpeechError) throw new HttpError(e.status, e.message);
   throw e;
 }
+
+/** The voice plan for each of a drive's interview languages (passed to the interview room). */
+export async function speechPlans(orgId: string, languages: string[]) {
+  const out: Record<string, { natural: boolean; naturalInput: boolean; locale: string }> = {};
+  for (const code of languages) {
+    const p = await voicePlan(orgId, code);
+    out[code] = { natural: p.natural, naturalInput: p.naturalInput, locale: p.locale };
+  }
+  return out;
+}

@@ -9,6 +9,7 @@ import { getBranding } from "@/lib/branding";
 import { InterviewRoom } from "@/components/room/room";
 import { LIMITS, pauseLimits, type SessionState } from "@/lib/core/interview";
 import { adjustmentFor } from "@/lib/services/accommodations";
+import { speechPlans } from "@/lib/speech/policy";
 
 export const dynamic = "force-dynamic";
 
@@ -33,6 +34,8 @@ export default async function RoundPage({ params }: { params: Promise<{ token: s
   const adjust = session ? (session.state as SessionState).adjust : await adjustmentFor(row.candidacy.id);
   const limits = adjust ? pauseLimits({ adjust } as SessionState) : { maxPauses: LIMITS.maxPauses, maxPauseSec: LIMITS.maxPauseSec };
   const factor = adjust?.timeFactor ?? 1;
+  const languages = (version.config as DriveConfig).languages ?? ["en"];
+  const speech = await speechPlans(row.candidacy.orgId, languages);
   return (
     <div style={brand.style as React.CSSProperties}>
     <InterviewRoom
@@ -49,7 +52,8 @@ export default async function RoundPage({ params }: { params: Promise<{ token: s
       companyName={settings.companyName}
       hasExercises={sections.some((s) => s.exercise && s.exercise !== "practical_fit")}
       initialSessionId={session?.id ?? null}
-      languages={(version.config as DriveConfig).languages ?? ["en"]}
+      languages={languages}
+      speech={speech}
       webcam={(version.config as DriveConfig).proctoring?.webcam && (row.candidacy.consent as { webcam?: boolean } | null)?.webcam ? { intervalSec: (version.config as DriveConfig).proctoring!.intervalSec } : null}
     />
     </div>

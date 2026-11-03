@@ -22,6 +22,9 @@ import { listChannels } from "@/lib/services/channels";
 import { ScimSettings } from "@/components/staff/scim-settings";
 import { getScimConfig, provisioningStats, scimBase } from "@/lib/services/scim";
 import { CHANNEL_EVENTS, CHANNEL_EVENT_KEYS } from "@/lib/core/notifications";
+import { VoiceSettingsCard } from "@/components/staff/voice-settings";
+import { speechAvailable } from "@/lib/speech/service";
+import { DEFAULT_VOICE } from "@/lib/core/speech";
 
 export const dynamic = "force-dynamic";
 
@@ -52,6 +55,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
       <SettingsForm initial={settings} />
       <KnowledgeBase docs={kb.map((d) => ({ id: d.id, title: d.title, size: d.content.length, preview: d.content.slice(0, 200) }))} />
       <UsersAdmin users={users.map((u) => ({ ...u, has2fa: !!u.totpEnabledAt, totpEnabledAt: undefined, scim: u.provisionedBy === "scim" ? (u.deprovisioned ? "deprovisioned" : "managed") : undefined, provisionedBy: undefined, deprovisioned: undefined }))} drives={drives} meId={me.id} />
+      <VoiceSettingsCard initial={{ ...DEFAULT_VOICE, ...settings.voice }} configured={speechAvailable()} />
       <BrandingSettings name={settings.companyName} logoUrl={branding.logoUrl} brandColor={branding.brandColor} />
       <section id="emails">
         <Card title="Candidate emails">

@@ -18,13 +18,15 @@ function pickType(): string {
  * Record → transcribe. While recording, `level` (0–1) drives a meter and `seconds` a timer; on stop the audio is
  * uploaded and the transcript is passed to onText (the candidate can still edit it before sending).
  */
-export function useCloudDictation(transcribeUrl: string, onText: (text: string) => void) {
+/** onText receives the transcript and how long the candidate spoke (so answer timing isn't mistaken for pasting). */
+export function useCloudDictation(transcribeUrl: string, onText: (text: string, spokenSec: number) => void) {
   const recRef = useRef<MediaRecorder | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const chunks = useRef<Blob[]>([]);
   const timer = useRef<ReturnType<typeof setInterval> | null>(null);
   const raf = useRef<number | null>(null);
   const audioCtx = useRef<AudioContext | null>(null);
+  const startedAt = useRef(0);
   const [listening, setListening] = useState(false);
   const [transcribing, setTranscribing] = useState(false);
   const [seconds, setSeconds] = useState(0);
@@ -44,7 +46,7 @@ export function useCloudDictation(transcribeUrl: string, onText: (text: string) 
   }, []);
 
   const upload = useCallback(
-    async (blob: Blob) => {
+    async (blob: Blob, spokenSec: number) => {
       if (blob.size < 800) {
         setError("We didn't catch any audio — please try again, closer to the microphone.");
         return;
@@ -58,7 +60,7 @@ export function useCloudDictation(transcribeUrl: string, onText: (text: string) 
         const res = await fetch(transcribeUrl, { method: "POST", headers: { "content-type": blob.type || "audio/webm" }, body: blob });
         const data = (await res.json().catch(() => ({}))) as { text?: string; error?: { message?: string } };
         if (!res.ok) throw new Error(data.error?.message ?? "Transcription failed.");
-        if (data.text?.trim()) onText(data.text.trim());
+        if (data.text?.trim()) onText(data.text.trim(), spokenSec);
         else setError("We couldn't make out any words — please try again, or type your answer.");
       } catch (e) {
         setError(`${(e as Error).message} You can try again or type your answer.`);
@@ -91,13 +93,14 @@ export function useCloudDictation(transcribeUrl: string, onText: (text: string) 
       rec.onstop = () => {
         const blob = new Blob(chunks.current, { type: rec.mimeType || type || "audio/webm" });
         cleanup();
-        void upload(blob);
+        void upload(blob, (Date.now() - startedAt.current) / 1000);
       };
       recRef.current = rec;
       rec.start(1000);
       setSeconds(0);
       setListening(true);
       const began = Date.now();
+      startedAt.current = began;
       timer.current = setInterval(() => {
         const s = Math.floor((Date.now() - began) / 1000);
         setSeconds(s);

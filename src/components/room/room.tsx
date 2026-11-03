@@ -6,6 +6,7 @@ import { Badge, BrandMark, Button, Card, Textarea, cx } from "../ui";
 import { Markdown } from "./markdown";
 import { postSSE } from "./sse";
 import { speak, stopSpeaking, useDictation, voiceSupport } from "./voice";
+import { CloudSpeaker, recordingSupported, useCloudDictation } from "./cloud-voice";
 import { CodingPanel } from "./coding-panel";
 import { TextExercisePanel } from "./text-exercise-panel";
 import { PracticalFitPanel } from "./practical-fit-panel";
@@ -23,7 +24,12 @@ interface ChatMessage {
   role: "ai" | "candidate";
   content: string;
   pending?: boolean;
+  /** Stored message id (for the natural voice). */
+  serverId?: string;
 }
+
+/** Per interview language: whether the natural (cloud) voice speaks and listens, and the speech locale. */
+export type SpeechPlan = { natural: boolean; naturalInput: boolean; locale: string };
 
 interface Props {
   token: string;
@@ -45,6 +51,8 @@ interface Props {
   extraTimePct: number;
   /** Unscored practice run: no integrity signals, no survey, practice wording. */
   practice?: boolean;
+  /** Natural voice per interview language (absent = browser speech only). */
+  speech?: Record<string, SpeechPlan>;
 }
 
 type IntegrityEvent = { type: "blur" | "paste" | "copy" | "fast_answer" | "camera_off"; payload?: Record<string, string | number | boolean> };
@@ -72,6 +80,8 @@ export function InterviewRoom(props: Props) {
   const [starting, setStarting] = useState(false);
   const [snippetOpen, setSnippetOpen] = useState(false);
   const base = sessionId ? `/api/c/${props.token}/sessions/${sessionId}` : "";
+  const sessionIdRef = useRef(sessionId);
+  sessionIdRef.current = sessionId;
   const integrity = useRef<IntegrityEvent[]>([]);
   const blurAt = useRef<number | null>(null);
   const typingStart = useRef<number | null>(null);
@@ -79,18 +89,54 @@ export function InterviewRoom(props: Props) {
   const chatEnd = useRef<HTMLDivElement>(null);
   const openedRef = useRef(false);
   const [language, setLanguage] = useState<string>(props.languages[0] ?? "en");
-  const speechLang = languageInfo(language).speech;
+  const plan: SpeechPlan = props.speech?.[language] ?? { natural: false, naturalInput: false, locale: languageInfo(language).speech };
+  const speechLang = plan.locale;
   // Detected after mount so server and first client render match (avoids a hydration mismatch in Chrome).
-  const [support, setSupport] = useState({ stt: false, tts: false });
-  useEffect(() => setSupport(voiceSupport()), []);
+  const [support, setSupport] = useState({ stt: false, tts: false, record: false });
+  useEffect(() => setSupport({ ...voiceSupport(), record: recordingSupported() }), []);
+  const cloudInput = plan.naturalInput && support.record;
+  const voiceOk = cloudInput || support.stt;
 
-  const dictation = useDictation(
+  const browserDictation = useDictation(
     useCallback((t: string) => {
       setInput((x) => (x ? `${x} ${t}` : t));
       if (!typingStart.current) typingStart.current = Date.now();
     }, []),
     speechLang,
   );
+  // Natural voice: the whole answer arrives at once, so time it from when the candidate started speaking.
+  const cloudDictation = useCloudDictation(
+    sessionId ? `/api/c/${props.token}/sessions/${sessionId}/transcribe` : "",
+    useCallback((t: string, spokenSec: number) => {
+      setInput((x) => (x ? `${x} ${t}` : t));
+      if (!typingStart.current) typingStart.current = Date.now() - spokenSec * 1000;
+    }, []),
+  );
+  const dictation = cloudInput ? { listening: cloudDictation.listening, interim: "", error: cloudDictation.error, start: cloudDictation.start, stop: cloudDictation.stop } : browserDictation;
+  const transcribing = cloudInput && cloudDictation.transcribing;
+
+  // The interviewer's voice: natural (cloud) when available, else the browser's; falls back if playback fails.
+  const speakerRef = useRef<CloudSpeaker | null>(null);
+  if (!speakerRef.current && typeof window !== "undefined") speakerRef.current = new CloudSpeaker((id) => `/api/c/${props.token}/sessions/${sessionIdRef.current}/speech/${id}`);
+  const say = useCallback(
+    (m: { serverId?: string; content: string }) => {
+      if (plan.natural && m.serverId && speakerRef.current) {
+        void speakerRef.current.speak(m.serverId).then((ok) => {
+          if (!ok) speak(m.content, speechLang);
+        });
+      } else speak(m.content, speechLang);
+    },
+    [plan.natural, speechLang],
+  );
+  const hush = useCallback(() => {
+    stopSpeaking();
+    speakerRef.current?.stop();
+  }, []);
+  useEffect(() => hush, [hush]);
+  // A language without voice support in this browser switches the choice back to text.
+  useEffect(() => {
+    if (mode === "voice" && !voiceOk && !sessionId) setMode("text");
+  }, [mode, voiceOk, sessionId]);
 
   /* ------------------------------ Load & stream ------------------------------ */
 
@@ -106,7 +152,7 @@ export function InterviewRoom(props: Props) {
       if (!base) return;
       setBusy(true);
       setError(null);
-      stopSpeaking();
+      hush();
       const aiId = `ai-${clientMsgId}`;
       setMessages((m) => {
         const next = m.filter((x) => x.id !== aiId && x.id !== `c-${clientMsgId}`);
@@ -116,6 +162,7 @@ export function InterviewRoom(props: Props) {
       });
       let full = "";
       let ended = false;
+      let aiServerId: string | undefined;
       try {
         await postSSE(`${base}/turns`, { clientMsgId, text, kind, inputMode: mode }, (type, data) => {
           const d = data as Record<string, unknown>;
@@ -126,12 +173,13 @@ export function InterviewRoom(props: Props) {
           else if (type === "state") applyState(d.state as PublicState);
           else if (type === "done") {
             ended = !!d.ended;
-            setMessages((m) => m.map((x) => (x.id === aiId ? { ...x, pending: false } : x)));
+            aiServerId = (d.aiMessageId as string | null) ?? undefined;
+            setMessages((m) => m.map((x) => (x.id === aiId ? { ...x, pending: false, serverId: aiServerId } : x)));
           } else if (type === "error") {
             throw Object.assign(new Error(String(d.message)), { retryable: !!d.retryable });
           }
         });
-        if (full && mode === "voice" && autoSpeak) speak(full, speechLang);
+        if (full && mode === "voice" && autoSpeak) say({ serverId: aiServerId, content: full });
         if (ended) setState((s) => (s ? { ...s, ended: true, status: "ended" } : s));
       } catch (e) {
         const err = e as Error & { retryable?: boolean; status?: number };
@@ -141,7 +189,7 @@ export function InterviewRoom(props: Props) {
         setBusy(false);
       }
     },
-    [base, mode, autoSpeak, applyState],
+    [base, mode, autoSpeak, applyState, hush, say],
   );
 
   const load = useCallback(async () => {
@@ -154,7 +202,7 @@ export function InterviewRoom(props: Props) {
     const data = await res.json();
     applyState(data.state);
     setWorkspace(data.workspace);
-    const msgs: ChatMessage[] = data.messages.map((m: { id: string; role: "ai" | "candidate"; content: string }) => ({ id: m.id, role: m.role, content: m.content }));
+    const msgs: ChatMessage[] = data.messages.map((m: { id: string; role: "ai" | "candidate"; content: string }) => ({ id: m.id, role: m.role, content: m.content, serverId: m.id }));
     setMessages(msgs);
     // Guard against double-open (React StrictMode runs effects twice in development).
     if (!data.state.ended && msgs.length === 0 && !openedRef.current) {
@@ -278,7 +326,7 @@ export function InterviewRoom(props: Props) {
           <div className="mt-4 space-y-2 text-sm">
             <Check ok label="Browser supports live interview streaming" />
             <Check ok={!props.hasExercises || wide} label={props.hasExercises ? "Screen is wide enough for the exercise panel (1024px+)" : "Screen size OK"} warn={props.hasExercises && !wide ? "Please use a laptop or desktop for this round." : undefined} />
-            <Check ok={support.stt && support.tts} label="Voice mode available in this browser" warn={!support.stt ? "Voice input needs Chrome or Edge. You can still use text." : undefined} />
+            <Check ok={voiceOk && (plan.natural || support.tts)} label={plan.natural ? "Voice mode available (natural interviewer voice)" : "Voice mode available in this browser"} warn={!voiceOk ? (plan.naturalInput ? "This browser can't record audio. You can still use text." : "Voice input needs Chrome or Edge. You can still use text.") : undefined} />
           </div>
           {props.languages.length > 1 && (
             <label className="mt-5 block text-sm">
@@ -297,14 +345,17 @@ export function InterviewRoom(props: Props) {
             <legend className="mb-2 text-sm font-medium">How would you like to answer?</legend>
             <div className="grid gap-2 sm:grid-cols-2">
               {(["text", "voice"] as const).map((m) => (
-                <label key={m} className={cx("cursor-pointer rounded-lg border p-3 text-sm", mode === m ? "border-brand-500 bg-brand-50" : "border-slate-200", m === "voice" && !support.stt && "cursor-not-allowed opacity-50")}>
-                  <input type="radio" name="mode" className="mr-2" disabled={m === "voice" && !support.stt} checked={mode === m} onChange={() => setMode(m)} />
+                <label key={m} className={cx("cursor-pointer rounded-lg border p-3 text-sm", mode === m ? "border-brand-500 bg-brand-50" : "border-slate-200", m === "voice" && !voiceOk && "cursor-not-allowed opacity-50")}>
+                  <input type="radio" name="mode" className="mr-2" disabled={m === "voice" && !voiceOk} checked={mode === m} onChange={() => setMode(m)} />
                   <b>{m === "text" ? "Text" : "Voice"}</b>
-                  <span className="mt-1 block text-xs text-slate-600">{m === "text" ? "Type your answers." : "The interviewer speaks; you answer by voice (you can edit the transcript before sending)."}</span>
+                  <span className="mt-1 block text-xs text-slate-600">{m === "text" ? "Type your answers." : cloudInput ? "The interviewer speaks; you record each answer, then check and edit the transcript before sending." : "The interviewer speaks; you answer by voice (you can edit the transcript before sending)."}</span>
                 </label>
               ))}
             </div>
           </fieldset>
+          {mode === "voice" && (plan.natural || cloudInput) && (
+            <p className="mt-3 text-xs text-slate-600">{`Voice is processed by our speech provider (Microsoft Azure): ${cloudInput ? "your recorded answers are turned into text and " : ""}the audio isn't kept — only the text appears in your interview record.`}</p>
+          )}
           <ul className="mt-5 list-disc space-y-1 pl-5 text-xs text-slate-500">
             <li>The timer starts when you click Start. Your progress is saved continuously — if you lose connection, reopen your link within 15 minutes.</li>
             <li>{`You can skip up to 3 questions and pause ${props.pauses.count === 2 ? "twice" : `${props.pauses.count} times`} (${props.pauses.minutes} minutes each).`}</li>
@@ -434,18 +485,18 @@ export function InterviewRoom(props: Props) {
                     }}
                   />
                   <div className="mt-2 flex flex-wrap items-center gap-2">
-                    <Button onClick={submitAnswer} disabled={busy || !input.trim()}>
+                    <Button onClick={submitAnswer} disabled={busy || transcribing || !input.trim()}>
                       {busy ? "Waiting…" : "Send"}
                     </Button>
                     {mode === "voice" && (
-                      <Button variant={dictation.listening ? "danger" : "secondary"} onClick={() => (dictation.listening ? dictation.stop() : (stopSpeaking(), dictation.start()))} disabled={busy}>
-                        {dictation.listening ? "● Stop mic" : "🎤 Speak"}
+                      <Button variant={dictation.listening ? "danger" : "secondary"} onClick={() => (dictation.listening ? dictation.stop() : (hush(), dictation.start()))} disabled={busy || transcribing}>
+                        {transcribing ? "Transcribing…" : dictation.listening ? (cloudInput ? `■ Done speaking ${fmt(cloudDictation.seconds)}` : "● Stop mic") : "🎤 Speak"}
                       </Button>
                     )}
                     <Button variant="ghost" disabled={busy} onClick={() => setSnippetOpen((x) => !x)} title="Write a code or SQL snippet into your answer">
                       {"</>"} Code
                     </Button>
-                    <Button variant="ghost" disabled={!lastAi} onClick={() => lastAi && (mode === "voice" ? speak(lastAi.content, speechLang) : document.getElementById(lastAi.id)?.scrollIntoView())}>
+                    <Button variant="ghost" disabled={!lastAi} onClick={() => lastAi && (mode === "voice" ? say(lastAi) : document.getElementById(lastAi.id)?.scrollIntoView())}>
                       Repeat
                     </Button>
                     <Button variant="ghost" disabled={busy || !state?.skipsLeft} onClick={() => confirm("Skip this question? Skipped questions count as not answered.") && sendTurn("skip", "")}>
@@ -458,7 +509,20 @@ export function InterviewRoom(props: Props) {
                     )}
                     <span className="ml-auto text-xs text-slate-500">{input.length}/4000</span>
                   </div>
-                  {dictation.error && <p className="mt-1 text-xs text-red-600">{dictation.error}</p>}
+                  {cloudInput && dictation.listening && (
+                    <div className="mt-2 flex items-center gap-2 text-xs text-slate-600">
+                      <span className="h-2 w-40 overflow-hidden rounded-full bg-slate-200" aria-hidden="true">
+                        <span className="block h-2 rounded-full bg-emerald-500 transition-[width] duration-75" style={{ width: `${Math.round(cloudDictation.level * 100)}%` }} />
+                      </span>
+                      <span role="status">Recording — speak naturally, then click Done speaking.</span>
+                    </div>
+                  )}
+                  {transcribing && (
+                    <p role="status" className="mt-1 text-xs text-slate-600">
+                      Turning your answer into text…
+                    </p>
+                  )}
+                  {dictation.error && <p className="mt-1 text-xs text-red-700">{dictation.error}</p>}
                 </>
               )}
             </div>

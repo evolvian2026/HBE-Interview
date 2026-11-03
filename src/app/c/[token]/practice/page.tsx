@@ -9,6 +9,7 @@ import { InterviewRoom } from "@/components/room/room";
 import { LIMITS } from "@/lib/core/interview";
 import { PRACTICE_INDEX, practiceRound } from "@/lib/core/practice";
 import { practiceSession } from "@/lib/services/practice";
+import { speechPlans } from "@/lib/speech/policy";
 
 export const dynamic = "force-dynamic";
 
@@ -25,6 +26,7 @@ export default async function PracticePage({ params }: { params: Promise<{ token
   const config = version.config as DriveConfig;
   const round = practiceRound(config);
   const brand = await getBranding(row.candidacy.orgId);
+  const speech = await speechPlans(row.candidacy.orgId, config.languages ?? ["en"]);
   return (
     <div style={brand.style as React.CSSProperties}>
       <InterviewRoom
@@ -44,6 +46,7 @@ export default async function PracticePage({ params }: { params: Promise<{ token
         initialSessionId={session?.status === "active" ? session.id : null}
         languages={config.languages ?? ["en"]}
         webcam={null}
+        speech={speech}
       />
     </div>
   );
